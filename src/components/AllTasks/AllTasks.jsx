@@ -1,37 +1,38 @@
 // src/components/AllTasks/AllTasks.jsx - Updated with new API endpoints and permissions
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { selectUserRole } from '../../redux/slices/authSlice';
-import { 
-  useGetTasksQuery,
-  useGetApprovedNotPublishedQuery,
-  useGetExpiringSoonQuery,
-  useAdvancedTaskSearchQuery, // NEW
-  useBulkTaskOperationsMutation, // NEW
-  useValidateFilesMutation, // NEW
-  useGetTaskHealthCheckQuery, // NEW
-  useUpdateTaskStatusMutation, // NEW
+import {
+    useGetTasksQuery,
+    useGetApprovedNotPublishedQuery,
+    useGetExpiringSoonQuery,
+    useAdvancedTaskSearchQuery,
+    useBulkTaskOperationsMutation,
+    useValidateFilesMutation,
+    useGetTaskHealthCheckQuery,
+    useUpdateTaskStatusMutation,
 } from '../../redux/api/tasksApi';
 import { hasPermission, PERMISSIONS } from '../../utils/roles';
-import { 
-  usePermissions, // Updated hook
-  CanReassignTask, // NEW
-  CanValidateFiles, // NEW
-  CanPerformBulkOperations, // NEW
-  CanViewHealthCheck, // NEW
-  CanViewDashboardStats, // NEW
+import {
+    usePermissions,
+    CanReassignTask,
+    CanValidateFiles,
+    CanPerformBulkOperations,
+    CanViewHealthCheck,
+    CanViewDashboardStats,
 } from '../PermissionWrapper';
 import CreateNewAdTask from '../Tasks/NewTask';
 import TaskDetailPanel from './TaskDetailPanel';
-import FileValidationModal from './FlieValidationModal'; // NEW - to be created
-import TaskReassignmentModal from './TaskReassignmentModal' // NEW - to be created
-import BulkOperationsModal from './BulkOperationsModal' // NEW - to be created
+import FileValidationModal from './FlieValidationModal';
+import TaskReassignmentModal from './TaskReassignmentModal'
+import BulkOperationsModal from './BulkOperationsModal'
 
 export default function AllTasksPage() {
     const navigate = useNavigate();
     const currentUserRole = useSelector(selectUserRole);
     const permissions = usePermissions();
+    const dispatch = useDispatch();
 
     const [filters, setFilters] = useState({
         taskType: '',
@@ -51,7 +52,7 @@ export default function AllTasksPage() {
         searchQuery: ''
     });
 
-    // NEW: Advanced search state
+    // Advanced search state
     const [advancedSearch, setAdvancedSearch] = useState({
         enabled: false,
         query: '',
@@ -66,26 +67,26 @@ export default function AllTasksPage() {
     const [selectedTaskForDetail, setSelectedTaskForDetail] = useState(null);
     const [showTaskDetail, setShowTaskDetail] = useState(false);
 
-    // NEW: Modal states for new features
+    // Modal states for new features
     const [showFileValidation, setShowFileValidation] = useState(false);
     const [showReassignment, setShowReassignment] = useState(false);
     const [showBulkOperations, setShowBulkOperations] = useState(false);
     const [bulkOperationType, setBulkOperationType] = useState('');
 
-    // NEW: Bulk operations mutation
-    const [performBulkOperation, { 
-        isLoading: isBulkLoading, 
-        error: bulkError 
+    // Bulk operations mutation
+    const [performBulkOperation, {
+        isLoading: isBulkLoading,
+        error: bulkError
     }] = useBulkTaskOperationsMutation();
 
-    // NEW: File validation mutation
-    const [validateFiles, { 
-        isLoading: isValidating 
+    // File validation mutation
+    const [validateFiles, {
+        isLoading: isValidating
     }] = useValidateFilesMutation();
 
-    // NEW: Status update mutation
-    const [updateTaskStatus, { 
-        isLoading: isUpdatingStatus 
+    // Status update mutation
+    const [updateTaskStatus, {
+        isLoading: isUpdatingStatus
     }] = useUpdateTaskStatusMutation();
 
     // Permission checks - Updated with new permissions
@@ -118,7 +119,7 @@ export default function AllTasksPage() {
         refetch: refetchExpiring
     } = useGetExpiringSoonQuery({ days: 15 });
 
-    // NEW: Advanced search query
+    // Advanced search query
     const {
         data: advancedSearchData,
         isLoading: isAdvancedSearchLoading,
@@ -130,16 +131,16 @@ export default function AllTasksPage() {
             page: filters.page,
             limit: filters.limit
         },
-        { 
+        {
             skip: !advancedSearch.enabled || !advancedSearch.query || !canAdvancedSearch
         }
     );
 
-    // NEW: Health check query for system monitoring
+    // Health check query for system monitoring
     const {
         data: healthCheckData,
         refetch: refetchHealthCheck
-    } = useGetTaskHealthCheckQuery(undefined, { 
+    } = useGetTaskHealthCheckQuery(undefined, {
         skip: !canViewHealthCheck,
         pollingInterval: 300000 // 5 minutes
     });
@@ -182,44 +183,44 @@ export default function AllTasksPage() {
 
     const { tasks, pagination, count, isLoading: currentLoading } = getCurrentData();
 
-    // Auto-refresh data
+
+    // Add focus handling to refresh data when tab becomes active
     useEffect(() => {
-        const interval = setInterval(() => {
-            switch (activeView) {
-                case 'approved-not-published':
-                    refetchApproved();
-                    break;
-                case 'expiring-soon':
-                    refetchExpiring();
-                    break;
-                default:
-                    refetch();
+        const handleFocus = () => {
+            if (document.visibilityState === 'visible') {
+                // Refresh current view when tab becomes visible
+                switch (activeView) {
+                    case 'approved-not-published':
+                        refetchApproved();
+                        break;
+                    case 'expiring-soon':
+                        refetchExpiring();
+                        break;
+                    default:
+                        refetch();
+                }
             }
-            // Also refresh health check
-            if (canViewHealthCheck) {
-                refetchHealthCheck();
-            }
-        }, 30000);
+        };
 
-        return () => clearInterval(interval);
-    }, [activeView, refetch, refetchApproved, refetchExpiring, refetchHealthCheck, canViewHealthCheck]);
-
+        document.addEventListener('visibilitychange', handleFocus);
+        return () => document.removeEventListener('visibilitychange', handleFocus);
+    }, [activeView, refetch, refetchApproved, refetchExpiring]);
     // Apply local filters to tasks
     const filteredData = useMemo(() => {
         return tasks.filter(task => {
-            const matchesCreatedBy = !localFilters.createdBy || 
+            const matchesCreatedBy = !localFilters.createdBy ||
                 task.createdBy?.fullName?.toLowerCase().includes(localFilters.createdBy.toLowerCase()) ||
                 task.createdBy?.toLowerCase().includes(localFilters.createdBy.toLowerCase());
-            
-            const matchesAssignedTo = !localFilters.assignedTo || 
-                task.assignedProducts?.some(product => 
+
+            const matchesAssignedTo = !localFilters.assignedTo ||
+                task.assignedProducts?.some(product =>
                     (typeof product === 'string' ? product : product.fullName)?.toLowerCase().includes(localFilters.assignedTo.toLowerCase())
                 );
-            
-            const matchesRefNo = !localFilters.refNo || 
+
+            const matchesRefNo = !localFilters.refNo ||
                 (task.uin && task.uin.toLowerCase().includes(localFilters.refNo.toLowerCase()));
-            
-            const matchesSearch = !localFilters.searchQuery || 
+
+            const matchesSearch = !localFilters.searchQuery ||
                 [task.title, task.description, task.uin, task.platform, task.category]
                     .some(value => value && value.toString().toLowerCase().includes(localFilters.searchQuery.toLowerCase()));
 
@@ -240,7 +241,7 @@ export default function AllTasksPage() {
         }
     };
 
-    // NEW: Handle advanced search
+    // Handle advanced search
     const handleAdvancedSearch = () => {
         if (advancedSearch.query.trim()) {
             setAdvancedSearch(prev => ({ ...prev, enabled: true }));
@@ -266,10 +267,10 @@ export default function AllTasksPage() {
     // Handle row selection with task detail logic
     const handleRowSelect = (id, task) => {
         setSelectedRows(prev => {
-            const newSelection = prev.includes(id) ? 
-                prev.filter(rowId => rowId !== id) : 
+            const newSelection = prev.includes(id) ?
+                prev.filter(rowId => rowId !== id) :
                 [...prev, id];
-            
+
             // Show task detail only if exactly one task is selected
             if (newSelection.length === 1) {
                 const selectedTask = paginatedData.find(t => t.id === newSelection[0]);
@@ -280,7 +281,7 @@ export default function AllTasksPage() {
                 setShowTaskDetail(false);
                 setSelectedTaskForDetail(null);
             }
-            
+
             return newSelection;
         });
     };
@@ -331,7 +332,7 @@ export default function AllTasksPage() {
         clearAdvancedSearch();
     };
 
-    // NEW: Handle bulk operations
+    // Handle bulk operations
     const handleBulkOperation = async (operation, data = {}) => {
         if (selectedRows.length === 0) return;
 
@@ -344,12 +345,12 @@ export default function AllTasksPage() {
 
             // Show success message
             console.log('Bulk operation completed:', result);
-            
+
             // Clear selection and refresh data
             setSelectedRows([]);
             setShowTaskDetail(false);
             setSelectedTaskForDetail(null);
-            
+
             // Refresh current view
             switch (activeView) {
                 case 'approved-not-published':
@@ -367,7 +368,7 @@ export default function AllTasksPage() {
         }
     };
 
-    // NEW: Handle file validation
+    // Handle file validation
     const handleFileValidation = async (files) => {
         try {
             const result = await validateFiles(files).unwrap();
@@ -388,8 +389,8 @@ export default function AllTasksPage() {
                 `"${task.title || ''}"`,
                 task.taskType || '',
                 task.createdBy?.fullName || task.createdBy || '',
-                `"${Array.isArray(task.assignedProducts) ? 
-                    task.assignedProducts.map(p => typeof p === 'string' ? p : p.fullName).join('; ') : 
+                `"${Array.isArray(task.assignedProducts) ?
+                    task.assignedProducts.map(p => typeof p === 'string' ? p : p.fullName).join('; ') :
                     ''}"`,
                 task.assignedCompliance?.fullName || task.assignedCompliance || '',
                 task.status || '',
@@ -493,7 +494,7 @@ export default function AllTasksPage() {
                         )}
                     </p>
                 </div>
-                <div className="flex gap-2">                    
+                <div className="flex gap-2">
                     <button className="btn btn-outline" onClick={handleExportCSV}>Export CSV</button>
                     <button className="btn btn-outline">Export Excel</button>
                 </div>
@@ -503,24 +504,19 @@ export default function AllTasksPage() {
             {canViewTaskBuckets && (
                 <div className="mb-6">
                     <div className="flex gap-2 mb-4">
-                        <button 
+                        <button
                             className={`btn btn-sm ${activeView === 'all' ? 'btn-primary' : 'btn-outline'}`}
                             onClick={() => handleViewChange('all')}
                         >
                             All Tasks
                         </button>
-                        <button 
+                        <button
                             className={`btn btn-sm ${activeView === 'approved-not-published' ? 'btn-primary' : 'btn-outline'}`}
                             onClick={() => handleViewChange('approved-not-published')}
                         >
                             Approved Not Published
                         </button>
-                        <button 
-                            className={`btn btn-sm ${activeView === 'expiring-soon' ? 'btn-primary' : 'btn-outline'}`}
-                            onClick={() => handleViewChange('expiring-soon')}
-                        >
-                            Expiring Soon
-                        </button>
+                         
                     </div>
                 </div>
             )}
@@ -534,9 +530,9 @@ export default function AllTasksPage() {
                     <div className="filter-grid">
                         <div>
                             <label className="info-label">Task Type</label>
-                            <select 
-                                className="select" 
-                                value={filters.taskType} 
+                            <select
+                                className="select"
+                                value={filters.taskType}
                                 onChange={(e) => handleFilterChange('taskType', e.target.value)}
                             >
                                 <option value="">All Task Types</option>
@@ -547,9 +543,9 @@ export default function AllTasksPage() {
 
                         <div>
                             <label className="info-label">Status</label>
-                            <select 
-                                className="select" 
-                                value={filters.status} 
+                            <select
+                                className="select"
+                                value={filters.status}
                                 onChange={(e) => handleFilterChange('status', e.target.value)}
                             >
                                 <option value="">All Status</option>
@@ -563,9 +559,9 @@ export default function AllTasksPage() {
 
                         <div>
                             <label className="info-label">Priority</label>
-                            <select 
-                                className="select" 
-                                value={filters.priority} 
+                            <select
+                                className="select"
+                                value={filters.priority}
                                 onChange={(e) => handleFilterChange('priority', e.target.value)}
                             >
                                 <option value="">All Priorities</option>
@@ -577,61 +573,61 @@ export default function AllTasksPage() {
 
                         <div>
                             <label className="info-label">Created By</label>
-                            <input 
-                                type="text" 
-                                className="input" 
-                                placeholder="Search by creator" 
-                                value={localFilters.createdBy} 
-                                onChange={(e) => handleFilterChange('createdBy', e.target.value)} 
+                            <input
+                                type="text"
+                                className="input"
+                                placeholder="Search by creator"
+                                value={localFilters.createdBy}
+                                onChange={(e) => handleFilterChange('createdBy', e.target.value)}
                             />
                         </div>
 
                         <div>
                             <label className="info-label">Assigned To</label>
-                            <input 
-                                type="text" 
-                                className="input" 
-                                placeholder="Search assignee" 
-                                value={localFilters.assignedTo} 
-                                onChange={(e) => handleFilterChange('assignedTo', e.target.value)} 
+                            <input
+                                type="text"
+                                className="input"
+                                placeholder="Search assignee"
+                                value={localFilters.assignedTo}
+                                onChange={(e) => handleFilterChange('assignedTo', e.target.value)}
                             />
                         </div>
 
                         <div>
                             <label className="info-label">Date From</label>
-                            <input 
-                                type="date" 
-                                className="input" 
-                                value={localFilters.dateFrom} 
-                                onChange={(e) => handleFilterChange('dateFrom', e.target.value)} 
+                            <input
+                                type="date"
+                                className="input"
+                                value={localFilters.dateFrom}
+                                onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
                             />
                         </div>
 
                         <div>
                             <label className="info-label">Date To</label>
-                            <input 
-                                type="date" 
-                                className="input" 
-                                value={localFilters.dateTo} 
-                                onChange={(e) => handleFilterChange('dateTo', e.target.value)} 
+                            <input
+                                type="date"
+                                className="input"
+                                value={localFilters.dateTo}
+                                onChange={(e) => handleFilterChange('dateTo', e.target.value)}
                             />
                         </div>
 
                         <div>
                             <label className="info-label">Search All</label>
-                            <input 
-                                type="text" 
-                                className="input" 
-                                placeholder="Search everything..." 
-                                value={localFilters.searchQuery} 
-                                onChange={(e) => handleFilterChange('searchQuery', e.target.value)} 
+                            <input
+                                type="text"
+                                className="input"
+                                placeholder="Search everything..."
+                                value={localFilters.searchQuery}
+                                onChange={(e) => handleFilterChange('searchQuery', e.target.value)}
                             />
                         </div>
                     </div>
 
                     <div className="filter-actions">
                         <div className="filter-summary">
-                            Showing {filteredData.length} of {count} tasks 
+                            Showing {filteredData.length} of {count} tasks
                             {activeView !== 'all' && ` (${activeView.replace('-', ' ')})`}
                             {advancedSearch.enabled && ` • Advanced search: "${advancedSearch.query}"`}
                         </div>
@@ -682,7 +678,7 @@ export default function AllTasksPage() {
                             {/* NEW: Bulk Operations */}
                             <CanPerformBulkOperations>
                                 <div className="flex gap-2">
-                                    <button 
+                                    <button
                                         className="btn btn-secondary btn-sm"
                                         onClick={() => {
                                             setBulkOperationType('bulk_status_update');
@@ -692,7 +688,7 @@ export default function AllTasksPage() {
                                     >
                                         Bulk Status Update
                                     </button>
-                                    <button 
+                                    <button
                                         className="btn btn-secondary btn-sm"
                                         onClick={() => {
                                             setBulkOperationType('bulk_assignment');
@@ -708,7 +704,7 @@ export default function AllTasksPage() {
                             {/* NEW: Individual Reassignment */}
                             <CanReassignTask>
                                 {selectedRows.length === 1 && (
-                                    <button 
+                                    <button
                                         className="btn btn-outline btn-sm"
                                         onClick={() => setShowReassignment(true)}
                                     >
@@ -717,7 +713,7 @@ export default function AllTasksPage() {
                                 )}
                             </CanReassignTask>
 
-                            <button 
+                            <button
                                 className="btn btn-ghost btn-sm"
                                 onClick={() => {
                                     setSelectedRows([]);
@@ -735,11 +731,11 @@ export default function AllTasksPage() {
                     <thead className="table-header">
                         <tr>
                             <th>
-                                <input 
-                                    type="checkbox" 
-                                    checked={selectedRows.length === paginatedData.length && paginatedData.length > 0} 
-                                    onChange={handleSelectAll} 
-                                    className="w-4 h-4 accent-blue-600" 
+                                <input
+                                    type="checkbox"
+                                    checked={selectedRows.length === paginatedData.length && paginatedData.length > 0}
+                                    onChange={handleSelectAll}
+                                    className="w-4 h-4 accent-blue-600"
                                 />
                             </th>
                             <th className="table-sortable">UIN</th>
@@ -754,16 +750,16 @@ export default function AllTasksPage() {
                     </thead>
                     <tbody className="table-body">
                         {paginatedData.length > 0 ? paginatedData.map((task) => (
-                            <tr 
-                                key={task.id} 
+                            <tr
+                                key={task.id}
                                 className={`group ${selectedRows.includes(task.id) ? 'bg-blue-50' : ''}`}
                             >
                                 <td>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={selectedRows.includes(task.id)} 
-                                        onChange={() => handleRowSelect(task.id, task)} 
-                                        className="w-4 h-4 accent-blue-600" 
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedRows.includes(task.id)}
+                                        onChange={() => handleRowSelect(task.id, task)}
+                                        className="w-4 h-4 accent-blue-600"
                                     />
                                 </td>
                                 <td className="font-medium">{task.uin}</td>
@@ -780,10 +776,9 @@ export default function AllTasksPage() {
                                 </td>
                                 <td>
                                     {task.priority && (
-                                        <span className={`badge ${
-                                            task.priority === 'HIGH' ? 'badge-error' : 
-                                            task.priority === 'MEDIUM' ? 'badge-warning' : 'badge-success'
-                                        }`}>
+                                        <span className={`badge ${task.priority === 'HIGH' ? 'badge-error' :
+                                                task.priority === 'MEDIUM' ? 'badge-warning' : 'badge-success'
+                                            }`}>
                                             {task.priority}
                                         </span>
                                     )}
@@ -817,7 +812,7 @@ export default function AllTasksPage() {
                                         </svg>
                                         <h3 className="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
                                         <p className="text-gray-500">
-                                            {activeView === 'all' ? 
+                                            {activeView === 'all' ?
                                                 'No tasks match your current filters. Try adjusting your search criteria.' :
                                                 `No ${activeView.replace('-', ' ')} tasks found.`
                                             }
@@ -889,7 +884,7 @@ export default function AllTasksPage() {
 
             {/* Task Detail Panel - Only show when exactly one task is selected */}
             {showTaskDetail && selectedTaskForDetail && selectedRows.length === 1 && (
-                <TaskDetailPanel 
+                <TaskDetailPanel
                     taskId={selectedTaskForDetail}
                     onClose={handleCloseTaskDetail}
                 />
@@ -902,7 +897,7 @@ export default function AllTasksPage() {
 
             {/* NEW: File Validation Modal */}
             {showFileValidation && (
-                <FileValidationModal 
+                <FileValidationModal
                     onClose={() => setShowFileValidation(false)}
                     onValidate={handleFileValidation}
                     isValidating={isValidating}
@@ -911,7 +906,7 @@ export default function AllTasksPage() {
 
             {/* NEW: Task Reassignment Modal */}
             {showReassignment && selectedRows.length === 1 && (
-                <TaskReassignmentModal 
+                <TaskReassignmentModal
                     taskId={selectedRows[0]}
                     onClose={() => setShowReassignment(false)}
                     onSuccess={() => {
@@ -923,7 +918,7 @@ export default function AllTasksPage() {
 
             {/* NEW: Bulk Operations Modal */}
             {showBulkOperations && (
-                <BulkOperationsModal 
+                <BulkOperationsModal
                     operationType={bulkOperationType}
                     selectedTasks={selectedRows}
                     onClose={() => setShowBulkOperations(false)}

@@ -223,91 +223,6 @@ const TaskDetailPanel = ({ taskId, onClose }) => {
             )}
         </div>
     );
-
-    const renderVersionsTab = () => (
-        <div className="task-detail-content">
-            <div className="task-detail-section">
-                <h4 className="task-detail-section-title">Version History</h4>
-                {task.versions && task.versions.length > 0 ? (
-                    <div className="space-y-3">
-                        {task.versions.map((version, index) => (
-                            <div key={index} className="border border-gray-200 rounded-lg p-4">
-                                <div className="flex justify-between items-start mb-2">
-                                    <span className="font-medium text-gray-900">Version {version.version}</span>
-                                    <span className="text-sm text-gray-500">{formatDate(version.createdAt)}</span>
-                                </div>
-                                {version.remarks && (
-                                    <p className="text-sm text-gray-600 mb-2">{version.remarks}</p>
-                                )}
-                                {version.files && version.files.length > 0 && (
-                                    <div className="space-y-1">
-                                        {version.files.map((file, fileIndex) => (
-                                            <a
-                                                key={fileIndex}
-                                                href={file.url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="exchange-file-link block"
-                                            >
-                                                {file.originalName || `File ${fileIndex + 1}`}
-                                            </a>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <p className="text-sm text-gray-500">No versions uploaded yet.</p>
-                )}
-            </div>
-        </div>
-    );
-
-    const renderCommentsTab = () => (
-        <div className="task-detail-content">
-            <div className="task-detail-section">
-                <h4 className="task-detail-section-title">Comments & Communication</h4>
-                {task.comments && task.comments.length > 0 ? (
-                    <div className="space-y-4">
-                        {task.comments.map((comment, index) => (
-                            <div key={index} className="border border-gray-200 rounded-lg p-4">
-                                <div className="flex items-start gap-3">
-                                    <div className="card-avatar-sm">
-                                        {comment.createdBy?.fullName?.split(' ').map(n => n[0]).join('') || 'U'}
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-medium text-gray-900">
-                                                {comment.createdBy?.fullName || 'Unknown User'}
-                                            </span>
-                                            <span className="text-sm text-gray-500">
-                                                {formatDate(comment.createdAt)}
-                                            </span>
-                                            {comment.isGlobal && (
-                                                <span className="badge badge-info badge-sm">Global</span>
-                                            )}
-                                        </div>
-                                        <div className="text-sm text-gray-700">
-                                            {comment.content}
-                                        </div>
-                                        {comment.requiresVersionUpdate && (
-                                            <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-                                                Version update requested
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <p className="text-sm text-gray-500">No comments yet.</p>
-                )}
-            </div>
-        </div>
-    );
-
     return (
         <div className="task-detail-panel">
             <div className="task-detail-header">
@@ -346,8 +261,7 @@ const TaskDetailPanel = ({ taskId, onClose }) => {
 
             <div className="task-detail-body">
                 {activeTab === 'overview' && renderOverviewTab()}
-                {activeTab === 'versions' && renderVersionsTab()}
-                {activeTab === 'comments' && renderCommentsTab()}
+                 
             </div>
         </div>
     );

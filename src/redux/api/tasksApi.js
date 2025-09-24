@@ -25,11 +25,11 @@ export const tasksApi = createApi({
   reducerPath: 'tasksApi',
   baseQuery: baseQueryWithReauth,
   tagTypes: ['Task', 'TaskBucket', 'TaskVersion', 'TaskComment', 'ExchangeApproval', 'TaskStats', 'TaskHealth'],
-  
+
   // Enhanced cache configuration
   keepUnusedDataFor: 60, // Keep cache for 1 minute
   refetchOnMountOrArgChange: 30, // Refetch if data is older than 30 seconds
-  
+
   endpoints: (builder) => ({
     // Enhanced getTasks with more specific cache invalidation
     getTasks: builder.query({
@@ -46,19 +46,17 @@ export const tasksApi = createApi({
         if (params.exchange) searchParams.append('exchange', params.exchange);
         if (params.dateFrom) searchParams.append('dateFrom', params.dateFrom);
         if (params.dateTo) searchParams.append('dateTo', params.dateTo);
-        
+
         return `?${searchParams.toString()}`;
       },
       providesTags: (result) =>
         result?.tasks
           ? [
-              ...result.tasks.map(({ id }) => ({ type: 'Task', id })),
-              { type: 'Task', id: 'LIST' }
-            ]
+            ...result.tasks.map(({ id }) => ({ type: 'Task', id })),
+            { type: 'Task', id: 'LIST' }
+          ]
           : [{ type: 'Task', id: 'LIST' }],
       transformResponse: (response) => response,
-      // Force refresh every 30 seconds for active data
-      pollingInterval: 30000,
     }),
 
     // Enhanced createTask with optimistic updates
@@ -69,7 +67,7 @@ export const tasksApi = createApi({
         body: taskData
       }),
       invalidatesTags: [
-        { type: 'Task', id: 'LIST' }, 
+        { type: 'Task', id: 'LIST' },
         { type: 'TaskBucket', id: 'LIST' },
         { type: 'TaskStats', id: 'DASHBOARD' }
       ],
@@ -102,12 +100,25 @@ export const tasksApi = createApi({
         body: { status, reason }
       }),
       // Immediate cache invalidation for real-time updates
-      invalidatesTags: (result, error, { id }) => [
-        { type: 'Task', id },
-        { type: 'Task', id: 'LIST' },
-        { type: 'TaskBucket', id: 'LIST' },
-        { type: 'TaskStats', id: 'DASHBOARD' }
-      ],
+      invalidatesTags: (result, error, { id }) => {
+        const tags = [{ type: 'Task', id }];
+
+        // Only invalidate specific buckets based on the new status
+        if (result?.data?.status === 'APPROVED') {
+          tags.push({ type: 'TaskBucket', id: 'APPROVED_NOT_PUBLISHED' });
+        }
+        if (result?.data?.status === 'PUBLISHED') {
+          tags.push({ type: 'TaskBucket', id: 'APPROVED_NOT_PUBLISHED' });
+          tags.push({ type: 'TaskBucket', id: 'EXPIRING_SOON' });
+        }
+
+        // Only invalidate list if status actually changed
+        if (result?.data?.previousStatus !== result?.data?.status) {
+          tags.push({ type: 'Task', id: 'LIST' });
+        }
+
+        return tags;
+      },
       // Optimistic cache update
       onQueryStarted: async ({ id, status }, { dispatch, queryFulfilled }) => {
         // Update individual task cache
@@ -120,28 +131,16 @@ export const tasksApi = createApi({
           })
         );
 
-        // Update tasks list cache
-        const listPatchResult = dispatch(
-          tasksApi.util.updateQueryData('getTasks', undefined, (draft) => {
-            if (draft?.tasks) {
-              const taskIndex = draft.tasks.findIndex(task => task.id === id);
-              if (taskIndex !== -1) {
-                draft.tasks[taskIndex].status = status;
-                draft.tasks[taskIndex].updatedAt = new Date().toISOString();
-              }
-            }
-          })
-        );
-
         try {
           await queryFulfilled;
         } catch {
           // Revert optimistic updates on error
           taskPatchResult.undo();
-          listPatchResult.undo();
         }
       },
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      refetchOnFocus: true,
+      refetchOnReconnect: true,
     }),
 
     // Enhanced classifyTask with cache updates
@@ -257,9 +256,9 @@ export const tasksApi = createApi({
       }),
       invalidatesTags: (result, error, { id }) => [
         { type: 'Task', id },
-        { type: 'Task', id: 'LIST' },
-        { type: 'TaskBucket', id: 'LIST' },
-        { type: 'TaskStats', id: 'DASHBOARD' }
+        { type: 'TaskBucket', id: 'APPROVED_NOT_PUBLISHED' },
+        // Only invalidate list for approved tasks
+        { type: 'Task', id: 'LIST' }
       ],
       // Optimistic approval update
       onQueryStarted: async ({ id, approvalDate, expiryDate, approvalProofUrl }, { dispatch, queryFulfilled }) => {
@@ -293,10 +292,10 @@ export const tasksApi = createApi({
       }),
       invalidatesTags: (result, error, { id }) => [
         { type: 'Task', id },
-        { type: 'Task', id: 'LIST' },
-        { type: 'TaskBucket', id: 'LIST' },
-        { type: 'TaskStats', id: 'DASHBOARD' }
+        { type: 'TaskBucket', id: 'APPROVED_NOT_PUBLISHED' },
+        { type: 'Task', id: 'LIST' }
       ],
+
       // Optimistic publish update
       onQueryStarted: async ({ id, publishDate, publishedCopyUrl }, { dispatch, queryFulfilled }) => {
         const patchResult = dispatch(
@@ -309,14 +308,15 @@ export const tasksApi = createApi({
             }
           })
         );
-
         try {
           await queryFulfilled;
         } catch {
           patchResult.undo();
         }
       },
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      refetchOnFocus: true,
+      refetchOnReconnect: true,
     }),
 
     // Enhanced closeTask with cache updates
@@ -438,23 +438,23 @@ export const tasksApi = createApi({
     getApprovedNotPublished: builder.query({
       query: () => 'buckets/approved-not-published',
       providesTags: [{ type: 'TaskBucket', id: 'APPROVED_NOT_PUBLISHED' }],
-      transformResponse: (response) => response,
-      pollingInterval: 60000, // Refresh every minute
+      transformResponse: (response) => response
     }),
 
     getExpiringSoon: builder.query({
       query: (days = 15) => `buckets/expiring-soon?days=${days}`,
       providesTags: [{ type: 'TaskBucket', id: 'EXPIRING_SOON' }],
       transformResponse: (response) => response,
-      pollingInterval: 300000, // Refresh every 5 minutes
+      refetchOnFocus: true,
+      refetchOnReconnect: true,
+
     }),
 
     // Dashboard stats with frequent updates
     getDashboardStats: builder.query({
       query: () => 'dashboard-stats',
       providesTags: [{ type: 'TaskStats', id: 'DASHBOARD' }],
-      transformResponse: (response) => response,
-      pollingInterval: 30000, // Refresh every 30 seconds
+      transformResponse: (response) => response
     }),
 
     // Advanced search with caching
@@ -465,7 +465,7 @@ export const tasksApi = createApi({
         if (params.type) searchParams.append('type', params.type);
         if (params.page) searchParams.append('page', params.page);
         if (params.limit) searchParams.append('limit', params.limit);
-        
+
         return `search/advanced?${searchParams.toString()}`;
       },
       providesTags: [{ type: 'Task', id: 'SEARCH' }],
@@ -482,8 +482,7 @@ export const tasksApi = createApi({
 
     getTeamOverview: builder.query({
       query: () => 'team-overview',
-      transformResponse: (response) => response,
-      pollingInterval: 120000, // Refresh every 2 minutes
+      transformResponse: (response) => response
     }),
 
     getPerformanceMetrics: builder.query({
@@ -500,8 +499,7 @@ export const tasksApi = createApi({
     getTaskHealthCheck: builder.query({
       query: () => 'health-check',
       providesTags: [{ type: 'TaskHealth', id: 'CHECK' }],
-      transformResponse: (response) => response,
-      pollingInterval: 300000, // Check every 5 minutes
+      transformResponse: (response) => response
     }),
 
     // Enhanced bulk operations with cache invalidation
@@ -518,9 +516,9 @@ export const tasksApi = createApi({
       ],
       // Optimistic updates for bulk operations
       onQueryStarted: async ({ operation, taskIds, ...data }, { dispatch, queryFulfilled }) => {
-        // Apply optimistic updates based on operation type
+        // Only update individual task caches for status updates
         if (operation === 'bulk_status_update' && data.status) {
-          const patchResults = taskIds.map(id => 
+          const patchResults = taskIds.map(id =>
             dispatch(
               tasksApi.util.updateQueryData('getTaskById', id, (draft) => {
                 if (draft) {
@@ -534,12 +532,8 @@ export const tasksApi = createApi({
           try {
             await queryFulfilled;
           } catch {
-            // Revert all optimistic updates on error
             patchResults.forEach(patch => patch.undo());
           }
-        } else {
-          // For other operations, just wait for completion
-          await queryFulfilled;
         }
       },
       transformResponse: (response) => response
@@ -569,7 +563,7 @@ export const {
   useGetApprovedNotPublishedQuery,
   useGetExpiringSoonQuery,
   useBulkTaskOperationsMutation,
-  
+
   // Backend endpoint hooks
   useUpdateTaskStatusMutation,
   useClassifyTaskMutation,

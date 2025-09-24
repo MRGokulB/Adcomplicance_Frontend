@@ -5,7 +5,6 @@ import { useSelector } from "react-redux";
 import { selectUserRole } from "../../redux/slices/authSlice";
 import { useGetTaskByIdQuery } from "../../redux/api/tasksApi";
 import { hasPermission, PERMISSIONS } from "../../utils/roles";
-import { useTaskSync } from "../../hooks/useTaskSync";
 import TaskHeader from "./TaskHeader/TaskHeader";
 import VersionControl from "./VersionControl/VersionControl";
 import ExchangeApproval from "./ExchangeApproval/ExchangeApproval";
@@ -20,36 +19,19 @@ const TaskMain = () => {
 
   // Enhanced task query with better error handling
   const {
-    data: task,
-    isLoading,
-    isError,
-    error,
-    refetch,
-    isFetching
-  } = useGetTaskByIdQuery(taskId, {
-    skip: !taskId,
-    refetchOnMountOrArgChange: true,
-    // Reduce polling when task is closed or published
-    pollingInterval: (data) => {
-      if (!data) return 30000; // Default 30s
-      const status = data.status;
-      if (status === 'PUBLISHED' || status?.includes('CLOSED')) {
-        return 300000; // 5 minutes for closed/published tasks
-      }
-      return 30000; // 30s for active tasks
-    },
-  });
-
-  // Real-time sync hook
-  const { refresh, broadcastUpdate, optimisticUpdate } = useTaskSync({
-    taskId,
-    autoRefresh: true,
-    refreshInterval: 30000,
-    onUpdate: (updates) => {
-      setLastSyncTime(new Date());
-      console.log('Task updated:', updates);
-    }
-  });
+  data: task,
+  isLoading,
+  isError,
+  error,
+  refetch,
+  isFetching
+} = useGetTaskByIdQuery(taskId, {
+  skip: !taskId,
+  refetchOnMountOrArgChange: true,
+  refetchOnFocus: true,
+  refetchOnReconnect: true
+});
+ 
 
   // Permission checks
   const canViewTask = hasPermission(userRole, PERMISSIONS.TASK_READ_ALL) ||
@@ -77,41 +59,35 @@ const TaskMain = () => {
 
   // Monitor connection status
   useEffect(() => {
-    const handleOnline = () => {
-      setIsConnected(true);
-      refresh(); // Refresh when connection is restored
-    };
-    
-    const handleOffline = () => setIsConnected(false);
+  const handleOnline = () => {
+    setIsConnected(true);
+    refetch(); // Use refetch instead
+  };
+  
+  const handleOffline = () => setIsConnected(false);
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+  window.addEventListener('online', handleOnline);
+  window.addEventListener('offline', handleOffline);
 
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, [refresh]);
+  return () => {
+    window.removeEventListener('online', handleOnline);
+    window.removeEventListener('offline', handleOffline);
+  };
+}, [refetch]);
 
   // Enhanced refresh with better error handling
   const handleRefresh = async () => {
-    try {
-      setLastSyncTime(new Date());
-      await refetch();
-      
-      // Broadcast update to other components
-      broadcastUpdate({ 
-        taskId: task?.id, 
-        status: task?.status,
-        refreshed: true 
-      });
-      
+  try {
+    setLastSyncTime(new Date());
+    const result = await refetch();
+    if (result.data) {
       setIsConnected(true);
-    } catch (error) {
-      console.error('Failed to refresh task:', error);
-      setIsConnected(false);
     }
-  };
+  } catch (error) {
+    console.error('Failed to refresh task:', error);
+    setIsConnected(false);
+  }
+};
 
   // Auto-retry mechanism for failed requests
   useEffect(() => {

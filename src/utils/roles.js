@@ -35,14 +35,14 @@ export const PERMISSIONS = {
   TASK_UPDATE_OWN: 'task:update:own',
   TASK_UPDATE_STATUS: 'task:update:status',
   TASK_ASSIGN: 'task:assign',
-  TASK_REASSIGN: 'task:reassign', // NEW - Missing from current setup
+  TASK_REASSIGN: 'task:reassign', 
   TASK_APPROVE: 'task:approve',
   TASK_REJECT: 'task:reject',
   TASK_PUBLISH: 'task:publish',
   TASK_CLASSIFY: 'task:classify',
   TASK_CLOSE: 'task:close',
   TASK_FOLLOW_UP: 'task:follow_up',
-  TASK_VALIDATE_FILES: 'task:validate_files', // NEW - Missing from current setup
+  TASK_VALIDATE_FILES: 'task:validate_files', 
 
   // Task Buckets - From backend
   TASK_VIEW_BUCKETS: 'task:view_buckets',
