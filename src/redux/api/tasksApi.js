@@ -139,7 +139,7 @@ export const tasksApi = createApi({
         }
       },
       transformResponse: (response) => response,
-      refetchOnFocus: true,
+       //refetchOnFocus: true,
       refetchOnReconnect: true,
     }),
 
@@ -315,7 +315,7 @@ export const tasksApi = createApi({
         }
       },
       transformResponse: (response) => response,
-      refetchOnFocus: true,
+      // //refetchOnFocus: true,
       refetchOnReconnect: true,
     }),
 
@@ -445,7 +445,7 @@ export const tasksApi = createApi({
       query: (days = 15) => `buckets/expiring-soon?days=${days}`,
       providesTags: [{ type: 'TaskBucket', id: 'EXPIRING_SOON' }],
       transformResponse: (response) => response,
-      refetchOnFocus: true,
+       //refetchOnFocus: true,
       refetchOnReconnect: true,
 
     }),

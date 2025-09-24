@@ -16,7 +16,7 @@ import { usePermissions } from '../../../components/PermissionWrapper';
 import { CanReassignTask } from '../../../components/PermissionWrapper';
 import TaskReassignmentModal from '../../AllTasks/TaskReassignmentModal';
 
-const TaskHeader = ({ task, onRefresh }) => {
+const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
   const userRole = useSelector(selectUserRole);
   const currentUser = useSelector(selectCurrentUser);
   const permissions = usePermissions();
@@ -26,7 +26,7 @@ const TaskHeader = ({ task, onRefresh }) => {
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [showCommentsSidebar, setShowCommentsSidebar] = useState(false);
   const [showReassignment, setShowReassignment] = useState(false);
-  const [comment, setComment] = useState('');
+  
   const [followUpMessage, setFollowUpMessage] = useState('');
   
   // Status-specific modals
@@ -219,14 +219,14 @@ const TaskHeader = ({ task, onRefresh }) => {
       'APPROVED': 'Task approved by compliance',
       'PUBLISHED': 'Task published successfully'
     };
-
     try {
       await updateTaskStatus({
         id: task.id,
         status: newStatus,
         reason: defaultReasons[newStatus] || `Status changed to ${newStatus}`
       }).unwrap();
-      onRefresh?.();
+      //onRefresh?.();
+      // refetch?.();
     } catch (error) {
       console.error('Failed to update status:', error);
       alert(error?.data?.message || 'Failed to update status');
@@ -241,7 +241,7 @@ const TaskHeader = ({ task, onRefresh }) => {
         id: task.id,
         taskType: newTaskType
       }).unwrap();
-      onRefresh?.();
+      //onRefresh?.();
     } catch (error) {
       console.error('Failed to classify task:', error);
       alert(error?.data?.message || 'Failed to classify task');
@@ -263,7 +263,7 @@ const TaskHeader = ({ task, onRefresh }) => {
       }).unwrap();
       
       setShowApprovalModal(false);
-      onRefresh?.();
+      //onRefresh?.();
     } catch (error) {
       console.error('Failed to approve task:', error);
       alert(error?.data?.message || 'Failed to approve task');

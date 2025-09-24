@@ -12,6 +12,7 @@ import ExchangeApproval from "./ExchangeApproval/ExchangeApproval";
 const TaskMain = () => {
   const { taskId } = useParams();
   const userRole = useSelector(selectUserRole);
+  const [comment, setComment] = useState('');
   
   // Local state for connection status
   const [isConnected, setIsConnected] = useState(true);
@@ -262,7 +263,7 @@ const TaskMain = () => {
       )}
 
       {/* Task Header - Always visible */}
-      <TaskHeader task={task} onRefresh={handleRefresh} />
+      <TaskHeader task={task} refetch={refetch} comment={comment} setComment={setComment} onRefresh={handleRefresh} />
       
       {/* Version Control Section - Show for all classified tasks */}
       {task.taskType && (
