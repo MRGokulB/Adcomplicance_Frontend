@@ -1,17 +1,47 @@
-// src/components/AllTasks/TaskReassignmentModal.jsx
+// src/components/AllTasks/TaskReassignmentModal.jsx - Role-based assignment restrictions
 import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import { selectUserRole, selectCurrentUser } from '../../redux/slices/authSlice';
 import { 
   useReassignTaskMutation, 
   useGetAssignmentOptionsQuery 
 } from '../../redux/api/tasksApi';
+import { USER_ROLES, hasPermission, PERMISSIONS } from '../../utils/roles';
 
 const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
+  const currentUser = useSelector(selectCurrentUser);
+  const userRole = useSelector(selectUserRole);
+
+  // Determine available assignment types based on user role
+  const getAvailableAssignmentTypes = () => {
+    switch (userRole) {
+      case USER_ROLES.PRODUCT_ADMIN:
+        return [{ value: 'PRODUCT', label: 'Product Team' }];
+      case USER_ROLES.COMPLIANCE_ADMIN:
+        return [{ value: 'COMPLIANCE', label: 'Compliance Team' }];
+      case USER_ROLES.ADMIN:
+      case USER_ROLES.SENIOR_MANAGER:
+        return [
+          { value: 'COMPLIANCE', label: 'Compliance Team' },
+          { value: 'PRODUCT', label: 'Product Team' }
+        ];
+      default:
+        return [];
+    }
+  };
+
+  const availableAssignmentTypes = getAvailableAssignmentTypes();
+  const defaultAssignmentType = availableAssignmentTypes.length > 0 ? availableAssignmentTypes[0].value : '';
+
   const [assignmentData, setAssignmentData] = useState({
-    assignType: 'COMPLIANCE', // 'COMPLIANCE' or 'PRODUCT'
+    assignType: defaultAssignmentType,
     userId: '',
     reason: ''
   });
   const [error, setError] = useState('');
+
+  // Check if user has permission to reassign tasks
+  const canReassign = hasPermission(userRole, PERMISSIONS.TASK_REASSIGN);
 
   // Get assignment options based on type
   const {
@@ -20,15 +50,25 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
     refetch: refetchOptions
   } = useGetAssignmentOptionsQuery(
     { id: taskId, type: assignmentData.assignType },
-    { skip: !taskId }
+    { skip: !taskId || !assignmentData.assignType }
   );
 
   // Reassignment mutation
   const [reassignTask, { isLoading: isReassigning }] = useReassignTaskMutation();
 
+  // Update default assignment type when available types change
+  useEffect(() => {
+    if (availableAssignmentTypes.length > 0 && !assignmentData.assignType) {
+      setAssignmentData(prev => ({
+        ...prev,
+        assignType: availableAssignmentTypes[0].value
+      }));
+    }
+  }, [availableAssignmentTypes, assignmentData.assignType]);
+
   // Refetch options when assignment type changes
   useEffect(() => {
-    if (taskId) {
+    if (taskId && assignmentData.assignType) {
       refetchOptions();
     }
   }, [assignmentData.assignType, refetchOptions, taskId]);
@@ -41,6 +81,11 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
   const handleReassign = async () => {
     if (!assignmentData.userId) {
       setError('Please select a user to assign the task to');
+      return;
+    }
+
+    if (!canReassign) {
+      setError('You do not have permission to reassign tasks');
       return;
     }
 
@@ -60,10 +105,73 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
   };
 
   const handleClose = () => {
-    setAssignmentData({ assignType: 'COMPLIANCE', userId: '', reason: '' });
+    setAssignmentData({ 
+      assignType: defaultAssignmentType, 
+      userId: '', 
+      reason: '' 
+    });
     setError('');
     onClose();
   };
+
+  // Don't render if user doesn't have permission
+  if (!canReassign) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+          <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose}></div>
+          <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div className="bg-white px-4 pt-5 pb-4 sm:p-6">
+              <div className="flex items-center justify-center">
+                <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                  <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+              </div>
+              <div className="mt-3 text-center">
+                <h3 className="text-lg font-medium text-gray-900">Access Denied</h3>
+                <p className="mt-2 text-sm text-gray-500">
+                  You do not have permission to reassign tasks. Contact your administrator if you believe this is an error.
+                </p>
+              </div>
+            </div>
+            <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              <button onClick={onClose} className="btn btn-primary sm:w-auto w-full">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if no assignment types are available
+  if (availableAssignmentTypes.length === 0) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+          <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose}></div>
+          <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div className="bg-white px-4 pt-5 pb-4 sm:p-6">
+              <div className="text-center">
+                <h3 className="text-lg font-medium text-gray-900">No Assignment Options</h3>
+                <p className="mt-2 text-sm text-gray-500">
+                  No assignment options are available for your role.
+                </p>
+              </div>
+            </div>
+            <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              <button onClick={onClose} className="btn btn-primary sm:w-auto w-full">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -84,6 +192,7 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
                 <button
                   onClick={handleClose}
                   className="text-gray-400 hover:text-gray-600"
+                  disabled={isReassigning}
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -91,23 +200,42 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
                 </button>
               </div>
 
+               
+
               <p className="text-sm text-gray-600 mb-4">
-                Reassign this task to a different team member. Select the assignment type and user below.
+                Select a team member to reassign this task to.
               </p>
 
-              {/* Assignment Type Selection */}
-              <div className="mb-4">
-                <label className="info-label">Assignment Type</label>
-                <select
-                  value={assignmentData.assignType}
-                  onChange={(e) => handleInputChange('assignType', e.target.value)}
-                  className="select"
-                  disabled={isReassigning}
-                >
-                  <option value="COMPLIANCE">Compliance Team</option>
-                  <option value="PRODUCT">Product Team</option>
-                </select>
-              </div>
+              {/* Assignment Type Selection - Only show if multiple options available */}
+              {availableAssignmentTypes.length > 1 && (
+                <div className="mb-4">
+                  <label className="info-label">Assignment Type</label>
+                  <select
+                    value={assignmentData.assignType}
+                    onChange={(e) => handleInputChange('assignType', e.target.value)}
+                    className="select"
+                    disabled={isReassigning}
+                  >
+                    {availableAssignmentTypes.map(type => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Show current assignment type if only one option */}
+              {availableAssignmentTypes.length === 1 && (
+                <div className="mb-4">
+                  <label className="info-label">Assignment Type</label>
+                  <div className="p-2 bg-gray-50 border border-gray-200 rounded-md">
+                    <span className="text-sm font-medium text-gray-900">
+                      {availableAssignmentTypes[0].label}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* User Selection */}
               <div className="mb-4">
@@ -131,28 +259,16 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
                       <option key={user.id || user._id} value={user.id || user._id}>
                         {user.fullName || user.name} 
                         {user.email && ` (${user.email})`}
-                        {user.workload && ` - ${user.workload} active tasks`}
+                        {user.workload && ` - ${user.workload.total || user.workload} active tasks`}
                       </option>
                     ))}
                   </select>
                 )}
 
-                {/* User recommendations */}
-                {assignmentOptions?.recommendations && assignmentOptions.recommendations.length > 0 && (
-                  <div className="mt-2 p-2 bg-blue-50 rounded-lg">
-                    <p className="text-xs font-medium text-blue-800 mb-1">Recommended:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {assignmentOptions.recommendations.slice(0, 3).map((rec) => (
-                        <button
-                          key={rec.id || rec._id}
-                          onClick={() => handleInputChange('userId', rec.id || rec._id)}
-                          className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                          disabled={isReassigning}
-                        >
-                          {rec.fullName || rec.name} ({rec.workload || 0} tasks)
-                        </button>
-                      ))}
-                    </div>
+                {/* Show total available users */}
+                {assignmentOptions?.total && (
+                  <div className="mt-1 text-xs text-gray-500">
+                    {assignmentOptions.total} {assignmentData.assignType.toLowerCase()} users available
                   </div>
                 )}
               </div>
@@ -167,13 +283,22 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
                   className="input"
                   rows={3}
                   disabled={isReassigning}
+                  maxLength={500}
                 />
+                <div className="text-xs text-gray-500 mt-1">
+                  {assignmentData.reason.length}/500 characters
+                </div>
               </div>
 
               {/* Error Display */}
               {error && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-700">{error}</p>
+                  <div className="flex">
+                    <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-sm text-red-700">{error}</p>
+                  </div>
                 </div>
               )}
 
@@ -181,14 +306,25 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
               {assignmentData.userId && assignmentOptions?.users && (
                 <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                   <h4 className="text-sm font-medium text-gray-900 mb-2">Assignment Summary</h4>
-                  <div className="text-sm text-gray-600">
-                    <p><strong>Type:</strong> {assignmentData.assignType === 'COMPLIANCE' ? 'Compliance Review' : 'Product Team'}</p>
-                    <p><strong>Assignee:</strong> {
-                      assignmentOptions.users.find(u => (u.id || u._id) === assignmentData.userId)?.fullName || 
-                      assignmentOptions.users.find(u => (u.id || u._id) === assignmentData.userId)?.name || 
-                      'Selected user'
-                    }</p>
-                    {assignmentData.reason && <p><strong>Reason:</strong> {assignmentData.reason}</p>}
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <div>
+                      <span className="font-medium">Type:</span> {assignmentData.assignType === 'COMPLIANCE' ? 'Compliance Review' : 'Product Team'}
+                    </div>
+                    <div>
+                      <span className="font-medium">Assignee:</span> {
+                        assignmentOptions.users.find(u => (u.id || u._id) === assignmentData.userId)?.fullName || 
+                        assignmentOptions.users.find(u => (u.id || u._id) === assignmentData.userId)?.name || 
+                        'Selected user'
+                      }
+                    </div>
+                    {assignmentData.reason && (
+                      <div>
+                        <span className="font-medium">Reason:</span> {assignmentData.reason}
+                      </div>
+                    )}
+                    <div>
+                      <span className="font-medium">Performed by:</span> {currentUser?.fullName || currentUser?.username || 'You'}
+                    </div>
                   </div>
                 </div>
               )}
@@ -199,7 +335,9 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
               <button
                 onClick={handleReassign}
                 disabled={isReassigning || !assignmentData.userId}
-                className="btn btn-primary sm:ml-3 sm:w-auto w-full"
+                className={`btn sm:ml-3 sm:w-auto w-full ${
+                  !assignmentData.userId ? 'btn-secondary' : 'btn-primary'
+                }`}
               >
                 {isReassigning ? (
                   <>
@@ -210,7 +348,7 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
                     Reassigning...
                   </>
                 ) : (
-                  'Reassign Task'
+                  `Reassign Task`
                 )}
               </button>
               <button

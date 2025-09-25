@@ -14,8 +14,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     title: '',
     description: '',
     category: '',
-    platform: '',
-    // Removed expectedPublishDate
+    platform: '', 
     assignedProductIds: [],
     selectedFiles: [],
     remarks: ''
