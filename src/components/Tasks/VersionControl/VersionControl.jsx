@@ -1,15 +1,16 @@
-// src/components/Tasks/VersionControl/VersionControl.jsx - Manual status workflow only
+// src/components/Tasks/VersionControl/VersionControl.jsx - Fixed Upload New Version functionality
 import React, { useState, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUserRole, selectCurrentUser } from '../../../redux/slices/authSlice';
 import { 
   useUploadVersionMutation,
   useAddCommentMutation,
-  useValidateFilesMutation
+  useValidateFilesMutation,
 } from '../../../redux/api/tasksApi';
 import { 
   useUploadFileMutation,
-  useUploadFilesMutation 
+  useUploadFilesMutation,
+  useValidateUrlsMutation 
 } from '../../../redux/api/uploadApi';
 import { usePermissions } from '../../../components/PermissionWrapper';
 import { CanValidateFiles } from '../../../components/PermissionWrapper';
@@ -24,18 +25,22 @@ const VersionControl = ({ task, onRefresh }) => {
   const [uploadData, setUploadData] = useState({
     files: [],
     remarks: '',
-    comment: ''
+    comment: '',
+    s3Urls: [] // Add this to track S3 URLs
   });
   const [versionComment, setVersionComment] = useState('');
   const [previewMode, setPreviewMode] = useState(false);
   const [validationResults, setValidationResults] = useState(null);
   const [showValidationResults, setShowValidationResults] = useState(false);
 
-  // API mutations
-  const [uploadVersion, { isLoading: isUploadingVersion }] = useUploadVersionMutation();
+  // API mutations - ALTERNATIVE PATTERN TO AVOID HOOK ISSUES
+  const [uploadVersionTrigger, uploadVersionResult] = useUploadVersionMutation();
   const [addComment, { isLoading: isAddingComment }] = useAddCommentMutation();
   const [uploadFiles, { isLoading: isUploadingFiles }] = useUploadFilesMutation();
-  const [validateFiles, { isLoading: isValidating }] = useValidateFilesMutation();
+  const [validateUrls, { isLoading: isValidating }] = useValidateUrlsMutation();
+
+  // Track loading state manually
+  const isUploadingVersion = uploadVersionResult.isLoading;
 
   // Get latest version
   const latestVersion = task?.versions && task.versions.length > 0 
@@ -124,7 +129,8 @@ const VersionControl = ({ task, onRefresh }) => {
     
     setUploadData(prev => ({
       ...prev,
-      files: files
+      files: files,
+      s3Urls: [] // Clear previous S3 URLs when new files selected
     }));
     
     // Clear previous validation results
@@ -139,105 +145,130 @@ const VersionControl = ({ task, onRefresh }) => {
     }));
   };
 
+  // FIXED: Proper file validation flow
   const handleValidateFiles = async () => {
-    if (uploadData.files.length === 0) {
-      alert('Please select files to validate');
-      return;
-    }
-
     try {
-      // Convert files to URLs for validation
-      const fileUrls = uploadData.files.map(file => URL.createObjectURL(file));
+      console.log('Starting file validation...', uploadData.files.length, 'files');
       
-      const result = await validateFiles(fileUrls).unwrap();
-      setValidationResults(result);
-      setShowValidationResults(true);
-      
-      // Clean up URLs
-      fileUrls.forEach(url => URL.revokeObjectURL(url));
+      // Step 1: Prepare FormData for upload
+      const formData = new FormData();
+      uploadData.files.forEach((file) => {
+        formData.append("files", file);
+      });
 
-    } catch (error) {
-      console.error('File validation failed:', error);
-      setValidationResults({
-        valid: false,
-        message: error?.data?.message || 'Validation failed',
-        errors: ['Validation service unavailable']
+      // Step 2: Upload to S3
+      console.log('Uploading files to S3...');
+      const uploadRes = await uploadFiles(formData).unwrap();
+      console.log('Upload response:', uploadRes);
+      
+      if (!uploadRes.files || uploadRes.files.length === 0) {
+        throw new Error('No files were uploaded successfully');
+      }
+
+      // Step 3: Extract S3 URLs
+      const s3Urls = uploadRes.files.map(f => f.url);
+      console.log('Extracted S3 URLs:', s3Urls);
+
+      // Step 4: Validate S3 URLs using the validate-urls endpoint
+      console.log('Validating S3 URLs...');
+      const validationRes = await validateUrls(s3Urls).unwrap();
+      console.log('Validation response:', validationRes);
+      
+      // Step 5: Update state with results
+      setValidationResults(validationRes);
+      setShowValidationResults(true);
+
+      // Step 6: Store the validated S3 URLs for version creation
+      setUploadData(prev => ({ 
+        ...prev, 
+        s3Urls: s3Urls,
+        uploadedFiles: uploadRes.files // Store full file details
+      }));
+
+      console.log('File validation completed successfully');
+
+    } catch (err) {
+      console.error("Validation error:", err);
+      const errorMessage = err?.data?.message || err?.message || 'Validation failed';
+      setValidationResults({ 
+        valid: false, 
+        message: errorMessage,
+        error: err?.data?.error || 'Unknown error'
       });
       setShowValidationResults(true);
+      
+      // Clear S3 URLs on error
+      setUploadData(prev => ({ ...prev, s3Urls: [] }));
     }
   };
 
-  // Version upload with NO automatic status change (per documentation)
+  // ENHANCED: Version upload with better error logging
   const handleFileUpload = async () => {
+  console.log("Starting version upload...");  
+    
+  try {
+    // Check permissions and validation first
     if (!canUserUploadVersion()) {
-      alert('You do not have permission to upload versions at this time');
+      alert("You do not have permission to upload versions at this time");
       return;
     }
 
-    if (uploadData.files.length === 0) {
-      alert('Please select files to upload');
+    if (!uploadData.s3Urls || uploadData.s3Urls.length === 0) {
+      alert("Please validate files before uploading a version.");
       return;
     }
 
-    if (uploadData.files.length > 5) {
-      alert('Maximum 5 files allowed per version');
+    // Ensure we have validation results and they are valid
+    if (!validationResults || validationResults.invalid > 0) {
+      alert("Files must pass validation before creating a version.");
       return;
     }
 
-    // Pre-validation check if validation results exist and files are invalid
-    if (validationResults && !validationResults.valid && !confirm('Files failed validation. Do you want to proceed anyway?')) {
-      return;
-    }
+    console.log('Creating version with S3 URLs:', uploadData.s3Urls);
 
-    try {
-      // Step 1: Upload files to get URLs
-      const formData = new FormData();
-      uploadData.files.forEach(file => {
-        formData.append('files', file);
-      });
+    // Prepare payload for version creation
+    const versionPayload = {
+      id: task.id,
+      files: uploadData.s3Urls,
+      remarks: uploadData.remarks?.trim() || `New version with ${uploadData.s3Urls.length} file(s)`
+    };
 
-      const uploadResult = await uploadFiles(formData).unwrap();
-      const fileUrls = uploadResult.files || uploadResult.urls || [];
+    console.log('Version payload:', versionPayload);
 
-      if (!fileUrls || fileUrls.length === 0) {
-        throw new Error('No file URLs returned from upload');
-      }
+    // Create version
+    const result = await uploadVersionTrigger(versionPayload).unwrap();
 
-      // Step 2: Create version with file URLs (NO status change)
-      const versionResult = await uploadVersion({
-        id: task.id,
-        files: fileUrls,
-        remarks: uploadData.remarks || `Version upload by ${currentUser?.fullName || 'user'}`
-      }).unwrap();
-
-      // Show success message with manual status guidance
+    if (result.success) {
+      // Show success message with guidance
       const guidance = getUploadGuidance();
       alert(`Version uploaded successfully! ${guidance.message}`);
 
-      // Clear form and refresh
-      setUploadData({ files: [], remarks: '', comment: '' });
+      // Reset form
+      setUploadData({
+        files: [],
+        remarks: '',
+        comment: '',
+        s3Urls: []
+      });
       setValidationResults(null);
       setShowValidationResults(false);
+      setPreviewMode(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-      
-      onRefresh?.();
 
-    } catch (error) {
-      console.error('Failed to upload version:', error);
-      
-      let errorMessage = 'Failed to upload version.';
-      if (error?.data?.message) {
-        errorMessage += ` ${error.data.message}`;
-      } else if (error?.message) {
-        errorMessage += ` ${error.message}`;
-      }
-      errorMessage += ' Please try again.';
-      
-      alert(errorMessage);
+      // Refresh task data
+      onRefresh?.();
+    } else {
+      throw new Error(result.message || 'Failed to create version');
     }
-  };
+
+  } catch (error) {
+    console.error("Version upload failed:", error);
+    const errorMessage = error?.data?.message || error?.message || 'Failed to create version';
+    alert(`Version upload failed: ${errorMessage}`);
+  }
+};
 
   const handleAddVersionComment = async () => {
     if (!versionComment.trim() || !latestVersion) return;
@@ -329,6 +360,13 @@ const VersionControl = ({ task, onRefresh }) => {
 
   const uploadGuidance = getUploadGuidance();
   const canUpload = canUserUploadVersion();
+
+  // Check if files are ready for version upload - FIXED: Handle numeric valid count
+  const filesReadyForUpload = uploadData.s3Urls.length > 0 && 
+    validationResults && 
+    (validationResults.valid === true || 
+     (typeof validationResults.valid === 'number' && validationResults.valid > 0)) &&
+    validationResults.invalid === 0;
 
   return (
     <div>
@@ -515,9 +553,9 @@ const VersionControl = ({ task, onRefresh }) => {
                   <button 
                     className="btn btn-outline btn-sm"
                     onClick={handleValidateFiles}
-                    disabled={isValidating}
+                    disabled={isValidating || isUploadingFiles}
                   >
-                    {isValidating ? 'Validating...' : 'Validate Files'}
+                    {isValidating ? 'Validating...' : isUploadingFiles ? 'Uploading...' : 'Validate Files'}
                   </button>
                 )}
               </CanValidateFiles>
@@ -532,8 +570,6 @@ const VersionControl = ({ task, onRefresh }) => {
           </div>
           <div className="card-body">
             
-             
-
             {canUpload ? (
               <>
                 <input
@@ -568,29 +604,56 @@ const VersionControl = ({ task, onRefresh }) => {
                 {/* Validation Results */}
                 {showValidationResults && validationResults && (
                   <div className={`mb-3 p-3 border rounded ${
-                    validationResults.valid ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                    (validationResults.valid === true || 
+                     (typeof validationResults.valid === 'number' && validationResults.valid > 0 && validationResults.invalid === 0))
+                     ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
                   }`}>
                     <div className={`text-sm font-medium mb-2 ${
-                      validationResults.valid ? 'text-green-800' : 'text-red-800'
+                      (validationResults.valid === true || 
+                       (typeof validationResults.valid === 'number' && validationResults.valid > 0 && validationResults.invalid === 0))
+                       ? 'text-green-800' : 'text-red-800'
                     }`}>
-                      {validationResults.valid ? '✓ Files Validated Successfully' : '⚠ Validation Issues Found'}
+                      {(validationResults.valid === true || 
+                        (typeof validationResults.valid === 'number' && validationResults.valid > 0 && validationResults.invalid === 0))
+                        ? '✓ Files Validated Successfully' : '⚠ Validation Issues Found'}
                     </div>
                     <div className={`text-sm ${
-                      validationResults.valid ? 'text-green-700' : 'text-red-700'
+                      (validationResults.valid === true || 
+                       (typeof validationResults.valid === 'number' && validationResults.valid > 0 && validationResults.invalid === 0))
+                       ? 'text-green-700' : 'text-red-700'
                     }`}>
                       {validationResults.message || (
-                        validationResults.valid 
-                          ? `All ${uploadData.files.length} files passed validation` 
+                        (validationResults.valid === true || 
+                         (typeof validationResults.valid === 'number' && validationResults.valid > 0 && validationResults.invalid === 0))
+                          ? `${typeof validationResults.valid === 'number' ? validationResults.valid : uploadData.files.length} files uploaded and validated` 
                           : 'Some files failed validation checks'
                       )}
                     </div>
-                    {validationResults.errors && validationResults.errors.length > 0 && (
-                      <ul className="text-sm text-red-600 mt-2 list-disc list-inside">
-                        {validationResults.errors.map((error, index) => (
-                          <li key={index}>{error}</li>
-                        ))}
-                      </ul>
+                    {filesReadyForUpload && uploadData.s3Urls.length > 0 && (
+                      <div className="text-xs text-green-600 mt-1">
+                        Ready to create version with {uploadData.s3Urls.length} file(s)
+                      </div>
                     )}
+                    {validationResults.results && 
+     validationResults.invalid === 0 && 
+     validationResults.valid > 0 && (
+      <div className="mt-3">
+        <div className="text-sm font-medium text-green-800 mb-2">Validation Details:</div>
+        <ul className="text-sm text-green-600 list-disc list-inside space-y-1">
+          {validationResults.results.map((result, index) => (
+            <li key={index}>
+              ✓ {uploadData.files[index]?.name || `File ${index + 1}`} - {
+                result.metadata ? 
+                  `${result.metadata.contentType || 'Unknown type'} (${
+                    result.metadata.size ? formatFileSize(result.metadata.size) : 'Unknown size'
+                  })` : 
+                  'Validated successfully'
+              }
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
                   </div>
                 )}
 
@@ -602,7 +665,12 @@ const VersionControl = ({ task, onRefresh }) => {
                       Ready to upload {uploadData.files.length} file{uploadData.files.length !== 1 ? 's' : ''} 
                       {uploadData.remarks && ` with remarks: "${uploadData.remarks}"`}
                       <br />
-                     </div>
+                      {filesReadyForUpload ? (
+                        <span className="text-green-700 font-medium">✓ Files validated and ready for version creation</span>
+                      ) : (
+                        <span className="text-orange-700">⚠ Please validate files before creating version</span>
+                      )}
+                    </div>
                   </div>
                 )}
                 
@@ -614,11 +682,14 @@ const VersionControl = ({ task, onRefresh }) => {
                 />
                 
                 <button 
-                  className="btn btn-primary w-full"
+                  className={`btn w-full ${
+                    filesReadyForUpload ? 'btn-primary' : 'btn-secondary'
+                  }`}
                   onClick={handleFileUpload}
-                  disabled={isUploadingVersion || isUploadingFiles || uploadData.files.length === 0}
+                  disabled={isUploadingVersion || !filesReadyForUpload}
                 >
-                  {isUploadingVersion || isUploadingFiles ? 'Uploading...' : 'Upload Version'}
+                  {isUploadingVersion ? 'Creating Version...' : 
+                   filesReadyForUpload ? 'Create Version' : 'Validate Files First'}
                 </button>
 
                 {/* Upload Instructions */}
@@ -626,6 +697,7 @@ const VersionControl = ({ task, onRefresh }) => {
                   <p className="mb-1">• Supported formats: PDF, DOC, DOCX, JPG, PNG, GIF, MP4, AVI, MOV</p>
                   <p className="mb-1">• Maximum 5 files per version</p>
                   <p className="mb-1">• Maximum file size: 50MB per file</p> 
+                  <p className="mb-1">• Step 1: Select files → Step 2: Validate → Step 3: Create version</p>
                 </div>
               </>
             ) : (
