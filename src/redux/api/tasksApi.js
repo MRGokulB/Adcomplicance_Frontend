@@ -81,6 +81,19 @@ export const tasksApi = createApi({
       }
     }),
 
+    updateTaskName: builder.mutation({
+      query: ({ id, title }) => ({
+        url: `${id}/name`,
+        method: 'PUT',
+        body: { title }
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: 'Task', id },
+        { type: 'Task', id: 'LIST' }
+      ],
+      transformResponse: (response) => response
+    }),
+
     // Enhanced getTaskById with better caching
     getTaskById: builder.query({
       query: (id) => id,
@@ -139,7 +152,7 @@ export const tasksApi = createApi({
         }
       },
       transformResponse: (response) => response,
-       //refetchOnFocus: true,
+      //refetchOnFocus: true,
       refetchOnReconnect: true,
     }),
 
@@ -445,7 +458,7 @@ export const tasksApi = createApi({
       query: (days = 15) => `buckets/expiring-soon?days=${days}`,
       providesTags: [{ type: 'TaskBucket', id: 'EXPIRING_SOON' }],
       transformResponse: (response) => response,
-       //refetchOnFocus: true,
+      //refetchOnFocus: true,
       refetchOnReconnect: true,
 
     }),
