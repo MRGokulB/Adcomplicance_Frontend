@@ -81,18 +81,6 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
 
   const unreadNotificationsCount = summary.unread;
 
-  // Debug logging (remove in production)
-  React.useEffect(() => {
-    console.log('Sidebar Debug:', {
-      counts,
-      notificationsData,
-      summary,
-      unreadCount: unreadNotificationsCount,
-      isCountsLoading,
-      countsError
-    });
-  }, [counts, notificationsData, summary, unreadNotificationsCount, isCountsLoading, countsError]);
-
   // Dynamic navigation items based on user role
   const getNavigationItems = () => {
     const items = [];
