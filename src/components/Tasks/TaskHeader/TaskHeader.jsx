@@ -921,42 +921,64 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
 
       {/* Closure Modal */}
       {showClosureModal && (
-        <div className="modal-overlay" onClick={() => setShowClosureModal(false)}>
-          <div className="modal max-w-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="text-lg font-semibold text-gray-900">Close Task</h3>
-              <button onClick={() => setShowClosureModal(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              <div className="mb-4">
-                <p className="text-sm text-gray-600">
-                  Closing task as: <strong>{closureType?.replace('_', ' ')}</strong>
-                </p>
-              </div>
-              <div>
-                <label className="exchange-form-label">Closure Comments *</label>
-                <textarea
-                  className="input resize-none min-h-[100px]"
-                  placeholder="Please explain the reason for closure..."
-                  value={formData.closureComments}
-                  onChange={(e) => setFormData(prev => ({ ...prev, closureComments: e.target.value }))}
-                  required
-                />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowClosureModal(false)}>Cancel</button>
-              <button
-                className="btn btn-error"
-                onClick={handleClosureSubmit}
-                disabled={isClosing || !formData.closureComments.trim()}
-              >
-                {isClosing ? 'Closing...' : 'Close Task'}
-              </button>
-            </div>
-          </div>
+  <div className="modal-overlay" onClick={() => setShowClosureModal(false)}>
+    <div className="modal max-w-lg" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-header">
+        <h3 className="text-lg font-semibold text-gray-900">
+          {closureType === 'CLOSED_INTERNAL' ? 'Close Internal Task' : 'Close Exchange Task'}
+        </h3>
+        <button onClick={() => setShowClosureModal(false)}>×</button>
+      </div>
+      <div className="modal-body">
+        <div className="mb-4">
+          <p className="text-sm text-gray-600">
+            Closing task as: <strong>
+              {closureType === 'CLOSED_INTERNAL' ? 'Internal Closure' : 'Exchange Closure'}
+            </strong>
+          </p>
+          {closureType === 'CLOSED_INTERNAL' && (
+            <p className="text-xs text-gray-500 mt-1">
+              This will mark the task as resolved internally without exchange submission.
+            </p>
+          )}
+          {closureType === 'CLOSED_EXCHANGE' && (
+            <p className="text-xs text-gray-500 mt-1">
+              This will mark the task as closed due to exchange-related issues.
+            </p>
+          )}
         </div>
-      )}
+        <div>
+          <label className="exchange-form-label">Closure Comments *</label>
+          <textarea
+            className="input resize-none min-h-[100px]"
+            placeholder={
+              closureType === 'CLOSED_INTERNAL' 
+                ? "Explain why this task is being resolved internally..."
+                : "Explain the exchange-related reason for closure..."
+            }
+            value={formData.closureComments}
+            onChange={(e) => setFormData(prev => ({ ...prev, closureComments: e.target.value }))}
+            required
+          />
+        </div>
+      </div>
+      <div className="modal-footer">
+        <button className="btn btn-secondary" onClick={() => setShowClosureModal(false)}>
+          Cancel
+        </button>
+        <button
+          className="btn btn-error"
+          onClick={handleClosureSubmit}
+          disabled={isClosing || !formData.closureComments.trim()}
+        >
+          {isClosing ? 'Closing...' : 
+            (closureType === 'CLOSED_INTERNAL' ? 'Close Internal' : 'Close Exchange')
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Follow-Up Modal */}
       {showFollowUp && (
