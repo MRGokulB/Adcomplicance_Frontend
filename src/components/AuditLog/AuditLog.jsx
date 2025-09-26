@@ -411,12 +411,7 @@ const AuditLog = () => {
                     <td>
                       <span className="font-medium text-gray-900">
                         {log.performedBy?.name || 'System'}
-                      </span>
-                      {log.performedBy?.username && (
-                        <div className="text-xs text-gray-500">
-                          @{log.performedBy.username}
-                        </div>
-                      )}
+                      </span> 
                     </td>
                     <td>
                       <span className={getRoleBadgeClass(log.performedBy?.role)}>
@@ -432,9 +427,7 @@ const AuditLog = () => {
                           >
                             {log.task.uin}
                           </button>
-                          <div className="text-xs text-gray-500 truncate max-w-32">
-                            {log.task.title}
-                          </div>
+                           
                         </div>
                       ) : (
                         <span className="text-gray-500">-</span>

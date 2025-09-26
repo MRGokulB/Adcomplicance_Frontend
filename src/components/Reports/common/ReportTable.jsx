@@ -109,7 +109,7 @@ const ReportTable = ({
   const renderSortIcon = (columnId) => {
     if (sortConfig.key !== columnId) {
       return (
-        <span className="table-sort-icon neutral">
+        <span className="ml-1 text-gray-400">
           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 12 12">
             <path d="M6 3l3 3H3l3-3zM6 9L3 6h6l-3 3z"/>
           </svg>
@@ -118,8 +118,15 @@ const ReportTable = ({
     }
     
     return (
-      <span className={`table-sort-icon ${sortConfig.direction}`}>
-        {sortConfig.direction === 'asc' ? '↑' : '↓'}
+      <span className={`ml-1 text-blue-600`}>
+        {sortConfig.direction === 'asc' ? 
+          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 12 12">
+            <path d="M6 3l3 3H3l3-3z"/>
+          </svg> : 
+          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 12 12">
+            <path d="M6 9L3 6h6l-3 3z"/>
+          </svg>
+        }
       </span>
     );
   };
@@ -133,56 +140,121 @@ const ReportTable = ({
     }
     
     // Auto-format based on column type or value
-    if (column.type === 'status' || column.id === 'status' || column.id === 'approvalStatus') {
+    if (column.type === 'status' || column.id === 'status' || column.id === 'approvalStatus' || column.id === 'taskStatus') {
       const statusClass = String(value).toLowerCase().replace(/[\s_]+/g, '');
       return (
-        <span className={`report-status-pill ${statusClass}`}>
-          {value}
+        <span className={`badge ${getStatusBadgeClass(statusClass)}`}>
+          {String(value).replace(/_/g, ' ')}
         </span>
       );
     }
     
-    if (column.type === 'date' || column.id.includes('Date')) {
-      if (!value || value === '-') return '-';
+    if (column.type === 'date' || column.id.includes('Date') || column.id === 'createdAt' || column.id === 'approvalDate' || column.id === 'expiryDate') {
+      if (!value || value === '-') return <span className="text-gray-500">-</span>;
       try {
-        return new Date(value).toLocaleDateString();
+        return <span className="text-sm text-gray-700">{new Date(value).toLocaleDateString()}</span>;
       } catch {
-        return value;
+        return <span className="text-sm text-gray-700">{value}</span>;
       }
     }
     
     if (column.type === 'number' || typeof value === 'number') {
-      if (value == null) return '-';
-      return Number(value).toLocaleString();
+      if (value == null) return <span className="text-gray-500">-</span>;
+      return <span className="text-sm text-gray-900 font-medium">{Number(value).toLocaleString()}</span>;
     }
     
     if (column.type === 'currency') {
-      if (value == null) return '-';
-      return new Intl.NumberFormat('en-US', { 
-        style: 'currency', 
-        currency: 'USD' 
-      }).format(value);
+      if (value == null) return <span className="text-gray-500">-</span>;
+      return <span className="text-sm text-gray-900 font-medium">
+        {new Intl.NumberFormat('en-US', { 
+          style: 'currency', 
+          currency: 'USD' 
+        }).format(value)}
+      </span>;
     }
     
     if (column.type === 'percentage') {
-      if (value == null) return '-';
-      return `${Number(value).toFixed(1)}%`;
+      if (value == null) return <span className="text-gray-500">-</span>;
+      return <span className="text-sm text-gray-900 font-medium">{Number(value).toFixed(1)}%</span>;
     }
     
     if (column.type === 'boolean') {
-      return value ? 'Yes' : 'No';
+      return <span className="text-sm text-gray-700">{value ? 'Yes' : 'No'}</span>;
+    }
+
+    // Handle role display
+    if (column.id === 'role' || column.id === 'userRole') {
+      return <span className={getRoleBadgeClass(value)}>{String(value).replace('_', ' ')}</span>;
+    }
+
+    // Handle UIN with clickable styling
+    if (column.id === 'uin') {
+      return <span className="font-medium text-gray-900">{value}</span>;
+    }
+
+    // Handle names and titles
+    if (column.id === 'fullName' || column.id === 'createdBy' || column.id === 'performedBy' || column.id === 'assignedTo' || column.id === 'updatedBy') {
+      return <span className="font-medium text-gray-900">{value || '-'}</span>;
+    }
+
+    // Handle titles with truncation
+    if (column.id === 'title') {
+      if (typeof value === 'string' && value.length > 50) {
+        return (
+          <span className="text-gray-900" title={value}>
+            {value.substring(0, 47)}...
+          </span>
+        );
+      }
+      return <span className="text-gray-900">{value || '-'}</span>;
     }
     
-    // Truncate long text
-    if (typeof value === 'string' && value.length > 50) {
-      return (
-        <span title={value}>
-          {value.substring(0, 47)}...
-        </span>
-      );
+    // Default text formatting
+    return <span className="text-sm text-gray-700">{value || '-'}</span>;
+  };
+
+  // Get status badge class similar to AuditLog
+  const getStatusBadgeClass = (status) => {
+    switch (status) {
+      case 'approved':
+      case 'published':
+        return 'badge-success';
+      case 'pending':
+      case 'productreview':
+      case 'compliancereview':
+        return 'badge-warning';
+      case 'rejected':
+      case 'closedin':
+      case 'closedinternal':
+      case 'closedexchange':
+        return 'badge-error';
+      case 'open':
+        return 'badge-secondary';
+      default:
+        return 'badge-primary';
     }
-    
-    return value || '-';
+  };
+
+  // Get role badge class similar to AuditLog
+  const getRoleBadgeClass = (role) => {
+    switch (role) {
+      case 'PRODUCT_USER':
+        return 'badge badge-primary';
+      case 'COMPLIANCE_USER':
+        return 'badge badge-warning';
+      case 'PRODUCT_ADMIN':
+        return 'badge badge-success';
+      case 'COMPLIANCE_ADMIN':
+        return 'badge badge-info';
+      case 'SENIOR_MANAGER':
+        return 'badge badge-secondary';
+      case 'ADMIN':
+        return 'badge badge-error';
+      case 'SYSTEM':
+        return 'badge badge-secondary';
+      default:
+        return 'badge badge-secondary';
+    }
   };
 
   // Handle pagination
@@ -199,8 +271,8 @@ const ReportTable = ({
 
   if (isLoading) {
     return (
-      <div className="report-table-container">
-        <div className="text-center py-8">
+      <div className="card">
+        <div className="card-body text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-2 text-gray-600">Loading data...</p>
         </div>
@@ -210,23 +282,25 @@ const ReportTable = ({
 
   if (!data.length) {
     return (
-      <div className="report-empty">
-        <div className="report-empty-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
+      <div className="card">
+        <div className="card-body text-center py-12">
+          <div className="table-empty">
+            <svg className="table-empty-icon" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+            </svg>
+            <h3 className="table-empty-title">No Data Found</h3>
+            <p className="table-empty-description">{emptyMessage}</p>
+          </div>
         </div>
-        <h3 className="report-empty-title">No Data Found</h3>
-        <p className="report-empty-description">{emptyMessage}</p>
       </div>
     );
   }
 
   return (
-    <div className="report-table-container">
+    <div>
       {/* Table Actions */}
       {(selectable || actions.length > 0) && (
-        <div className="flex items-center justify-between mb-4 p-3 bg-gray-50 rounded-lg">
+        <div className="flex items-center justify-between mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
           {selectable && (
             <div className="flex items-center gap-3">
               <span className="text-sm text-gray-600">
@@ -254,7 +328,7 @@ const ReportTable = ({
             <select
               value={rowsPerPage}
               onChange={(e) => setRowsPerPage(Number(e.target.value))}
-              className="border border-gray-300 rounded px-2 py-1 text-sm"
+              className="select"
             >
               <option value={10}>10</option>
               <option value={20}>20</option>
@@ -265,127 +339,129 @@ const ReportTable = ({
         </div>
       )}
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="report-table">
-          <thead className="report-table-header">
-            <tr>
-              {selectable && (
-                <th className="w-12">
-                  <input
-                    type="checkbox"
-                    checked={selectedRows.size === paginatedData.length && paginatedData.length > 0}
-                    onChange={handleSelectAll}
-                    className="rounded border-gray-300"
-                  />
-                </th>
-              )}
-              {columns.map(column => (
-                <th 
-                  key={column.id}
-                  className={`${column.sortable ? 'table-sortable' : ''} ${column.width ? `w-${column.width}` : ''}`}
-                  onClick={column.sortable ? () => handleSort(column.id) : undefined}
-                  style={{ minWidth: column.minWidth }}
-                >
-                  <div className="flex items-center gap-1">
-                    {column.label}
-                    {column.sortable && renderSortIcon(column.id)}
-                  </div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="report-table-body">
-            {paginatedData.map(row => (
-              <tr 
-                key={row.id}
-                className={`${selectedRows.has(row.id) ? 'bg-blue-50' : ''} hover:bg-gray-50`}
-              >
+      {/* Table - Using same classes as AuditLog */}
+      <div className="card">
+        <div className="table-container">
+          <table className="table table-modern">
+            <thead className="table-header">
+              <tr>
                 {selectable && (
-                  <td>
+                  <th>
                     <input
                       type="checkbox"
-                      checked={selectedRows.has(row.id)}
-                      onChange={() => handleRowSelect(row.id)}
-                      className="rounded border-gray-300"
+                      checked={selectedRows.size === paginatedData.length && paginatedData.length > 0}
+                      onChange={handleSelectAll}
+                      className="w-4 h-4 accent-blue-600"
                     />
-                  </td>
+                  </th>
                 )}
                 {columns.map(column => (
-                  <td key={`${row.id}-${column.id}`} className={column.className}>
-                    {renderCell(row, column)}
-                  </td>
+                  <th 
+                    key={column.id}
+                    className={`${column.sortable ? 'table-sortable cursor-pointer select-none hover:bg-gray-100' : ''} ${column.width ? `w-${column.width}` : ''}`}
+                    onClick={column.sortable ? () => handleSort(column.id) : undefined}
+                    style={{ minWidth: column.minWidth }}
+                  >
+                    <div className="flex items-center">
+                      {column.label}
+                      {column.sortable && renderSortIcon(column.id)}
+                    </div>
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="table-body">
+              {paginatedData.map(row => (
+                <tr 
+                  key={row.id}
+                  className={`group ${selectedRows.has(row.id) ? 'bg-blue-50' : ''}`}
+                >
+                  {selectable && (
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedRows.has(row.id)}
+                        onChange={() => handleRowSelect(row.id)}
+                        className="w-4 h-4 accent-blue-600"
+                      />
+                    </td>
+                  )}
+                  {columns.map(column => (
+                    <td key={`${row.id}-${column.id}`} className={column.className}>
+                      {renderCell(row, column)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
-          <div className="text-sm text-gray-700">
-            Showing {((currentPageData - 1) * (pagination?.limit || rowsPerPage)) + 1} to{' '}
-            {Math.min(currentPageData * (pagination?.limit || rowsPerPage), data.length)} of{' '}
-            {pagination?.total || data.length} results
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => handlePageChange(currentPageData - 1)}
-              disabled={currentPageData === 1}
-              className="btn btn-outline btn-sm"
-            >
-              Previous
-            </button>
-            
-            {/* Page numbers */}
-            <div className="flex space-x-1">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPageData <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPageData > totalPages - 3) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPageData - 2 + i;
-                }
-                
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => handlePageChange(pageNum)}
-                    className={`px-3 py-1 text-sm rounded ${
-                      pageNum === currentPageData
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-6 p-4 border-t border-gray-200">
+            <div className="text-sm text-gray-700">
+              Showing {((currentPageData - 1) * (pagination?.limit || rowsPerPage)) + 1} to{' '}
+              {Math.min(currentPageData * (pagination?.limit || rowsPerPage), data.length)} of{' '}
+              {pagination?.total || data.length} results
             </div>
             
-            <button
-              onClick={() => handlePageChange(currentPageData + 1)}
-              disabled={currentPageData === totalPages}
-              className="btn btn-outline btn-sm"
-            >
-              Next
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => handlePageChange(currentPageData - 1)}
+                disabled={currentPageData === 1}
+                className="btn btn-outline btn-sm"
+              >
+                Previous
+              </button>
+              
+              {/* Page numbers */}
+              <div className="flex space-x-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPageData <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPageData > totalPages - 3) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPageData - 2 + i;
+                  }
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`px-3 py-1 text-sm rounded ${
+                        pageNum === currentPageData
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              
+              <button
+                onClick={() => handlePageChange(currentPageData + 1)}
+                disabled={currentPageData === totalPages}
+                className="btn btn-outline btn-sm"
+              >
+                Next
+              </button>
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* Table Footer Info */}
-      <div className="mt-4 text-xs text-gray-500 text-center">
-        {sortConfig.key && (
-          <span>Sorted by {columns.find(c => c.id === sortConfig.key)?.label} ({sortConfig.direction})</span>
         )}
+
+        {/* Table Footer Info */}
+        <div className="p-3 text-xs text-gray-500 text-center border-t border-gray-100">
+          {sortConfig.key && (
+            <span>Sorted by {columns.find(c => c.id === sortConfig.key)?.label} ({sortConfig.direction === 'asc' ? 'ascending' : 'descending'})</span>
+          )}
+        </div>
       </div>
     </div>
   );

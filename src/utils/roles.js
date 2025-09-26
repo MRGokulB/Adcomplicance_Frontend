@@ -136,7 +136,7 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.TASK_REJECT,
     PERMISSIONS.TASK_PUBLISH,
     PERMISSIONS.TASK_CLASSIFY,
-    PERMISSIONS.TASK_CLOSE,
+    //PERMISSIONS.TASK_CLOSE,
     PERMISSIONS.TASK_FOLLOW_UP,
     PERMISSIONS.TASK_VALIDATE_FILES, // NEW
     PERMISSIONS.TASK_VIEW_BUCKETS,
@@ -272,6 +272,7 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.TASK_APPROVE,
     PERMISSIONS.TASK_REJECT,
     PERMISSIONS.TASK_CLASSIFY,
+    PERMISSIONS.TASK_CLOSE,
     PERMISSIONS.TASK_FOLLOW_UP,
     PERMISSIONS.TASK_VIEW_BUCKETS,
     PERMISSIONS.TASK_VIEW_DASHBOARD_STATS, // NEW
@@ -476,14 +477,33 @@ export const canExportAudit = (userRole) => {
   return hasPermission(userRole, PERMISSIONS.AUDIT_EXPORT)
 }
 
-export const canClassifyOrReclassifyTask = (userRole, task = null) => {
+export const canClassifyOrReclassifyTask = (userRole, task = null, currentUserId = null) => {
   if (!hasPermission(userRole, PERMISSIONS.TASK_CLASSIFY)) {
     return false
-  } 
-  if (task && task.taskType) {
-    return [USER_ROLES.COMPLIANCE_ADMIN, USER_ROLES.ADMIN].includes(userRole)
   }
-  return true
+  
+  // If task is provided and already classified, check if user can reclassify
+  if (task && task.taskType) {
+    // FIXED: COMPLIANCE_ADMIN and ADMIN can reclassify ANY task (no assignment check)
+    if ([USER_ROLES.COMPLIANCE_ADMIN, USER_ROLES.ADMIN].includes(userRole)) {
+      return true
+    }
+    
+    // COMPLIANCE_USER can only reclassify tasks assigned to them
+    if (userRole === USER_ROLES.COMPLIANCE_USER && currentUserId) {
+      return task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
+    }
+    
+    return false
+  }
+  
+  // For new classification, check assignment only for COMPLIANCE_USER
+  if (userRole === USER_ROLES.COMPLIANCE_USER && task && currentUserId) {
+    return task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
+  }
+  
+  // COMPLIANCE_ADMIN and ADMIN can classify any task
+  return [USER_ROLES.COMPLIANCE_ADMIN, USER_ROLES.ADMIN].includes(userRole)
 }
 
 export const canCloseSpecificTask = (userRole, task = null, currentUserId = null) => {
@@ -496,58 +516,85 @@ export const canCloseSpecificTask = (userRole, task = null, currentUserId = null
     return true
   }
   
-  // PRODUCT_ADMIN can only close tasks they created or are assigned to
-  if (userRole === USER_ROLES.PRODUCT_ADMIN && task && currentUserId) {
-    return task.createdBy === currentUserId || 
-           (task.assignedProductIds && task.assignedProductIds.includes(currentUserId))
+  // MODIFIED: Assigned COMPLIANCE_USER can close tasks assigned to them (replacing PRODUCT_ADMIN logic)
+  if (userRole === USER_ROLES.COMPLIANCE_USER && task && currentUserId) {
+    return task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
   }
   
   return false
 }
 
-// Check if user can perform reclassification specifically
-export const canReclassifyTask = (userRole) => {
-  return [USER_ROLES.COMPLIANCE_ADMIN, USER_ROLES.ADMIN].includes(userRole)
+export const canReclassifyTask = (userRole, task = null, currentUserId = null) => {
+  // FIXED: COMPLIANCE_ADMIN and ADMIN can reclassify ANY task (no assignment check)
+  if ([USER_ROLES.COMPLIANCE_ADMIN, USER_ROLES.ADMIN].includes(userRole)) {
+    return true
+  }
+  
+  // COMPLIANCE_USER can only reclassify assigned tasks
+  if (userRole === USER_ROLES.COMPLIANCE_USER && task && currentUserId) {
+    return task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
+  }
+  
+  return false
 }
 
-// Check what classification actions are available to user
-export const getClassificationActions = (userRole, task = null) => {
+export const getClassificationActions = (userRole, task = null, currentUserId = null) => {
   if (!hasPermission(userRole, PERMISSIONS.TASK_CLASSIFY)) {
     return { canClassify: false, canReclassify: false }
   }
   
+  // FIXED: For COMPLIANCE_USER only, check if assigned to task
+  if (userRole === USER_ROLES.COMPLIANCE_USER && task && currentUserId) {
+    const isAssigned = task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
+    if (!isAssigned) {
+      return { canClassify: false, canReclassify: false }
+    }
+  }
+  
   const canClassify = !task || !task.taskType // Can classify if task has no type
-  const canReclassify = task && task.taskType && canReclassifyTask(userRole) // Can reclassify if task has type and user has reclassify permission
+  
+  // FIXED: COMPLIANCE_ADMIN and ADMIN can reclassify ANY task
+  let canReclassify = false
+  if (task && task.taskType) {
+    if ([USER_ROLES.COMPLIANCE_ADMIN, USER_ROLES.ADMIN].includes(userRole)) {
+      canReclassify = true // No assignment check for admins
+    } else if (userRole === USER_ROLES.COMPLIANCE_USER && currentUserId) {
+      canReclassify = task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
+    }
+  }
   
   return { canClassify, canReclassify }
 }
+
 
 export const getClosureActions = (userRole, task = null, currentUserId = null) => {
   if (!hasPermission(userRole, PERMISSIONS.TASK_CLOSE)) {
     return { canClose: false, reason: 'No close permission' }
   }
- 
+  
+  // Full admin access
   if ([USER_ROLES.ADMIN, USER_ROLES.SENIOR_MANAGER, USER_ROLES.COMPLIANCE_ADMIN].includes(userRole)) {
     return { canClose: true, reason: 'Admin access' }
   }
- 
-  if (userRole === USER_ROLES.PRODUCT_ADMIN) {
+  
+  // MODIFIED: Assigned COMPLIANCE_USER can close tasks assigned to them (replacing PRODUCT_ADMIN logic)
+  if (userRole === USER_ROLES.COMPLIANCE_USER) {
     if (!task || !currentUserId) {
       return { canClose: false, reason: 'Task or user information missing' }
     }
     
-    const isCreator = task.createdBy === currentUserId
-    const isAssigned = task.assignedProductIds && task.assignedProductIds.includes(currentUserId)
+    const isAssigned = task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
     
-    if (isCreator || isAssigned) {
-      return { canClose: true, reason: isCreator ? 'Task creator' : 'Task assigned' }
+    if (isAssigned) {
+      return { canClose: true, reason: 'Assigned compliance user' }
     }
     
-    return { canClose: false, reason: 'Not creator or assigned to task' }
+    return { canClose: false, reason: 'Not assigned to this task' }
   }
   
-  return { canClose: false, reason: 'Unknown role restriction' }
+  return { canClose: false, reason: 'Insufficient permissions' }
 }
+
 
 export default {
   USER_ROLES,

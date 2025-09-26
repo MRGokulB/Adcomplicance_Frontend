@@ -3,6 +3,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { selectCurrentUser, selectUserRole } from '../../redux/slices/authSlice';
 import { useLogoutUserMutation } from '../../redux/api/authApi';
+// Import notifications API for real-time badge count
+import { 
+  useGetCountsQuery, 
+  useGetNotificationsQuery 
+} from '../../redux/api/notificationsApi';
 import { 
   hasPermission, 
   canAccessReports, 
@@ -43,8 +48,50 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
   const currentUser = useSelector(selectCurrentUser);
   const userRole = useSelector(selectUserRole);
   
-  // RTK Query mutation
+  // RTK Query mutations and queries
   const [logoutUser] = useLogoutUserMutation();
+  
+  // Real-time notifications count query - matching exactly with Notifications component
+  const { 
+    data: counts, 
+    isLoading: isCountsLoading,
+    error: countsError 
+  } = useGetCountsQuery(undefined, {
+    pollingInterval: 30000, // Update every 30 seconds
+    refetchOnMountOrArgChange: true,
+  });
+
+  // Fallback notifications query (same as Notifications component)
+  const { 
+    data: notificationsData 
+  } = useGetNotificationsQuery({
+    page: 1,
+    limit: 20,
+    isRead: undefined // Get all to match Notifications component
+  }, {
+    pollingInterval: 30000, // Same as Notifications component
+    refetchOnMountOrArgChange: true,
+  });
+
+  // Use the exact same logic as Notifications component for getting unread count
+  const summary = {
+    total: counts?.total ?? notificationsData?.pagination?.totalCount ?? 0,
+    unread: counts?.unread ?? notificationsData?.unreadCount ?? 0,
+  };
+
+  const unreadNotificationsCount = summary.unread;
+
+  // Debug logging (remove in production)
+  React.useEffect(() => {
+    console.log('Sidebar Debug:', {
+      counts,
+      notificationsData,
+      summary,
+      unreadCount: unreadNotificationsCount,
+      isCountsLoading,
+      countsError
+    });
+  }, [counts, notificationsData, summary, unreadNotificationsCount, isCountsLoading, countsError]);
 
   // Dynamic navigation items based on user role
   const getNavigationItems = () => {
@@ -80,12 +127,12 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
             <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
           </svg>
         ),
-        badge: 3, // This would come from actual data
+        badge: null, // You can add task-specific badge logic here if needed
         show: true
       });
     }
 
-    // Notifications - All authenticated users
+    // Notifications - All authenticated users with real-time unread count
     items.push({
       id: 'notifications',
       label: 'Notifications',
@@ -95,7 +142,7 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
           <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
         </svg>
       ),
-      badge: 5, // This would come from actual data
+      badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : null, // Only show badge if there are unread notifications
       show: true
     });
 
@@ -321,7 +368,13 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
                     )}
                   </div>
                   {isCollapsed && (
-                    <div className="sidebar-tooltip">{item.label}</div>
+                    <div className="sidebar-tooltip">
+                      {item.label}
+                      {/* Show unread count in tooltip when collapsed */}
+                      {item.id === 'notifications' && unreadNotificationsCount > 0 && (
+                        <span className="ml-2 text-red-400">({unreadNotificationsCount} unread)</span>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}

@@ -1,8 +1,8 @@
-// src/components/Tasks/TaskHeader/TaskHeader.jsx - Enhanced with new permissions
-import React, { useState } from 'react';
+// src/components/Tasks/TaskHeader/TaskHeader.jsx - Enhanced with task name editing
+import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUserRole, selectCurrentUser } from '../../../redux/slices/authSlice';
-import { 
+import {
   useUpdateTaskStatusMutation,
   useClassifyTaskMutation,
   useReassignTaskMutation,
@@ -10,32 +10,36 @@ import {
   useAddCommentMutation,
   useApproveTaskMutation,
   usePublishTaskMutation,
-  useCloseTaskMutation
+  useCloseTaskMutation,
+  useUpdateTaskNameMutation
 } from '../../../redux/api/tasksApi';
 import { usePermissions } from '../../../components/PermissionWrapper';
 import { CanReassignTask } from '../../../components/PermissionWrapper';
 // ADDED: Import enhanced permission helpers
-import { 
-  canClassifyOrReclassifyTask, 
+import {
+  USER_ROLES,
+  canClassifyOrReclassifyTask,
   canCloseSpecificTask,
   getClassificationActions,
-  getClosureActions 
+  getClosureActions
 } from '../../../utils/roles';
 import TaskReassignmentModal from '../../AllTasks/TaskReassignmentModal';
 
-const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
+const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
   const userRole = useSelector(selectUserRole);
   const currentUser = useSelector(selectCurrentUser);
   const permissions = usePermissions();
 
   // Local state
   const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(task?.title || '');
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [showCommentsSidebar, setShowCommentsSidebar] = useState(false);
   const [showReassignment, setShowReassignment] = useState(false);
-  
+  const [selectedTaskType, setSelectedTaskType] = useState(task?.taskType || '');
+  const [showClassificationSubmit, setShowClassificationSubmit] = useState(false);
   const [followUpMessage, setFollowUpMessage] = useState('');
-  
+
   // Status-specific modals
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
@@ -44,7 +48,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
   const [selectedNewStatus, setSelectedNewStatus] = useState('');
   const [statusReason, setStatusReason] = useState('');
   const [closureType, setClosureType] = useState('');
-  
+
   // Form data for status-specific actions
   const [formData, setFormData] = useState({
     approvalDate: new Date().toISOString().split('T')[0],
@@ -63,12 +67,19 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
   const [approveTask, { isLoading: isApproving }] = useApproveTaskMutation();
   const [publishTask, { isLoading: isPublishing }] = usePublishTaskMutation();
   const [closeTask, { isLoading: isClosing }] = useCloseTaskMutation();
+  const [updateTaskName, { isLoading: isUpdatingName }] = useUpdateTaskNameMutation();
+  useEffect(() => {
+    if (task) {
+      setSelectedTaskType(task.taskType || '');
+      setShowClassificationSubmit(false);
+    }
+  }, [task?.taskType, task?.id]);
 
   // ADDED: Helper function to get correct CSS class for buttons
   const getButtonClass = (buttonType) => {
     const buttonClasses = {
       'primary': 'btn-primary',
-      'secondary': 'btn-secondary', 
+      'secondary': 'btn-secondary',
       'success': 'btn-success',
       'warning': 'btn-warning',
       'error': 'btn-error',
@@ -81,46 +92,58 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
 
   // Check if user can act on this specific task
   const canUserActOnThisTask = () => {
-    if (!task || !currentUser) return false;
-    
-    // Admin can always act
-    if (permissions.isAdmin) return true;
-    
-    // Compliance users: check assignment
+    if (!task || !currentUser) return false
+
+    if (permissions.isAdmin) return true
+
+    // ENHANCED: Compliance users with more permissions when assigned
     if (permissions.isComplianceUser) {
       return task.assignedComplianceId === currentUser.id ||
-             task.assignedCompliance?.id === currentUser.id;
+        task.assignedCompliance?.id === currentUser.id
     }
-    
-    // Product users: check creation or assignment
+
     if (permissions.isProductUser) {
       return task.createdBy === currentUser.id ||
-             task.assignedProductIds?.includes(currentUser.id) ||
-             (task.assignedProducts && task.assignedProducts.some(user => 
-               typeof user === 'object' ? user.id === currentUser.id : false
-             ));
+        task.assignedProductIds?.includes(currentUser.id) ||
+        (task.assignedProducts && task.assignedProducts.some(user =>
+          typeof user === 'object' ? user.id === currentUser.id : false
+        ))
     }
-    
-    return false;
-  };
+
+    return false
+  }
 
   // UPDATED: Enhanced classification check using new helper function
   const canUserClassifyThisTask = () => {
-    if (!currentUser) return false;
-    return canClassifyOrReclassifyTask(userRole, task) && canUserActOnThisTask();
+  if (!currentUser) return false
+  
+  // FIXED: COMPLIANCE_ADMIN and ADMIN can classify/reclassify any task
+  if ([USER_ROLES.COMPLIANCE_ADMIN, USER_ROLES.ADMIN].includes(userRole)) {
+    return canClassifyOrReclassifyTask(userRole, task, currentUser.id)
+  }
+  
+  // For other roles, check both classification permission AND task access
+  return canClassifyOrReclassifyTask(userRole, task, currentUser.id) && canUserActOnThisTask()
+}
+  const canUserEditTask = () => {
+    if (!permissions.isComplianceUser && !permissions.isAdmin) return false;
+    if (permissions.isAdmin) return true;
+    return task?.assignedComplianceId === currentUser?.id;
   };
-
+  const handleTaskTypeSelection = (taskType) => {
+    setSelectedTaskType(taskType);
+    // Show submit button only if different from current task type
+    setShowClassificationSubmit(taskType && taskType !== task.taskType);
+  };
   // ADDED: Get classification actions for better UI feedback
-  const classificationActions = task ? getClassificationActions(userRole, task) : { canClassify: false, canReclassify: false };
-
-  // ADDED: Get closure actions for better UI feedback  
+  const classificationActions = task && currentUser ? getClassificationActions(userRole, task, currentUser.id) : { canClassify: false, canReclassify: false };
   const closureActions = task && currentUser ? getClosureActions(userRole, task, currentUser.id) : { canClose: false, reason: '' };
 
   // Get workflow buttons based on current status and permissions
   const getWorkflowButtons = () => {
     const buttons = [];
     const canAct = canUserActOnThisTask();
-    
+
     if (!canAct) return buttons;
 
     // Classification required first
@@ -218,7 +241,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
   const getStatusBadgeClass = (status) => {
     const statusStyles = {
       'OPEN': 'bg-blue-100 text-blue-800',
-      'COMPLIANCE_REVIEW': 'bg-yellow-100 text-yellow-800', 
+      'COMPLIANCE_REVIEW': 'bg-yellow-100 text-yellow-800',
       'PRODUCT_REVIEW': 'bg-orange-100 text-orange-800',
       'APPROVED': 'bg-green-100 text-green-800',
       'PUBLISHED': 'bg-purple-100 text-purple-800',
@@ -229,7 +252,30 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
     return statusStyles[status] || 'bg-gray-100 text-gray-800';
   };
 
+
   // HANDLERS
+  const handleSubmitClassification = async () => {
+    if (!selectedTaskType || selectedTaskType === task.taskType) return;
+
+    try {
+      await classifyTask({
+        id: task.id,
+        taskType: selectedTaskType
+      }).unwrap();
+      setShowClassificationSubmit(false);
+    } catch (error) {
+      console.error('Failed to classify task:', error);
+      alert(error?.data?.message || 'Failed to classify task');
+      // Reset on error
+      setSelectedTaskType(task.taskType || '');
+      setShowClassificationSubmit(false);
+    }
+  };
+
+  const handleCancelClassification = () => {
+    setSelectedTaskType(task.taskType || '');
+    setShowClassificationSubmit(false);
+  };
   const handleQuickStatusChange = async (newStatus) => {
     const defaultReasons = {
       'COMPLIANCE_REVIEW': 'Task ready for compliance review',
@@ -266,12 +312,41 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
     }
   };
 
+  // NEW: Handle task name update
+  const handleTaskNameUpdate = async () => {
+    if (!editedTitle.trim() || editedTitle.trim() === task.title) {
+      setIsEditingTitle(false);
+      setEditedTitle(task.title);
+      return;
+    }
+
+    try {
+      await updateTaskName({
+        id: task.id,
+        title: editedTitle.trim()
+      }).unwrap();
+
+      setIsEditingTitle(false);
+      onRefresh?.();
+    } catch (error) {
+      console.error('Failed to update task name:', error);
+      alert(error?.data?.message || 'Failed to update task name');
+      setEditedTitle(task.title); // Reset to original title on error
+    }
+  };
+
+  // NEW: Handle edit cancellation
+  const handleCancelEdit = () => {
+    setEditedTitle(task.title);
+    setIsEditingTitle(false);
+  };
+
   const handleApprovalSubmit = async () => {
     if (!formData.approvalDate || !formData.expiryDate) {
       alert('Approval date and expiry date are required');
       return;
     }
-    
+
     try {
       await approveTask({
         id: task.id,
@@ -279,7 +354,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
         expiryDate: formData.expiryDate,
         approvalProofUrl: formData.approvalProofUrl
       }).unwrap();
-      
+
       setShowApprovalModal(false);
       //onRefresh?.();
     } catch (error) {
@@ -293,14 +368,14 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
       alert('Publish date and published copy URL are required');
       return;
     }
-    
+
     try {
       await publishTask({
         id: task.id,
         publishDate: formData.publishDate,
         publishedCopyUrl: formData.publishedCopyUrl
       }).unwrap();
-      
+
       setShowPublishModal(false);
       onRefresh?.();
     } catch (error) {
@@ -321,7 +396,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
         status: selectedNewStatus,
         reason: statusReason
       }).unwrap();
-      
+
       setShowStatusModal(false);
       setSelectedNewStatus('');
       setStatusReason('');
@@ -337,14 +412,14 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
       alert('Closure comments are required');
       return;
     }
-    
+
     try {
       await closeTask({
         id: task.id,
         closureType: closureType,
         closureComments: formData.closureComments
       }).unwrap();
-      
+
       setShowClosureModal(false);
       onRefresh?.();
     } catch (error) {
@@ -360,7 +435,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
         message: followUpMessage || 'Follow-up initiated from task header',
         urgency: 'MEDIUM'
       }).unwrap();
-      
+
       setShowFollowUp(false);
       setFollowUpMessage('');
       onRefresh?.();
@@ -379,7 +454,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
         content: comment,
         isGlobal: true
       }).unwrap();
-      
+
       setComment('');
       onRefresh?.();
     } catch (error) {
@@ -405,26 +480,35 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
                   {task.uin || task.id}
                 </span>
               </div>
-              
+
               <div className="flex items-center gap-3">
                 {isEditingTitle && (permissions.isComplianceUser || permissions.isAdmin) ? (
                   <div className="flex items-center gap-2 flex-1">
                     <input
                       type="text"
-                      value={task.title}
+                      value={editedTitle}
+                      onChange={(e) => setEditedTitle(e.target.value)}
                       className="input flex-1"
-                      onBlur={() => setIsEditingTitle(false)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') setIsEditingTitle(false);
-                        if (e.key === 'Escape') setIsEditingTitle(false);
+                        if (e.key === 'Enter') handleTaskNameUpdate();
+                        if (e.key === 'Escape') handleCancelEdit();
                       }}
                       autoFocus
+                      disabled={isUpdatingName}
                     />
                     <button
                       className="btn btn-sm btn-primary"
-                      onClick={() => setIsEditingTitle(false)}
+                      onClick={handleTaskNameUpdate}
+                      disabled={isUpdatingName || !editedTitle.trim()}
                     >
-                      Save
+                      {isUpdatingName ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      onClick={handleCancelEdit}
+                      disabled={isUpdatingName}
+                    >
+                      Cancel
                     </button>
                   </div>
                 ) : (
@@ -433,8 +517,12 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
                     {(permissions.isComplianceUser || permissions.isAdmin) && (
                       <button
                         className="btn btn-ghost btn-sm"
-                        onClick={() => setIsEditingTitle(true)}
+                        onClick={() => {
+                          setEditedTitle(task.title);
+                          setIsEditingTitle(true);
+                        }}
                         title="Edit task title"
+                        disabled={isUpdatingName}
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -448,19 +536,53 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
 
             {/* Task Type and Status */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+
+              {/* Enhanced Classification Section */}
               <div>
                 <label className="exchange-form-label">Task Type</label>
                 {canUserClassifyThisTask() ? (
-                  <select
-                    className="exchange-form-select"
-                    value={task.taskType || ''}
-                    onChange={(e) => handleTaskTypeChange(e.target.value)}
-                    disabled={isClassifying}
-                  >
-                    <option value="">Select Type...</option>
-                    <option value="INTERNAL">Internal</option>
-                    <option value="EXCHANGE">Exchange</option>
-                  </select>
+                  <div className="space-y-2">
+                    <select
+                      className="exchange-form-select"
+                      value={selectedTaskType}
+                      onChange={(e) => handleTaskTypeSelection(e.target.value)}
+                      disabled={isClassifying}
+                    >
+                      <option value="">Select Type...</option>
+                      <option value="INTERNAL">Internal</option>
+                      <option value="EXCHANGE">Exchange</option>
+                    </select>
+
+                    {/* Submit Classification Button */}
+                    {showClassificationSubmit && (
+                      <div className="flex gap-2">
+                        <button
+                          className="btn btn-primary btn-sm flex-1"
+                          onClick={handleSubmitClassification}
+                          disabled={isClassifying}
+                        >
+                          {isClassifying ? 'Submitting...' : `Submit as ${selectedTaskType === 'INTERNAL' ? 'Internal' : 'Exchange'}`}
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={handleCancelClassification}
+                          disabled={isClassifying}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Show current classification if exists and no pending changes */}
+                    {task.taskType && !showClassificationSubmit && (
+                      <div className="text-sm text-green-600 mt-1">
+                        ✓ Currently classified as: {task.taskType === 'EXCHANGE' ? 'Exchange' : 'Internal'}
+                        {classificationActions.canReclassify && (
+                          <span className="text-gray-500"> (You can reclassify if needed)</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <div className="exchange-form-select bg-gray-100 cursor-not-allowed flex items-center">
                     <span className={task.taskType ? 'text-gray-900' : 'text-gray-500'}>
@@ -468,17 +590,20 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
                     </span>
                   </div>
                 )}
-                
+
+                {/* UPDATED: Better user feedback for classification permissions */}
                 {!canUserClassifyThisTask() && !task.taskType && (
                   <p className="text-xs text-amber-600 mt-1">
-                    Only assigned users can classify this task
+                    {permissions.isComplianceUser
+                      ? 'You can only classify tasks assigned to you'
+                      : 'Only assigned compliance users can classify this task'}
                   </p>
                 )}
               </div>
 
               <div>
                 <label className="exchange-form-label">Status & Actions</label>
-                
+
                 <div className="mb-3">
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusBadgeClass(task.status)}`}>
                     {task.status?.replace('_', ' ')}
@@ -506,14 +631,14 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
                         Close Task ({closureActions.reason})
                       </summary>
                       <div className="flex gap-2 mt-2">
-                        <button 
+                        <button
                           className="btn btn-error btn-sm flex-1"
                           onClick={() => { setClosureType('CLOSED_INTERNAL'); setShowClosureModal(true); }}
                           disabled={isClosing}
                         >
                           Close Internal
                         </button>
-                        <button 
+                        <button
                           className="btn btn-error btn-sm flex-1"
                           onClick={() => { setClosureType('CLOSED_EXCHANGE'); setShowClosureModal(true); }}
                           disabled={isClosing}
@@ -529,14 +654,14 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
                     <details className="mt-2">
                       <summary className="text-sm text-red-600 cursor-pointer">Admin: Close Task</summary>
                       <div className="flex gap-2 mt-2">
-                        <button 
+                        <button
                           className="btn btn-error btn-sm flex-1"
                           onClick={() => { setClosureType('CLOSED_INTERNAL'); setShowClosureModal(true); }}
                           disabled={isClosing}
                         >
                           Close Internal
                         </button>
-                        <button 
+                        <button
                           className="btn btn-error btn-sm flex-1"
                           onClick={() => { setClosureType('CLOSED_EXCHANGE'); setShowClosureModal(true); }}
                           disabled={isClosing}
@@ -610,8 +735,8 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-green-400 rounded-full"></div>
                       <span className="text-sm text-gray-700">
-                        {typeof task.assignedCompliance === 'string' 
-                          ? task.assignedCompliance 
+                        {typeof task.assignedCompliance === 'string'
+                          ? task.assignedCompliance
                           : task.assignedCompliance.fullName || task.assignedCompliance.name}
                       </span>
                     </div>
@@ -671,7 +796,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
                     type="date"
                     className="input"
                     value={formData.approvalDate}
-                    onChange={(e) => setFormData(prev => ({...prev, approvalDate: e.target.value}))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, approvalDate: e.target.value }))}
                     required
                   />
                 </div>
@@ -681,25 +806,16 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
                     type="date"
                     className="input"
                     value={formData.expiryDate}
-                    onChange={(e) => setFormData(prev => ({...prev, expiryDate: e.target.value}))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, expiryDate: e.target.value }))}
                     required
                   />
                 </div>
-                <div>
-                  <label className="exchange-form-label">Approval Proof URL (Optional)</label>
-                  <input
-                    type="url"
-                    className="input"
-                    value={formData.approvalProofUrl}
-                    onChange={(e) => setFormData(prev => ({...prev, approvalProofUrl: e.target.value}))}
-                    placeholder="https://..."
-                  />
-                </div>
+
               </div>
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowApprovalModal(false)}>Cancel</button>
-              <button 
+              <button
                 className="btn btn-primary"
                 onClick={handleApprovalSubmit}
                 disabled={isApproving || !formData.approvalDate || !formData.expiryDate}
@@ -727,29 +843,19 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
                     type="date"
                     className="input"
                     value={formData.publishDate}
-                    onChange={(e) => setFormData(prev => ({...prev, publishDate: e.target.value}))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, publishDate: e.target.value }))}
                     required
                   />
                 </div>
-                <div>
-                  <label className="exchange-form-label">Published Copy URL *</label>
-                  <input
-                    type="url"
-                    className="input"
-                    value={formData.publishedCopyUrl}
-                    onChange={(e) => setFormData(prev => ({...prev, publishedCopyUrl: e.target.value}))}
-                    placeholder="https://..."
-                    required
-                  />
-                </div>
+
               </div>
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowPublishModal(false)}>Cancel</button>
-              <button 
+              <button
                 className="btn btn-primary"
                 onClick={handlePublishSubmit}
-                disabled={isPublishing || !formData.publishDate || !formData.publishedCopyUrl}
+                disabled={isPublishing || !formData.publishDate}
               >
                 {isPublishing ? 'Publishing...' : 'Publish Task'}
               </button>
@@ -801,7 +907,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowStatusModal(false)}>Cancel</button>
-              <button 
+              <button
                 className="btn btn-primary"
                 onClick={handleManualStatusChange}
                 disabled={isUpdatingStatus || !selectedNewStatus || !statusReason.trim()}
@@ -833,14 +939,14 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
                   className="input resize-none min-h-[100px]"
                   placeholder="Please explain the reason for closure..."
                   value={formData.closureComments}
-                  onChange={(e) => setFormData(prev => ({...prev, closureComments: e.target.value}))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, closureComments: e.target.value }))}
                   required
                 />
               </div>
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowClosureModal(false)}>Cancel</button>
-              <button 
+              <button
                 className="btn btn-error"
                 onClick={handleClosureSubmit}
                 disabled={isClosing || !formData.closureComments.trim()}
@@ -862,7 +968,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
             </div>
             <div className="modal-body">
               <p className="text-gray-700 mb-4">Send a follow-up reminder for this task?</p>
-              <textarea 
+              <textarea
                 className="input resize-none min-h-[100px]"
                 placeholder="Add follow-up message (optional)..."
                 value={followUpMessage}
@@ -871,7 +977,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowFollowUp(false)}>Cancel</button>
-              <button 
+              <button
                 className="btn btn-primary"
                 onClick={handleFollowUp}
                 disabled={isFollowingUp}
@@ -917,7 +1023,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
               />
-              <button 
+              <button
                 className="btn btn-primary btn-sm mt-2"
                 onClick={handleAddComment}
                 disabled={isAddingComment || !comment.trim()}
@@ -931,7 +1037,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
 
       {/* Task Reassignment Modal */}
       {showReassignment && (
-        <TaskReassignmentModal 
+        <TaskReassignmentModal
           taskId={task.id}
           onClose={() => setShowReassignment(false)}
           onSuccess={() => {

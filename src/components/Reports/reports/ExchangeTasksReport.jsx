@@ -118,7 +118,13 @@ const ExchangeTasksReport = () => {
     <div>
       <div className="flex-between mb-4">
         <h2 className="text-heading-3">Exchange Tasks Report</h2>
-        <ExportButtons />
+        {/* FIXED: Added required props to ExportButtons */}
+        <ExportButtons 
+          data={tableData}
+          columns={columns}
+          filename="exchange-tasks-report"
+          isLoading={isLoading}
+        />
       </div>
 
       <ReportFilters 

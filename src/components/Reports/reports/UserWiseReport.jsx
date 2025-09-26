@@ -69,6 +69,9 @@ const UserWiseReport = ({ type, onTypeChange }) => {
     { id: 'activityScore', label: 'Activity Score', sortable: true }
   ];
 
+  // Get current columns and data for export
+  const currentColumns = type === 'compliance' ? complianceColumns : productColumns;
+  
   // Get unique users for filter options from current data
   const getUserFilterOptions = () => {
     if (!currentData?.data) return [];
@@ -122,7 +125,13 @@ const UserWiseReport = ({ type, onTypeChange }) => {
         <h2 className="text-heading-3">
           {type === 'compliance' ? 'Compliance Users Report' : 'Product Users Report'}
         </h2>
-        <ExportButtons />
+        {/* FIXED: Added required props to ExportButtons */}
+        <ExportButtons 
+          data={tableData}
+          columns={currentColumns}
+          filename={`${type}-users-report`}
+          isLoading={isLoading}
+        />
       </div>
 
       <ReportFilters 
@@ -235,7 +244,7 @@ const UserWiseReport = ({ type, onTypeChange }) => {
       {/* Report Table */}
       {!isLoading && (
         <ReportTable 
-          columns={type === 'compliance' ? complianceColumns : productColumns}
+          columns={currentColumns}
           data={tableData}
           emptyMessage={`No ${type} user data found for the selected filters.`}
         />

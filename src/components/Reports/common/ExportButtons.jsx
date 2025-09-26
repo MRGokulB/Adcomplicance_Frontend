@@ -190,24 +190,7 @@ ${csvData.split('\n').map(line => line.replace(/,/g, ' | ')).join('\n')}
           </button>
         ))}
       </div>
-
-      {/* Export Info */}
-      <div className="mt-2">
-        <p className="text-xs text-gray-500">
-          {data.length === 0 ? (
-            'No data available for export'
-          ) : (
-            `Ready to export ${data.length} record${data.length !== 1 ? 's' : ''}`
-          )}
-        </p>
-      </div>
-
-      {/* Export Statistics */}
-      {data.length > 0 && (
-        <div className="mt-1 text-xs text-gray-400">
-          Last updated: {new Date().toLocaleTimeString()}
-        </div>
-      )}
+       
     </div>
   );
 };

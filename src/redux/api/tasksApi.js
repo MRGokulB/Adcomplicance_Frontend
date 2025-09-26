@@ -591,6 +591,7 @@ export const {
   useGetPerformanceMetricsQuery,
   useGetTaskHealthCheckQuery,
   useGetAbsentUserTasksQuery,
+  useUpdateTaskNameMutation,
 } = tasksApi;
 
 // Utility function to manually invalidate cache

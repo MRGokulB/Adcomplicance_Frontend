@@ -90,6 +90,8 @@ export const CanPromoteUser = ({ children, fallback = null }) => (
   </PermissionWrapper>
 )
 
+
+
 export const CanViewTaskBuckets = ({ children, fallback = null }) => (
   <PermissionWrapper 
     requiredPermissions={[PERMISSIONS.TASK_VIEW_BUCKETS]} 
@@ -203,6 +205,15 @@ export const ComplianceAccess = ({ children, fallback = null }) => (
 export const ProductAccess = ({ children, fallback = null }) => (
   <PermissionWrapper 
     requiredRoles={[USER_ROLES.PRODUCT_ADMIN, USER_ROLES.PRODUCT_USER]} 
+    fallback={fallback}
+  >
+    {children}
+  </PermissionWrapper>
+)
+
+export const CanCloseTask = ({ children, fallback = null }) => (
+  <PermissionWrapper 
+    requiredPermissions={[PERMISSIONS.TASK_CLOSE]} 
     fallback={fallback}
   >
     {children}

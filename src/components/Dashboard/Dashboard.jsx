@@ -10,9 +10,9 @@ import {
   useGetActivityFeedQuery,
   useGetPerformanceMetricsQuery
 } from '../../redux/api/dashboardApi';
-import AllTasksPage from '../AllTasks/AllTasks'; // Import your comprehensive AllTasksPage
 import CreateNewAdTask from '../Tasks/NewTask';
 import { USER_ROLES } from '../../utils/roles';
+import AdvancedTable from './AdvancedTable';
 
 const Dashboard = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -369,7 +369,7 @@ const Dashboard = () => {
 
       {/* Replace the basic table with the comprehensive AllTasksPage component */}
       <div className="mt-8">
-        <AllTasksPage />
+        <AdvancedTable/>
       </div>
 
       {/* Create Task Modal - Only show if user has permission */}

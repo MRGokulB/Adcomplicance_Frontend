@@ -242,14 +242,7 @@ const Notifications = () => {
                 )}
               </button>
             ))}
-          </div>
-          
-          <div className="filter-actions">
-            <div className="filter-summary">
-              Showing {notifications.length} of {summary.total} notifications
-              {filter !== 'all' && ` (${filter})`}
-            </div>
-          </div>
+          </div> 
         </div>
       </div>
 

@@ -96,8 +96,7 @@ const ReportSelector = ({
                 ? 'report-selector-tab-active' 
                 : 'report-selector-tab-inactive'
             }`}
-            onClick={() => onReportTypeChange(report.id)}
-            title={report.description}
+            onClick={() => onReportTypeChange(report.id)} 
           >
             {report.label}
           </button>
@@ -125,16 +124,6 @@ const ReportSelector = ({
           )}
         </div>
       )}
-
-      {/* Report description */}
-      {selectedReportType && (
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800">
-            {availableReports.find(r => r.id === selectedReportType)?.description}
-          </p>
-        </div>
-      )}
-
       {/* No access message */}
       {availableReports.length === 0 && (
         <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
