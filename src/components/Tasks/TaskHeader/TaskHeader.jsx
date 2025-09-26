@@ -1,4 +1,4 @@
-// src/components/Tasks/TaskHeader/TaskHeader.jsx - Using existing hooks and permission system
+// src/components/Tasks/TaskHeader/TaskHeader.jsx - Enhanced with new permissions
 import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUserRole, selectCurrentUser } from '../../../redux/slices/authSlice';
@@ -14,6 +14,13 @@ import {
 } from '../../../redux/api/tasksApi';
 import { usePermissions } from '../../../components/PermissionWrapper';
 import { CanReassignTask } from '../../../components/PermissionWrapper';
+// ADDED: Import enhanced permission helpers
+import { 
+  canClassifyOrReclassifyTask, 
+  canCloseSpecificTask,
+  getClassificationActions,
+  getClosureActions 
+} from '../../../utils/roles';
 import TaskReassignmentModal from '../../AllTasks/TaskReassignmentModal';
 
 const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
@@ -57,6 +64,21 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
   const [publishTask, { isLoading: isPublishing }] = usePublishTaskMutation();
   const [closeTask, { isLoading: isClosing }] = useCloseTaskMutation();
 
+  // ADDED: Helper function to get correct CSS class for buttons
+  const getButtonClass = (buttonType) => {
+    const buttonClasses = {
+      'primary': 'btn-primary',
+      'secondary': 'btn-secondary', 
+      'success': 'btn-success',
+      'warning': 'btn-warning',
+      'error': 'btn-error',
+      'outline': 'btn-outline',
+      'ghost': 'btn-ghost',
+      'info': 'btn-primary' // fallback to primary for info
+    };
+    return buttonClasses[buttonType] || 'btn-secondary';
+  };
+
   // Check if user can act on this specific task
   const canUserActOnThisTask = () => {
     if (!task || !currentUser) return false;
@@ -82,12 +104,17 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
     return false;
   };
 
-  // Check if user can classify this specific task
+  // UPDATED: Enhanced classification check using new helper function
   const canUserClassifyThisTask = () => {
-    if (task?.taskType) return false; // Already classified
-    if (!permissions.canClassifyTask) return false;
-    return canUserActOnThisTask();
+    if (!currentUser) return false;
+    return canClassifyOrReclassifyTask(userRole, task) && canUserActOnThisTask();
   };
+
+  // ADDED: Get classification actions for better UI feedback
+  const classificationActions = task ? getClassificationActions(userRole, task) : { canClassify: false, canReclassify: false };
+
+  // ADDED: Get closure actions for better UI feedback  
+  const closureActions = task && currentUser ? getClosureActions(userRole, task, currentUser.id) : { canClose: false, reason: '' };
 
   // Get workflow buttons based on current status and permissions
   const getWorkflowButtons = () => {
@@ -106,27 +133,18 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
       }];
     }
 
+    // ADDED: Submit button for classified tasks in OPEN status
+    if (task.taskType && task.status === 'OPEN') {
+      buttons.push({
+        type: 'primary',
+        text: 'Submit for Review',
+        action: () => handleQuickStatusChange('COMPLIANCE_REVIEW'),
+        disabled: isUpdatingStatus
+      });
+    }
+
     // Status-specific workflow buttons
     switch (task.status) {
-      case 'OPEN':
-        if (permissions.isComplianceUser) {
-          buttons.push({
-            type: 'primary',
-            text: 'Start Compliance Review',
-            action: () => handleQuickStatusChange('COMPLIANCE_REVIEW'),
-            disabled: isUpdatingStatus
-          });
-        }
-        if (permissions.isProductUser) {
-          buttons.push({
-            type: 'secondary',
-            text: 'Start Product Review',
-            action: () => handleQuickStatusChange('PRODUCT_REVIEW'),
-            disabled: isUpdatingStatus
-          });
-        }
-        break;
-
       case 'COMPLIANCE_REVIEW':
         if (permissions.isComplianceUser && canAct) {
           buttons.push({
@@ -168,7 +186,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
 
       case 'PUBLISHED':
         buttons.push({
-          type: 'info',
+          type: 'success',
           text: 'Published Successfully',
           disabled: true
         });
@@ -177,7 +195,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
       default:
         if (task.status?.includes('CLOSED')) {
           buttons.push({
-            type: 'error',
+            type: 'secondary',
             text: 'Task Closed',
             disabled: true
           });
@@ -389,7 +407,42 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
               </div>
               
               <div className="flex items-center gap-3">
-                <h1 className="text-xl font-semibold text-gray-900">{task.title}</h1>
+                {isEditingTitle && (permissions.isComplianceUser || permissions.isAdmin) ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <input
+                      type="text"
+                      value={task.title}
+                      className="input flex-1"
+                      onBlur={() => setIsEditingTitle(false)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') setIsEditingTitle(false);
+                        if (e.key === 'Escape') setIsEditingTitle(false);
+                      }}
+                      autoFocus
+                    />
+                    <button
+                      className="btn btn-sm btn-primary"
+                      onClick={() => setIsEditingTitle(false)}
+                    >
+                      Save
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <h1 className="text-xl font-semibold text-gray-900">{task.title}</h1>
+                    {(permissions.isComplianceUser || permissions.isAdmin) && (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setIsEditingTitle(true)}
+                        title="Edit task title"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             </div>
 
@@ -437,7 +490,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
                   {workflowButtons.map((button, index) => (
                     <button
                       key={index}
-                      className={`btn btn-${button.type} btn-sm w-full`}
+                      className={`btn ${getButtonClass(button.type)} btn-sm w-full`}
                       onClick={button.action}
                       disabled={button.disabled}
                       title={button.message}
@@ -446,8 +499,33 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
                     </button>
                   ))}
 
-                  {/* Admin closure options */}
-                  {permissions.isAdmin && !task.status?.includes('CLOSED') && task.status !== 'PUBLISHED' && (
+                  {/* UPDATED: Enhanced closure options with better permission checking */}
+                  {closureActions.canClose && !task.status?.includes('CLOSED') && task.status !== 'PUBLISHED' && (
+                    <details className="mt-2">
+                      <summary className="text-sm text-red-600 cursor-pointer">
+                        Close Task ({closureActions.reason})
+                      </summary>
+                      <div className="flex gap-2 mt-2">
+                        <button 
+                          className="btn btn-error btn-sm flex-1"
+                          onClick={() => { setClosureType('CLOSED_INTERNAL'); setShowClosureModal(true); }}
+                          disabled={isClosing}
+                        >
+                          Close Internal
+                        </button>
+                        <button 
+                          className="btn btn-error btn-sm flex-1"
+                          onClick={() => { setClosureType('CLOSED_EXCHANGE'); setShowClosureModal(true); }}
+                          disabled={isClosing}
+                        >
+                          Close Exchange
+                        </button>
+                      </div>
+                    </details>
+                  )}
+
+                  {/* Fallback: Admin closure options (keep existing logic for backwards compatibility) */}
+                  {!closureActions.canClose && permissions.isAdmin && !task.status?.includes('CLOSED') && task.status !== 'PUBLISHED' && (
                     <details className="mt-2">
                       <summary className="text-sm text-red-600 cursor-pointer">Admin: Close Task</summary>
                       <div className="flex gap-2 mt-2">
@@ -474,8 +552,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
 
             {/* Task Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-               
-
               <div>
                 <label className="exchange-form-label">Platform</label>
                 <div className="bg-gray-50 rounded-lg p-3">
@@ -493,8 +569,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
                   </span>
                 </div>
               </div>
-
-               
             </div>
 
             {/* Description */}
@@ -551,7 +625,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
 
           {/* Action Buttons */}
           <div className="flex flex-col gap-2 ml-4">
-            {permissions.canFollowUp && (
+            {(permissions.isComplianceUser || permissions.isAdmin || permissions.isSeniorManager) && (
               <button
                 className="btn btn-secondary btn-sm"
                 onClick={() => setShowFollowUp(true)}
@@ -580,7 +654,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh}) => {
         </div>
       </div>
 
-      {/* MODALS */}
+      {/* ALL EXISTING MODALS REMAIN THE SAME - No changes needed */}
       {/* Approval Modal */}
       {showApprovalModal && (
         <div className="modal-overlay" onClick={() => setShowApprovalModal(false)}>

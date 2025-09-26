@@ -298,6 +298,7 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.TASK_READ_TEAM,
     PERMISSIONS.TASK_UPDATE_OWN,
     PERMISSIONS.TASK_ASSIGN,
+    PERMISSIONS.TASK_CLOSE,
     PERMISSIONS.TASK_REASSIGN, // NEW
     PERMISSIONS.TASK_PUBLISH,
     PERMISSIONS.TASK_VALIDATE_FILES, // NEW
@@ -475,6 +476,79 @@ export const canExportAudit = (userRole) => {
   return hasPermission(userRole, PERMISSIONS.AUDIT_EXPORT)
 }
 
+export const canClassifyOrReclassifyTask = (userRole, task = null) => {
+  if (!hasPermission(userRole, PERMISSIONS.TASK_CLASSIFY)) {
+    return false
+  } 
+  if (task && task.taskType) {
+    return [USER_ROLES.COMPLIANCE_ADMIN, USER_ROLES.ADMIN].includes(userRole)
+  }
+  return true
+}
+
+export const canCloseSpecificTask = (userRole, task = null, currentUserId = null) => {
+  if (!hasPermission(userRole, PERMISSIONS.TASK_CLOSE)) {
+    return false
+  }
+  
+  // ADMIN, SENIOR_MANAGER, COMPLIANCE_ADMIN can close any task
+  if ([USER_ROLES.ADMIN, USER_ROLES.SENIOR_MANAGER, USER_ROLES.COMPLIANCE_ADMIN].includes(userRole)) {
+    return true
+  }
+  
+  // PRODUCT_ADMIN can only close tasks they created or are assigned to
+  if (userRole === USER_ROLES.PRODUCT_ADMIN && task && currentUserId) {
+    return task.createdBy === currentUserId || 
+           (task.assignedProductIds && task.assignedProductIds.includes(currentUserId))
+  }
+  
+  return false
+}
+
+// Check if user can perform reclassification specifically
+export const canReclassifyTask = (userRole) => {
+  return [USER_ROLES.COMPLIANCE_ADMIN, USER_ROLES.ADMIN].includes(userRole)
+}
+
+// Check what classification actions are available to user
+export const getClassificationActions = (userRole, task = null) => {
+  if (!hasPermission(userRole, PERMISSIONS.TASK_CLASSIFY)) {
+    return { canClassify: false, canReclassify: false }
+  }
+  
+  const canClassify = !task || !task.taskType // Can classify if task has no type
+  const canReclassify = task && task.taskType && canReclassifyTask(userRole) // Can reclassify if task has type and user has reclassify permission
+  
+  return { canClassify, canReclassify }
+}
+
+export const getClosureActions = (userRole, task = null, currentUserId = null) => {
+  if (!hasPermission(userRole, PERMISSIONS.TASK_CLOSE)) {
+    return { canClose: false, reason: 'No close permission' }
+  }
+ 
+  if ([USER_ROLES.ADMIN, USER_ROLES.SENIOR_MANAGER, USER_ROLES.COMPLIANCE_ADMIN].includes(userRole)) {
+    return { canClose: true, reason: 'Admin access' }
+  }
+ 
+  if (userRole === USER_ROLES.PRODUCT_ADMIN) {
+    if (!task || !currentUserId) {
+      return { canClose: false, reason: 'Task or user information missing' }
+    }
+    
+    const isCreator = task.createdBy === currentUserId
+    const isAssigned = task.assignedProductIds && task.assignedProductIds.includes(currentUserId)
+    
+    if (isCreator || isAssigned) {
+      return { canClose: true, reason: isCreator ? 'Task creator' : 'Task assigned' }
+    }
+    
+    return { canClose: false, reason: 'Not creator or assigned to task' }
+  }
+  
+  return { canClose: false, reason: 'Unknown role restriction' }
+}
+
 export default {
   USER_ROLES,
   PERMISSIONS,
@@ -503,5 +577,10 @@ export default {
   canPromoteUser,
   canViewAudit,
   canExportAudit,
-  canPerformBulkOperations
+  canPerformBulkOperations,
+  canClassifyOrReclassifyTask,
+  canCloseSpecificTask,
+  canReclassifyTask,
+  getClassificationActions,
+  getClosureActions
 }
