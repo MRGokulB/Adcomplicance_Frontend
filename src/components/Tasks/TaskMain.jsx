@@ -1,4 +1,4 @@
-// src/components/Tasks/TaskMain.jsx - Enhanced with real-time synchronization
+// src/components/Tasks/TaskMain.jsx - Cleaned UI with better action placement
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -245,6 +245,28 @@ const TaskMain = () => {
   return (
     <div className="container-lg section-md">
 
+      {/* Connection Status Banner - Only show when offline */}
+      {!isConnected && (
+        <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-red-600">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-sm font-medium">Connection Lost</span>
+              <span className="text-xs text-red-500">- Attempting to reconnect...</span>
+            </div>
+            <button 
+              onClick={handleRefresh}
+              className="btn btn-outline btn-sm text-red-600 border-red-300 hover:bg-red-100"
+              disabled={isFetching}
+            >
+              {isFetching ? 'Retrying...' : 'Retry Now'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Classification Notice */}
       {needsClassification && (
         <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -262,8 +284,18 @@ const TaskMain = () => {
         </div>
       )}
 
-      {/* Task Header - Always visible */}
-      <TaskHeader task={task} refetch={refetch} comment={comment} setComment={setComment} onRefresh={handleRefresh} />
+      {/* Task Header with integrated actions */}
+      <TaskHeader 
+        task={task} 
+        refetch={refetch} 
+        comment={comment} 
+        setComment={setComment} 
+        onRefresh={handleRefresh}
+        // Pass additional props for integrated actions
+        isConnected={isConnected}
+        isFetching={isFetching}
+        lastSyncTime={lastSyncTime}
+      />
       
       {/* Version Control Section - Show for all classified tasks */}
       {task.taskType && (
@@ -279,84 +311,65 @@ const TaskMain = () => {
         </div>
       )}
 
-      {/* Enhanced Task Progress Indicator */}
-      <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-        <div className="flex items-center justify-between text-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-gray-600">Task Progress:</span>
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-              task.status === 'PUBLISHED' ? 'bg-green-100 text-green-800' :
-              task.status === 'APPROVED' ? 'bg-blue-100 text-blue-800' :
-              task.status === 'PRODUCT_REVIEW' ? 'bg-yellow-100 text-yellow-800' :
-              task.status === 'COMPLIANCE_REVIEW' ? 'bg-purple-100 text-purple-800' :
-              'bg-gray-100 text-gray-800'
-            }`}>
-              {task.status?.replace('_', ' ')}
-            </span>
+      {/* Clean Task Footer - Essential info only */}
+      <div className="mt-8 pt-6 border-t border-gray-200">
+        <div className="flex items-center justify-between text-sm text-gray-500">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Task ID: {task.uin || task.id}</span>
+            </div>
             
-            {/* Real-time update indicator */}
-            {isFetching && (
-              <span className="text-xs text-blue-600">• Syncing</span>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-4 text-xs text-gray-500">
-            <span>Created: {new Date(task.createdAt).toLocaleDateString()}</span>
-            <span>Updated: {new Date(task.updatedAt).toLocaleDateString()}</span>
-            {task.versions?.length > 0 && (
-              <span>Versions: {task.versions.length}</span>
-            )}
+            <span>• Created: {new Date(task.createdAt).toLocaleDateString()}</span>
             
-            {/* Show last API call status */}
+            {/* Connection Status Indicator */}
+            <div className="flex items-center gap-1">
+              <span>•</span>
+              {isConnected ? (
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-green-600">Online</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                  <span className="text-red-600">Offline</span>
+                </div>
+              )}
+            </div>
+            
             {lastSyncTime && (
-              <span className="text-green-600">
-                Synced: {lastSyncTime.toLocaleTimeString()}
-              </span>
+              <span className="text-green-600">• Last synced: {lastSyncTime.toLocaleTimeString()}</span>
             )}
           </div>
-        </div>
-      </div>
-
-      {/* Enhanced Task Actions Footer */}
-      <div className="mt-6 flex justify-between items-center text-sm text-gray-500">
-        <div className="flex items-center gap-2">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span>Task ID: {task.uin || task.id}</span>
           
-          {/* Connection quality indicator */}
-          {isConnected ? (
-            <span className="text-green-600">• Online</span>
-          ) : (
-            <span className="text-red-600">• Offline</span>
-          )}
-        </div>
-        
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={handleRefresh}
-            className={`flex items-center gap-1 ${
-              isConnected ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400'
-            }`}
-            title="Refresh task data"
-            disabled={!isConnected || isFetching}
-          >
-            <svg className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            {isFetching ? 'Refreshing...' : 'Refresh'}
-          </button>
-          
-          <button 
-            onClick={() => window.history.back()}
-            className="flex items-center gap-1 text-gray-600 hover:text-gray-800"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Tasks
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={handleRefresh}
+              className={`flex items-center gap-1 text-xs ${
+                isConnected ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400'
+              } transition-colors duration-200`}
+              title="Refresh task data"
+              disabled={!isConnected || isFetching}
+            >
+              <svg className={`w-3 h-3 ${isFetching ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {isFetching ? 'Syncing...' : 'Refresh'}
+            </button>
+            
+            <button 
+              onClick={() => window.history.back()}
+              className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800 transition-colors duration-200"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to Tasks
+            </button>
+          </div>
         </div>
       </div>
     </div>

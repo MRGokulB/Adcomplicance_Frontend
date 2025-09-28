@@ -676,10 +676,10 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
             </div>
 
             {/* Task Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 mb-2">
               <div>
                 <label className="exchange-form-label">Platform</label>
-                <div className="bg-gray-50 rounded-lg p-3">
+                <div className="bg-gray-50 rounded-lg ">
                   <span className="text-sm text-gray-700">
                     {task.platform || 'Not specified'}
                   </span>
@@ -688,7 +688,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
 
               <div>
                 <label className="exchange-form-label">Category</label>
-                <div className="bg-gray-50 rounded-lg p-3">
+                <div className="bg-gray-50 rounded-lg">
                   <span className="text-sm text-gray-700">
                     {task.category || 'Not specified'}
                   </span>
@@ -700,7 +700,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
             {task.description && (
               <div className="mb-4">
                 <label className="exchange-form-label">Description</label>
-                <div className="bg-gray-50 rounded-lg p-3">
+                <div className="bg-gray-50 rounded-lg ">
                   <p className="text-sm text-gray-700 whitespace-pre-wrap">
                     {task.description}
                   </p>
@@ -1013,49 +1013,109 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
 
       {/* Comments Sidebar */}
       {showCommentsSidebar && (
-        <div className="fixed inset-y-0 right-0 w-80 bg-white border-l border-gray-200 shadow-lg z-50">
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Comments</h3>
-            <button onClick={() => setShowCommentsSidebar(false)}>×</button>
-          </div>
-          <div className="p-4">
-            <div className="space-y-4">
-              {task.comments && task.comments.length > 0 ? (
-                task.comments.map((comment, index) => (
-                  <div key={index} className="bg-gray-50 rounded-lg p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-sm font-medium text-gray-900">
-                        {comment.author?.fullName || comment.createdBy?.fullName || comment.createdBy || 'User'}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {new Date(comment.createdAt).toLocaleString()}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-700">{comment.content}</p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-gray-500">No comments yet</p>
-              )}
+  <>
+    {/* Overlay for mobile */}
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+      onClick={() => setShowCommentsSidebar(false)}
+    />
+    
+    {/* Comments Sidebar */}
+    <div className="fixed inset-y-0 right-0 w-full sm:w-96 lg:w-80 bg-white border-l border-gray-200 shadow-lg z-50 flex flex-col">
+      
+      {/* Fixed Header */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white flex-shrink-0">
+        <h3 className="text-lg font-semibold text-gray-900">Comments</h3>
+        <button 
+          onClick={() => setShowCommentsSidebar(false)}
+          className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+          aria-label="Close comments"
+        >
+          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      
+      {/* Scrollable Comments Area */}
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="space-y-4">
+          {task.comments && task.comments.length > 0 ? (
+            task.comments.map((comment, index) => (
+              <div key={index} className="bg-gray-50 rounded-lg p-3 break-words">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <span className="text-sm font-medium text-gray-900 break-words">
+                    {comment.author?.fullName || comment.createdBy?.fullName || comment.createdBy || 'User'}
+                  </span>
+                  <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">
+                    {new Date(comment.createdAt).toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-700 break-words leading-relaxed">{comment.content}</p>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-8">
+              <svg className="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <p className="text-sm text-gray-500 mb-2">No comments yet</p>
+              <p className="text-xs text-gray-400">Be the first to add a comment below</p>
             </div>
-            <div className="mt-4">
-              <textarea
-                className="input resize-none min-h-[100px]"
-                placeholder="Add a comment..."
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-              />
+          )}
+        </div>
+      </div>
+      
+      {/* Fixed Input Area */}
+      <div className="border-t border-gray-200 p-4 bg-white flex-shrink-0">
+        <div className="space-y-3">
+          <textarea
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+            rows={3}
+            placeholder="Add a comment..."
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            maxLength={500}
+          />
+          
+          {/* Character count and actions */}
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400">
+              {comment.length}/500 characters
+            </span>
+            <div className="flex gap-2">
               <button
-                className="btn btn-primary btn-sm mt-2"
+                type="button"
+                onClick={() => setComment('')}
+                className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800 transition-colors duration-200"
+                disabled={!comment.trim()}
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                className="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                 onClick={handleAddComment}
                 disabled={isAddingComment || !comment.trim()}
               >
-                {isAddingComment ? 'Adding...' : 'Add Comment'}
+                {isAddingComment ? (
+                  <div className="flex items-center gap-2">
+                    <svg className="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Adding...
+                  </div>
+                ) : (
+                  'Add Comment'
+                )}
               </button>
             </div>
           </div>
         </div>
-      )}
+      </div>
+    </div>
+  </>
+)}
 
       {/* Task Reassignment Modal */}
       {showReassignment && (

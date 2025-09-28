@@ -33,6 +33,7 @@ const VersionControl = ({ task, onRefresh }) => {
   const [validationResults, setValidationResults] = useState(null);
   const [showValidationResults, setShowValidationResults] = useState(false);
   const [selectedVersion, setSelectedVersion] = useState(null); // For viewing version details
+  const selectedVersionRef = useRef(null); // Ref for scrolling to selected version
 
   // API mutations - ALTERNATIVE PATTERN TO AVOID HOOK ISSUES
   const [uploadVersionTrigger, uploadVersionResult] = useUploadVersionMutation();
@@ -117,7 +118,7 @@ const VersionControl = ({ task, onRefresh }) => {
     }
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const files = Array.from(e.target.files);
     
     // Validate file count (max 5 as per documentation)
@@ -135,6 +136,11 @@ const VersionControl = ({ task, onRefresh }) => {
     // Clear previous validation results
     setValidationResults(null);
     setShowValidationResults(false);
+
+    // Auto-validate files if any are selected
+    if (files.length > 0) {
+      await handleValidateFiles(files);
+    }
   };
 
   const handleInputChange = (field, value) => {
@@ -144,14 +150,16 @@ const VersionControl = ({ task, onRefresh }) => {
     }));
   };
 
-  // FIXED: Proper file validation flow
-  const handleValidateFiles = async () => {
+  // UPDATED: Auto-validation with optional files parameter
+  const handleValidateFiles = async (filesToValidate = null) => {
+    const files = filesToValidate || uploadData.files;
+    
     try {
-      console.log('Starting file validation...', uploadData.files.length, 'files');
+      console.log('Starting file validation...', files.length, 'files');
       
       // Step 1: Prepare FormData for upload
       const formData = new FormData();
-      uploadData.files.forEach((file) => {
+      files.forEach((file) => {
         formData.append("files", file);
       });
 
@@ -185,6 +193,7 @@ const VersionControl = ({ task, onRefresh }) => {
       }));
 
       console.log('File validation completed successfully');
+      return true;
 
     } catch (err) {
       console.error("Validation error:", err);
@@ -198,29 +207,35 @@ const VersionControl = ({ task, onRefresh }) => {
       
       // Clear S3 URLs on error
       setUploadData(prev => ({ ...prev, s3Urls: [] }));
+      return false;
     }
   };
 
-  // ENHANCED: Version upload with better error logging
+  // UPDATED: Create version with auto-validation if needed
   const handleFileUpload = async () => {
   console.log("Starting version upload...");  
     
   try {
-    // Check permissions and validation first
+    // Check permissions first
     if (!canUserUploadVersion()) {
       alert("You do not have permission to upload versions at this time");
       return;
     }
 
-    if (!uploadData.s3Urls || uploadData.s3Urls.length === 0) {
-      alert("Please validate files before uploading a version.");
+    if (!uploadData.files || uploadData.files.length === 0) {
+      alert("Please select files before creating a version.");
       return;
     }
 
-    // Ensure we have validation results and they are valid
-    if (!validationResults || validationResults.invalid > 0) {
-      alert("Files must pass validation before creating a version.");
-      return;
+    // Auto-validate if not already validated or validation failed
+    if (!uploadData.s3Urls || uploadData.s3Urls.length === 0 || 
+        !validationResults || validationResults.invalid > 0) {
+      console.log('Auto-validating files before version creation...');
+      const validationSuccess = await handleValidateFiles();
+      if (!validationSuccess) {
+        alert("File validation failed. Please check your files and try again.");
+        return;
+      }
     }
 
     console.log('Creating version with S3 URLs:', uploadData.s3Urls);
@@ -297,6 +312,17 @@ const VersionControl = ({ task, onRefresh }) => {
   // Handle viewing version details
   const handleViewVersion = (version) => {
     setSelectedVersion(version);
+    
+    // Scroll to the selected version details card after state update
+    setTimeout(() => {
+      if (selectedVersionRef.current) {
+        selectedVersionRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+          inline: 'nearest'
+        });
+      }
+    }, 100); // Small delay to ensure the component has rendered
   };
 
   // Handle closing version details
@@ -462,20 +488,25 @@ const VersionControl = ({ task, onRefresh }) => {
                 {/* Version Comments */}
                 <div className="mt-4">
                   {latestVersion.comments && latestVersion.comments.length > 0 && (
-                    <div className="mb-3 space-y-2 max-h-32 overflow-y-auto">
-                      {latestVersion.comments.slice(-3).map((comment, index) => (
-                        <div key={index} className="text-sm bg-white p-2 rounded border">
-                          <div className="flex justify-between items-start mb-1">
-                            <span className="font-medium text-gray-700">
-                              {comment.createdBy?.fullName || comment.author?.fullName || 'User'}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {formatDate(comment.createdAt)}
-                            </span>
+                    <div className="mb-3">
+                      <div className="text-sm font-medium text-gray-700 mb-2">
+                        Comments ({latestVersion.comments.length})
+                      </div>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {latestVersion.comments.map((comment, index) => (
+                          <div key={index} className="text-sm bg-white p-2 rounded border">
+                            <div className="flex justify-between items-start mb-1">
+                              <span className="font-medium text-gray-700">
+                                {comment.createdBy?.fullName || comment.author?.fullName || 'User'}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {formatDate(comment.createdAt)}
+                              </span>
+                            </div>
+                            <p className="text-gray-600">{comment.content}</p>
                           </div>
-                          <p className="text-gray-600">{comment.content}</p>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   )}
                   
@@ -509,7 +540,7 @@ const VersionControl = ({ task, onRefresh }) => {
 
       {/* Selected Version Details Card */}
       {selectedVersion && (
-        <div className="info-section">
+        <div className="info-section" ref={selectedVersionRef}>
           <div className="info-card bg-purple-50">
             <div className="info-card-header flex-between">
               <div className="flex items-center gap-2">
@@ -661,17 +692,6 @@ const VersionControl = ({ task, onRefresh }) => {
           <div className="info-card-header flex-between">
             <span className="card-title">Upload New Version</span>
             <div className="flex gap-2">
-              <CanValidateFiles>
-                {uploadData.files.length > 0 && (
-                  <button 
-                    className="btn btn-outline btn-sm"
-                    onClick={handleValidateFiles}
-                    disabled={isValidating || isUploadingFiles}
-                  >
-                    {isValidating ? 'Validating...' : isUploadingFiles ? 'Uploading...' : 'Validate Files'}
-                  </button>
-                )}
-              </CanValidateFiles>
               <button 
                 className="btn btn-primary btn-sm"
                 onClick={handlePreview}
@@ -774,15 +794,44 @@ const VersionControl = ({ task, onRefresh }) => {
                 {previewMode && uploadData.files.length > 0 && (
                   <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded">
                     <div className="text-sm font-medium text-purple-800 mb-2">Preview Mode</div>
-                    <div className="text-sm text-purple-700">
-                      Ready to upload {uploadData.files.length} file{uploadData.files.length !== 1 ? 's' : ''} 
-                      {uploadData.remarks && ` with remarks: "${uploadData.remarks}"`}
-                      <br />
-                      {filesReadyForUpload ? (
-                        <span className="text-green-700 font-medium">✓ Files validated and ready for version creation</span>
-                      ) : (
-                        <span className="text-orange-700">⚠ Please validate files before creating version</span>
+                    <div className="text-sm text-purple-700 space-y-1">
+                      <div>Ready to upload {uploadData.files.length} file{uploadData.files.length !== 1 ? 's' : ''}</div>
+                      {uploadData.remarks && (
+                        <div>Remarks: "{uploadData.remarks}"</div>
                       )}
+                      
+                      {/* Validation Status */}
+                      <div className="mt-2 pt-2 border-t border-purple-200">
+                        {isValidating ? (
+                          <div className="flex items-center gap-2 text-blue-700">
+                            <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            <span className="font-medium">Validating files...</span>
+                          </div>
+                        ) : filesReadyForUpload ? (
+                          <div className="flex items-center gap-2 text-green-700">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span className="font-medium">Files validated & ready</span>
+                          </div>
+                        ) : validationResults && validationResults.invalid > 0 ? (
+                          <div className="flex items-center gap-2 text-red-700">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span className="font-medium">Validation failed</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span className="font-medium">Auto-validation will run on upload</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -795,14 +844,27 @@ const VersionControl = ({ task, onRefresh }) => {
                 />
                 
                 <button 
-                  className={`btn w-full ${
-                    filesReadyForUpload ? 'btn-primary' : 'btn-secondary'
-                  }`}
+                  className="btn btn-primary w-full"
                   onClick={handleFileUpload}
-                  disabled={isUploadingVersion || !filesReadyForUpload}
+                  disabled={isUploadingVersion || isValidating || uploadData.files.length === 0}
                 >
-                  {isUploadingVersion ? 'Creating Version...' : 
-                   filesReadyForUpload ? 'Create Version' : 'Validate Files First'}
+                  {isUploadingVersion ? (
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Creating Version...
+                    </div>
+                  ) : isValidating ? (
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Validating Files...
+                    </div>
+                  ) : (
+                    'Create Version'
+                  )}
                 </button>
 
                 {/* Upload Instructions */}
@@ -810,7 +872,6 @@ const VersionControl = ({ task, onRefresh }) => {
                   <p className="mb-1">• Supported formats: PDF, DOC, DOCX, JPG, PNG, GIF, MP4, AVI, MOV</p>
                   <p className="mb-1">• Maximum 5 files per version</p>
                   <p className="mb-1">• Maximum file size: 50MB per file</p> 
-                  <p className="mb-1">• Step 1: Select files → Step 2: Validate → Step 3: Create version</p>
                 </div>
               </>
             ) : (
@@ -832,9 +893,11 @@ const VersionControl = ({ task, onRefresh }) => {
       {task?.olderVersions && task.olderVersions.length > 0 && (
         <div className="info-section">
           <div className="info-card">
-            <div className="info-card-header">
+            <div className="info-card-header flex-between">
               <span className="text-heading-4">Version History</span>
-              <span className="text-sm text-gray-500">({task.olderVersions.length} older versions)</span>
+              <span className="text-sm text-gray-500">
+                Total versions: {task.olderVersions.length}
+              </span>
             </div>
             <div className="card-body">
               <div className="space-y-3 max-h-64 overflow-y-auto">
@@ -861,23 +924,7 @@ const VersionControl = ({ task, onRefresh }) => {
                         <div className="text-xs text-gray-500 mt-1 truncate">
                           {version.remarks}
                         </div>
-                      )}
-                      {/* Show file types in history */}
-                      {version.fileUrls && (
-                        <div className="flex gap-1 mt-1">
-                          {version.fileUrls.slice(0, 3).map((fileUrl, fileIndex) => {
-                            const fileName = fileUrl.split('/').pop();
-                            return (
-                              <div key={fileIndex} className="inline-flex items-center">
-                                {getFileTypeIcon(fileName)}
-                              </div>
-                            );
-                          })}
-                          {version.fileUrls.length > 3 && (
-                            <span className="text-xs text-gray-500">+{version.fileUrls.length - 3} more</span>
-                          )}
-                        </div>
-                      )}
+                      )} 
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-xs text-gray-500">
@@ -901,9 +948,7 @@ const VersionControl = ({ task, onRefresh }) => {
               
               {/* Quick Actions for Version History */}
               <div className="mt-4 pt-3 border-t border-gray-200 flex justify-between items-center">
-                <div className="text-xs text-gray-500">
-                  Click "View" to see detailed information about any version
-                </div>
+                <div></div>
                 {selectedVersion && (
                   <button
                     onClick={handleCloseVersionView}
