@@ -1,4 +1,4 @@
-// src/components/Tasks/VersionControl/VersionControl.jsx - Fixed Upload New Version functionality
+// src/components/Tasks/VersionControl/VersionControl.jsx - Fixed Latest Version Display
 import React, { useState, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUserRole, selectCurrentUser } from '../../../redux/slices/authSlice';
@@ -32,6 +32,7 @@ const VersionControl = ({ task, onRefresh }) => {
   const [previewMode, setPreviewMode] = useState(false);
   const [validationResults, setValidationResults] = useState(null);
   const [showValidationResults, setShowValidationResults] = useState(false);
+  const [selectedVersion, setSelectedVersion] = useState(null); // For viewing version details
 
   // API mutations - ALTERNATIVE PATTERN TO AVOID HOOK ISSUES
   const [uploadVersionTrigger, uploadVersionResult] = useUploadVersionMutation();
@@ -42,10 +43,8 @@ const VersionControl = ({ task, onRefresh }) => {
   // Track loading state manually
   const isUploadingVersion = uploadVersionResult.isLoading;
 
-  // Get latest version
-  const latestVersion = task?.versions && task.versions.length > 0 
-    ? task.versions[task.versions.length - 1] 
-    : null;
+  // FIXED: Get latest version from currentVersion field in API response
+  const latestVersion = task?.currentVersion || null;
 
   // Check if user can upload based on role and task status
   const canUserUploadVersion = () => {
@@ -235,33 +234,31 @@ const VersionControl = ({ task, onRefresh }) => {
 
     console.log('Version payload:', versionPayload);
 
-    // Create version
+    // Create version - FIXED: Just await the result, API success means no error was thrown
     const result = await uploadVersionTrigger(versionPayload).unwrap();
+    console.log('Version upload result:', result);
 
-    if (result.success) {
-      // Show success message with guidance
-      const guidance = getUploadGuidance();
-      alert(`Version uploaded successfully! ${guidance.message}`);
+    // If we get here, the upload was successful (no error thrown)
+    // Show success message with guidance
+    const guidance = getUploadGuidance();
+    alert(`Version uploaded successfully! ${guidance.message}`);
 
-      // Reset form
-      setUploadData({
-        files: [],
-        remarks: '',
-        comment: '',
-        s3Urls: []
-      });
-      setValidationResults(null);
-      setShowValidationResults(false);
-      setPreviewMode(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-
-      // Refresh task data
-      onRefresh?.();
-    } else {
-      throw new Error(result.message || 'Failed to create version');
+    // Reset form
+    setUploadData({
+      files: [],
+      remarks: '',
+      comment: '',
+      s3Urls: []
+    });
+    setValidationResults(null);
+    setShowValidationResults(false);
+    setPreviewMode(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
+
+    // Refresh task data
+    onRefresh?.();
 
   } catch (error) {
     console.error("Version upload failed:", error);
@@ -295,6 +292,16 @@ const VersionControl = ({ task, onRefresh }) => {
       return;
     }
     setPreviewMode(!previewMode);
+  };
+
+  // Handle viewing version details
+  const handleViewVersion = (version) => {
+    setSelectedVersion(version);
+  };
+
+  // Handle closing version details
+  const handleCloseVersionView = () => {
+    setSelectedVersion(null);
   };
 
   const formatFileSize = (bytes) => {
@@ -387,14 +394,13 @@ const VersionControl = ({ task, onRefresh }) => {
                 <div className="info-row">
                   <span className="info-label">Version:</span>
                   <span className="info-value">
-                    {latestVersion.version || latestVersion.versionNumber || '1.0'}
+                    {latestVersion.versionNumber || '1.0'}
                   </span>
                 </div>
                 <div className="info-row">
                   <span className="info-label">Uploaded By:</span>
                   <span className="info-value">
                     {latestVersion.uploadedBy?.fullName || 
-                     latestVersion.uploadedBy || 
                      currentUser?.fullName || 
                      'Unknown'}
                   </span>
@@ -402,7 +408,7 @@ const VersionControl = ({ task, onRefresh }) => {
                 <div className="info-row">
                   <span className="info-label">On:</span>
                   <span className="info-value">
-                    {formatDate(latestVersion.createdAt || latestVersion.uploadedAt)}
+                    {formatDate(latestVersion.uploadedAt)}
                   </span>
                 </div>
                 <div className="info-row">
@@ -414,11 +420,10 @@ const VersionControl = ({ task, onRefresh }) => {
                 <div className="info-row">
                   <span className="info-label">Files:</span>
                   <span className="info-value info-file-list">
-                    {latestVersion.files && latestVersion.files.length > 0 ? (
+                    {latestVersion.fileUrls && latestVersion.fileUrls.length > 0 ? (
                       <div className="space-y-1">
-                        {latestVersion.files.map((file, index) => {
-                          const fileName = typeof file === 'string' ? file.split('/').pop() : file.filename || `File ${index + 1}`;
-                          const fileUrl = typeof file === 'string' ? file : file.url;
+                        {latestVersion.fileUrls.map((fileUrl, index) => {
+                          const fileName = fileUrl.split('/').pop();
                           return (
                             <div key={index} className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
@@ -427,69 +432,29 @@ const VersionControl = ({ task, onRefresh }) => {
                                   {fileName}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-2">
-                                {file.size && (
-                                  <span className="text-xs text-gray-500">
-                                    {formatFileSize(file.size)}
-                                  </span>
-                                )}
-                                <div className="flex gap-1">
-                                  <button
-                                    onClick={() => window.open(fileUrl, '_blank')}
-                                    className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
-                                    title="View file"
-                                  >
-                                    View
-                                  </button>
-                                  <a
-                                    href={fileUrl}
-                                    download={fileName}
-                                    className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200"
-                                    title="Download file"
-                                  >
-                                    Download
-                                  </a>
-                                </div>
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => window.open(fileUrl, '_blank')}
+                                  className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
+                                  title="View file"
+                                >
+                                  View
+                                </button>
+                                <a
+                                  href={fileUrl}
+                                  download={fileName}
+                                  className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200"
+                                  title="Download file"
+                                >
+                                  Download
+                                </a>
                               </div>
                             </div>
                           );
                         })}
                       </div>
                     ) : (
-                      latestVersion.fileUrls && latestVersion.fileUrls.length > 0 ? (
-                        <div className="space-y-1">
-                          {latestVersion.fileUrls.map((fileUrl, index) => {
-                            const fileName = fileUrl.split('/').pop();
-                            return (
-                              <div key={index} className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  {getFileTypeIcon(fileName)}
-                                  <span className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer truncate">
-                                    {fileName}
-                                  </span>
-                                </div>
-                                <div className="flex gap-1">
-                                  <button
-                                    onClick={() => window.open(fileUrl, '_blank')}
-                                    className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
-                                    title="View file"
-                                  >
-                                    View
-                                  </button>
-                                  <a
-                                    href={fileUrl}
-                                    download={fileName}
-                                    className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200"
-                                    title="Download file"
-                                  >
-                                    Download
-                                  </a>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : 'No files'
+                      'No files'
                     )}
                   </span>
                 </div>
@@ -541,6 +506,154 @@ const VersionControl = ({ task, onRefresh }) => {
           </div>
         </div>
       </div>
+
+      {/* Selected Version Details Card */}
+      {selectedVersion && (
+        <div className="info-section">
+          <div className="info-card bg-purple-50">
+            <div className="info-card-header flex-between">
+              <div className="flex items-center gap-2">
+                <span className="info-badge-new bg-purple-500 text-white">
+                  VIEWING
+                </span>
+                <span className="text-heading-2">
+                  Version Details
+                </span>
+              </div>
+              <button 
+                onClick={handleCloseVersionView}
+                className="btn btn-ghost btn-sm"
+                title="Close version details"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Close
+              </button>
+            </div>
+            <div className="card-body">
+              <div className="info-row">
+                <span className="info-label">Version:</span>
+                <span className="info-value">
+                  {selectedVersion.versionNumber || '1.0'}
+                </span>
+              </div>
+              <div className="info-row">
+                <span className="info-label">Uploaded By:</span>
+                <span className="info-value">
+                  {selectedVersion.uploadedBy?.fullName || 
+                   currentUser?.fullName || 
+                   'Unknown'}
+                </span>
+              </div>
+              <div className="info-row">
+                <span className="info-label">On:</span>
+                <span className="info-value">
+                  {formatDate(selectedVersion.uploadedAt)}
+                </span>
+              </div>
+              <div className="info-row">
+                <span className="info-label">Remarks:</span>
+                <span className="info-value info-remark-box">
+                  {selectedVersion.remarks || 'No remarks'}
+                </span>
+              </div>
+              <div className="info-row">
+                <span className="info-label">Files:</span>
+                <span className="info-value info-file-list">
+                  {selectedVersion.fileUrls && selectedVersion.fileUrls.length > 0 ? (
+                    <div className="space-y-1">
+                      {selectedVersion.fileUrls.map((fileUrl, index) => {
+                        const fileName = fileUrl.split('/').pop();
+                        return (
+                          <div key={index} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {getFileTypeIcon(fileName)}
+                              <span className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer truncate">
+                                {fileName}
+                              </span>
+                            </div>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => window.open(fileUrl, '_blank')}
+                                className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
+                                title="View file"
+                              >
+                                View
+                              </button>
+                              <a
+                                href={fileUrl}
+                                download={fileName}
+                                className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200"
+                                title="Download file"
+                              >
+                                Download
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    'No files'
+                  )}
+                </span>
+              </div>
+              
+              {/* Version Comments */}
+              {selectedVersion.comments && selectedVersion.comments.length > 0 && (
+                <div className="mt-4">
+                  <div className="text-sm font-medium text-gray-700 mb-2">
+                    Comments ({selectedVersion.comments.length})
+                  </div>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {selectedVersion.comments.map((comment, index) => (
+                      <div key={index} className="text-sm bg-white p-2 rounded border">
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="font-medium text-gray-700">
+                            {comment.author?.fullName || comment.createdBy?.fullName || 'User'}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {formatDate(comment.createdAt)}
+                          </span>
+                        </div>
+                        <p className="text-gray-600">{comment.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Version Statistics */}
+              <div className="mt-4 p-3 bg-white rounded border">
+                <div className="text-sm font-medium text-gray-700 mb-2">Version Statistics</div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">Files:</span>
+                    <span className="ml-2 font-medium">{selectedVersion.fileUrls?.length || 0}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Comments:</span>
+                    <span className="ml-2 font-medium">{selectedVersion.comments?.length || 0}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Version ID:</span>
+                    <span className="ml-2 font-mono text-xs">{selectedVersion.id}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Status:</span>
+                    <span className="ml-2">
+                      <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">
+                        {selectedVersion.id === latestVersion?.id ? 'Current' : 'Archived'}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Upload New Version */}
       <div className="info-section">
@@ -715,57 +828,93 @@ const VersionControl = ({ task, onRefresh }) => {
         </div>
       </div>
 
-      {/* Version History */}
-      {task?.versions && task.versions.length > 1 && (
+      {/* Version History - UPDATED: Use olderVersions from API response */}
+      {task?.olderVersions && task.olderVersions.length > 0 && (
         <div className="info-section">
           <div className="info-card">
             <div className="info-card-header">
               <span className="text-heading-4">Version History</span>
-              <span className="text-sm text-gray-500">({task.versions.length} versions)</span>
+              <span className="text-sm text-gray-500">({task.olderVersions.length} older versions)</span>
             </div>
             <div className="card-body">
               <div className="space-y-3 max-h-64 overflow-y-auto">
-                {task.versions.slice(0, -1).reverse().map((version, index) => (
+                {task.olderVersions.map((version, index) => (
                   <div key={index} className="flex items-start justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-sm font-medium text-gray-900">
-                          Version {version.version || version.versionNumber || `${task.versions.length - index - 1}.0`}
+                          Version {version.versionNumber || `${task.olderVersions.length - index}.0`}
                         </span>
                         <span className="text-xs text-gray-500">
-                          {formatDate(version.createdAt || version.uploadedAt)}
+                          {formatDate(version.uploadedAt)}
                         </span>
+                        {version.comments && version.comments.length > 0 && (
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                            {version.comments.length} comment{version.comments.length !== 1 ? 's' : ''}
+                          </span>
+                        )}
                       </div>
                       <div className="text-xs text-gray-600">
                         By: {version.uploadedBy?.fullName || 'Unknown'}
                       </div>
                       {version.remarks && (
-                        <div className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-gray-500 mt-1 truncate">
                           {version.remarks}
                         </div>
                       )}
                       {/* Show file types in history */}
-                      {(version.files || version.fileUrls) && (
+                      {version.fileUrls && (
                         <div className="flex gap-1 mt-1">
-                          {(version.files || version.fileUrls).slice(0, 3).map((file, fileIndex) => {
-                            const fileName = typeof file === 'string' ? file.split('/').pop() : file.filename;
+                          {version.fileUrls.slice(0, 3).map((fileUrl, fileIndex) => {
+                            const fileName = fileUrl.split('/').pop();
                             return (
                               <div key={fileIndex} className="inline-flex items-center">
                                 {getFileTypeIcon(fileName)}
                               </div>
                             );
                           })}
-                          {(version.files || version.fileUrls).length > 3 && (
-                            <span className="text-xs text-gray-500">+{(version.files || version.fileUrls).length - 3} more</span>
+                          {version.fileUrls.length > 3 && (
+                            <span className="text-xs text-gray-500">+{version.fileUrls.length - 3} more</span>
                           )}
                         </div>
                       )}
                     </div>
-                    <div className="text-xs text-gray-500">
-                      {(version.files || version.fileUrls)?.length || 0} files
+                    <div className="flex items-center gap-3">
+                      <div className="text-xs text-gray-500">
+                        {version.fileUrls?.length || 0} files
+                      </div>
+                      <button
+                        onClick={() => handleViewVersion(version)}
+                        className="btn btn-outline btn-sm text-xs"
+                        title="View version details"
+                      >
+                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        View
+                      </button>
                     </div>
                   </div>
                 ))}
+              </div>
+              
+              {/* Quick Actions for Version History */}
+              <div className="mt-4 pt-3 border-t border-gray-200 flex justify-between items-center">
+                <div className="text-xs text-gray-500">
+                  Click "View" to see detailed information about any version
+                </div>
+                {selectedVersion && (
+                  <button
+                    onClick={handleCloseVersionView}
+                    className="btn btn-ghost btn-sm text-xs"
+                  >
+                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Close Details
+                  </button>
+                )}
               </div>
             </div>
           </div>
