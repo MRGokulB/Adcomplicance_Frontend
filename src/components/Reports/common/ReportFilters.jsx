@@ -219,12 +219,7 @@ const ReportFilters = ({ filters, onFilterChange, filterFields, options = {} }) 
         {/* Filter Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <h3 className="text-sm font-medium text-gray-700">Filters</h3>
-            {hasActiveFilters() && (
-              <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
-                {Object.values(localFilters).filter(v => v && v !== '').length} active
-              </span>
-            )}
+            <h3 className="text-sm font-medium text-gray-700">Filters</h3> 
           </div>
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
@@ -238,8 +233,7 @@ const ReportFilters = ({ filters, onFilterChange, filterFields, options = {} }) 
           <>
             {/* Date Range Presets */}
             {filterFields.some(field => field.type === 'date' || field.type === 'dateRange') && (
-              <div className="mb-4">
-                <p className="text-xs font-medium text-gray-600 mb-2">Quick Date Filters:</p>
+              <div className="mb-4"> 
                 <div className="flex flex-wrap gap-2">
                   {getDatePresets().map(preset => (
                     <button
@@ -261,10 +255,7 @@ const ReportFilters = ({ filters, onFilterChange, filterFields, options = {} }) 
 
             {/* Action Buttons */}
             <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-100">
-              <div className="text-xs text-gray-500">
-                {hasActiveFilters() && 'Filters applied - click "Apply Filters" to update results'}
-              </div>
-              
+              <div ></div>
               <div className="flex gap-3">
                 <button 
                   className="btn btn-secondary"

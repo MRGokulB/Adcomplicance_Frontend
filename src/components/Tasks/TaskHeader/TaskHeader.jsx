@@ -576,10 +576,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
                     {/* Show current classification if exists and no pending changes */}
                     {task.taskType && !showClassificationSubmit && (
                       <div className="text-sm text-green-600 mt-1">
-                        ✓ Currently classified as: {task.taskType === 'EXCHANGE' ? 'Exchange' : 'Internal'}
-                        {classificationActions.canReclassify && (
-                          <span className="text-gray-500"> (You can reclassify if needed)</span>
-                        )}
+                        ✓ Currently classified as: {task.taskType === 'EXCHANGE' ? 'Exchange' : 'Internal'} 
                       </div>
                     )}
                   </div>
@@ -844,6 +841,15 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
                     className="input"
                     value={formData.publishDate}
                     onChange={(e) => setFormData(prev => ({ ...prev, publishDate: e.target.value }))}
+                    required
+                  />
+                  <label className="exchange-form-label">Published Copy URL *</label>
+                  <input
+                    type="url"
+                    className="input"
+                    value={formData.publishedCopyUrl}
+                    onChange={(e) => setFormData(prev => ({...prev, publishedCopyUrl: e.target.value}))}
+                    placeholder="https://..."
                     required
                   />
                 </div>

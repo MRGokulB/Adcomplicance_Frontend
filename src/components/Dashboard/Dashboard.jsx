@@ -302,36 +302,102 @@ const Dashboard = () => {
         </div>
 
         {/* Activity Feed */}
-        {activityFeed && activityFeed.length > 0 && (
-          <div className="mt-8">
-            <h2 className="text-lg font-semibold mb-4">Recent Activity</h2>
-            <div className="bg-white rounded-lg shadow border">
-              <div className="p-4">
-                {isActivityLoading ? (
-                  <div className="text-center py-4">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="mt-2 text-gray-600">Loading activity...</p>
+        {/* Enhanced Activity Feed - Minimal Version */}
+{activityFeed && activityFeed.length > 0 && (
+  <div className="mt-8">
+    <h2 className="text-lg font-semibold mb-4">Recent Activity</h2>
+    <div className="info-card">
+      <div className="card-body">
+        {isActivityLoading ? (
+          <div className="flex-col-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+            <p className="text-gray-600">Loading recent activity...</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {activityFeed.slice(0, 5).map((item, index) => {
+              const formattedItem = formatActivityItem(item);
+              
+              // Determine activity type for styling
+              const getActivityStyle = (text) => {
+                if (text.includes('uploaded') || text.includes('created')) {
+                  return {
+                    iconBg: 'bg-green-100',
+                    iconColor: 'text-green-600',
+                    icon: (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                    )
+                  };
+                } else if (text.includes('comment') || text.includes('added')) {
+                  return {
+                    iconBg: 'bg-blue-100',
+                    iconColor: 'text-blue-600',
+                    icon: (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                    )
+                  };
+                } else if (text.includes('status') || text.includes('changed') || text.includes('updated')) {
+                  return {
+                    iconBg: 'bg-yellow-100',
+                    iconColor: 'text-yellow-600',
+                    icon: (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    )
+                  };
+                } else if (text.includes('approved') || text.includes('published')) {
+                  return {
+                    iconBg: 'bg-green-100',
+                    iconColor: 'text-green-600',
+                    icon: (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )
+                  };
+                } else {
+                  return {
+                    iconBg: 'bg-gray-100',
+                    iconColor: 'text-gray-600',
+                    icon: (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    )
+                  };
+                }
+              };
+              
+              const activityStyle = getActivityStyle(formattedItem.displayText);
+              
+              return (
+                <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                  <div className={`flex-shrink-0 w-8 h-8 ${activityStyle.iconBg} rounded-lg flex items-center justify-center ${activityStyle.iconColor}`}>
+                    {activityStyle.icon}
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    {activityFeed.slice(0, 5).map((item, index) => {
-                      const formattedItem = formatActivityItem(item);
-                      return (
-                        <div key={index} className="flex items-start space-x-3">
-                          <div className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                          <div className="flex-grow">
-                            <p className="text-sm text-gray-900">{formattedItem.displayText}</p>
-                            <p className="text-xs text-gray-500">{formattedItem.timeAgo}</p>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-900 leading-relaxed">
+                      {formattedItem.displayText}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {formattedItem.timeAgo}
+                    </p>
                   </div>
-                )}
-              </div>
-            </div>
+                </div>
+              );
+            })}
           </div>
         )}
+      </div>
+    </div>
+  </div>
+)}
 
         {/* System Status for Admins - Updated with real data */}
         {permissions.isAdmin && (

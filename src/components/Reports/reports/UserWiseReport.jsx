@@ -1,5 +1,8 @@
 import PropTypes from 'prop-types';
 import { useState } from 'react';
+import { useSelector } from 'react-redux';
+import { selectUserRole } from '../../../redux/slices/authSlice';
+import { hasPermission, PERMISSIONS } from '../../../utils/roles';
 import { useGetComplianceUsersReportQuery, useGetProductUsersReportQuery } from '../../../redux/api/reportsApi';
 import ReportFilters from '../common/ReportFilters';
 import ReportTable from '../common/ReportTable';
@@ -12,14 +15,20 @@ const UserWiseReport = ({ type, onTypeChange }) => {
     userId: ''
   });
 
-  // Conditional API calls based on report type
+  const userRole = useSelector(selectUserRole);
+
+  // Check permissions for current report type
+  const canAccessCompliance = hasPermission(userRole, PERMISSIONS.REPORT_COMPLIANCE_USERS);
+  const canAccessProduct = hasPermission(userRole, PERMISSIONS.REPORT_PRODUCT_USERS);
+
+  // Conditional API calls based on report type AND permissions
   const { 
     data: complianceData, 
     isLoading: isComplianceLoading, 
     error: complianceError,
     refetch: refetchCompliance
   } = useGetComplianceUsersReportQuery(filters, {
-    skip: type !== 'compliance',
+    skip: type !== 'compliance' || !canAccessCompliance, // Skip if no permission
     pollingInterval: 60000,
     refetchOnMountOrArgChange: true,
   });
@@ -30,12 +39,69 @@ const UserWiseReport = ({ type, onTypeChange }) => {
     error: productError,
     refetch: refetchProduct
   } = useGetProductUsersReportQuery(filters, {
-    skip: type !== 'product',
+    skip: type !== 'product' || !canAccessProduct, // Skip if no permission
     pollingInterval: 60000,
     refetchOnMountOrArgChange: true,
   });
 
-  // Current data based on selected type
+  // Handle permission-based access control
+  if (type === 'compliance' && !canAccessCompliance) {
+    return (
+      <div className="p-6">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex">
+            <svg className="w-5 h-5 text-yellow-600 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <div>
+              <h3 className="text-sm font-medium text-yellow-800">Access Restricted</h3>
+              <p className="text-sm text-yellow-700 mt-1">
+                You don't have permission to view compliance users reports.
+              </p>
+              {canAccessProduct && (
+                <button
+                  onClick={() => onTypeChange('product')}
+                  className="mt-2 btn btn-primary btn-sm"
+                >
+                  Switch to Product Users Report
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (type === 'product' && !canAccessProduct) {
+    return (
+      <div className="p-6">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex">
+            <svg className="w-5 h-5 text-yellow-600 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <div>
+              <h3 className="text-sm font-medium text-yellow-800">Access Restricted</h3>
+              <p className="text-sm text-yellow-700 mt-1">
+                You don't have permission to view product users reports.
+              </p>
+              {canAccessCompliance && (
+                <button
+                  onClick={() => onTypeChange('compliance')}
+                  className="mt-2 btn btn-primary btn-sm"
+                >
+                  Switch to Compliance Users Report
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Current data based on selected type and permissions
   const currentData = type === 'compliance' ? complianceData : productData;
   const isLoading = type === 'compliance' ? isComplianceLoading : isProductLoading;
   const error = type === 'compliance' ? complianceError : productError;
@@ -101,6 +167,7 @@ const UserWiseReport = ({ type, onTypeChange }) => {
   const tableData = transformData(currentData);
   const summary = currentData?.summary || {};
 
+  // Only show API errors for reports the user has permission to access
   if (error) {
     return (
       <div className="p-6">
@@ -125,7 +192,6 @@ const UserWiseReport = ({ type, onTypeChange }) => {
         <h2 className="text-heading-3">
           {type === 'compliance' ? 'Compliance Users Report' : 'Product Users Report'}
         </h2>
-        {/* FIXED: Added required props to ExportButtons */}
         <ExportButtons 
           data={tableData}
           columns={currentColumns}

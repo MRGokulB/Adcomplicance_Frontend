@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUserRole } from '../../redux/slices/authSlice';
-import { canAccessReports } from '../../utils/roles';
+import { canAccessReports, hasPermission, PERMISSIONS } from '../../utils/roles';
 import ReportSelector from './ReportSelector';
 import InternalTasksReport from './reports/InternalTasksReport';
 import ExchangeTasksReport from './reports/ExchangeTasksReport';
@@ -14,6 +14,23 @@ const ReportsPage = () => {
   const [selectedReportType, setSelectedReportType] = useState('internal-tasks');
   const [userReportType, setUserReportType] = useState('compliance');
   const userRole = useSelector(selectUserRole);
+
+  // Set correct initial userReportType based on user permissions
+  useEffect(() => {
+    const canAccessCompliance = hasPermission(userRole, PERMISSIONS.REPORT_COMPLIANCE_USERS);
+    const canAccessProduct = hasPermission(userRole, PERMISSIONS.REPORT_PRODUCT_USERS);
+    
+    // If user can't access compliance but can access product, default to product
+    if (!canAccessCompliance && canAccessProduct) {
+      setUserReportType('product');
+    } else if (canAccessCompliance && !canAccessProduct) {
+      setUserReportType('compliance');
+    } else if (canAccessCompliance && canAccessProduct) {
+      // If user has access to both, keep current selection or default to compliance
+      // This maintains existing behavior for users with full access
+      setUserReportType('compliance');
+    }
+  }, [userRole]);
 
   // Check if user has access to reports
   if (!canAccessReports(userRole)) {

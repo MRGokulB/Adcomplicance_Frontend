@@ -185,7 +185,7 @@ const InternalTasksReport = () => {
         </div>
       )}
 
-      {/* Status Distribution Chart (if available in summary) */}
+      {/* Status Distribution Chart (if available in summary) 
       {summary.tasksByStatus && (
         <div className="mb-6 p-4 bg-gray-50 rounded-lg">
           <h3 className="text-sm font-medium text-gray-700 mb-3">Status Distribution</h3>
@@ -198,7 +198,7 @@ const InternalTasksReport = () => {
             ))}
           </div>
         </div>
-      )}
+      )}*/}
 
       {/* Loading State */}
       {isLoading && (
