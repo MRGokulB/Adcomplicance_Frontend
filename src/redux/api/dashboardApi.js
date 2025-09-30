@@ -1,4 +1,4 @@
-// src/redux/api/dashboardApi.js - Updated for new backend routes
+// src/redux/api/dashboardApi.js - OPTIMIZED VERSION
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 const baseQuery = fetchBaseQuery({
@@ -25,36 +25,45 @@ export const dashboardApi = createApi({
   reducerPath: 'dashboardApi',
   baseQuery: baseQueryWithReauth,
   tagTypes: ['Dashboard', 'DashboardStats', 'DashboardNotification', 'UserWorkload', 'TeamOverview'],
+  
+  // OPTIMIZED: Add default cache retention
+  keepUnusedDataFor: 300, // 5 minutes
+  refetchOnMountOrArgChange: 300, // Only refetch if data is older than 5 minutes
+  
   endpoints: (builder) => ({
-    // Main dashboard data - Updated to match new backend structure
+    // Main dashboard data - aggregate view
     getDashboard: builder.query({
       query: () => '',
       providesTags: ['Dashboard'],
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 300,
     }),
 
-    // Quick stats for metrics cards - Updated structure
+    // OPTIMIZED: Quick stats with longer cache
     getQuickStats: builder.query({
       query: () => 'quick-stats',
       providesTags: ['DashboardStats'],
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 180, // 3 minutes - frequently viewed
     }),
 
-    // Task buckets for dashboard sections - Updated with new structure
+    // Task buckets - no polling needed, refetch on user action
     getTaskBuckets: builder.query({
       query: () => 'task-buckets',
       providesTags: ['Dashboard'],
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 600, // 10 minutes - relatively static
     }),
 
-    // Workload chart data - Updated endpoint
+    // Workload chart - less critical, longer cache
     getWorkloadChart: builder.query({
       query: () => 'workload-chart',
       providesTags: ['Dashboard'],
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 600, // 10 minutes
     }),
 
-    // Completion trends with optional date range - Updated
+    // Completion trends - analytics data, can be cached longer
     getCompletionTrends: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -63,10 +72,11 @@ export const dashboardApi = createApi({
         return `completion-trends?${searchParams.toString()}`;
       },
       providesTags: ['Dashboard'],
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 900, // 15 minutes - historical data
     }),
 
-    // Activity feed with pagination - Updated
+    // Activity feed - needs fresher data
     getActivityFeed: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -75,56 +85,59 @@ export const dashboardApi = createApi({
         return `activity-feed?${searchParams.toString()}`;
       },
       providesTags: ['Dashboard'],
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 120, // 2 minutes - recent activity
     }),
 
-    // Performance metrics - Updated
+    // OPTIMIZED: Performance metrics - simplified query construction
     getPerformanceMetrics: builder.query({
-  query: (params = {}) => {
-    const searchParams = new URLSearchParams();
-     const period = params?.period || '30d';
-     if (typeof period === 'string' && period) {
-      searchParams.append('period', period);
-    };
-    const queryString = searchParams.toString();
-    return queryString ? `performance-metrics?${queryString}` : 'performance-metrics';
-  },
-  providesTags: ['Dashboard'],
-  transformResponse: (response) => response
-}),
+      query: (params = {}) => {
+        const period = params?.period || '30d';
+        return `performance-metrics?period=${period}`;
+      },
+      providesTags: ['Dashboard'],
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 600, // 10 minutes - metrics don't change frequently
+    }),
 
-    // NEW: Dashboard stats - From backend /api/tasks/dashboard-stats
+    // Dashboard-specific stats (different from tasksApi)
     getDashboardStats: builder.query({
       query: () => 'dashboard-stats',
       providesTags: ['DashboardStats'],
-      transformResponse: (response) => response // Returns { overview, byStatus, alerts, userRole, generatedAt }
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 180, // 3 minutes
     }),
 
-    // NEW: User workload analytics - From backend /api/tasks/user-workload/:userId  
+    // User workload with caching per user
     getUserWorkload: builder.query({
       query: (userId) => `user-workload/${userId}`,
       providesTags: (result, error, userId) => [{ type: 'UserWorkload', id: userId }],
-      transformResponse: (response) => response // Returns { user, workload, summary }
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 300, // 5 minutes per user
     }),
 
-    // NEW: Team overview analytics - From backend /api/tasks/team-overview
+    // Team overview - less frequently changing
     getTeamOverview: builder.query({
       query: () => 'team-overview',
       providesTags: ['TeamOverview'],
-      transformResponse: (response) => response // Returns { team, summary, filters, generatedAt }
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 600, // 10 minutes
     }),
 
-    // Mark dashboard notification as read
+    // Mutations for notifications
     markDashboardNotificationRead: builder.mutation({
       query: (id) => ({
         url: `notifications/${id}/read`,
         method: 'PATCH'
       }),
-      invalidatesTags: ['Dashboard', 'DashboardNotification'],
+      // OPTIMIZED: Only invalidate specific tags
+      invalidatesTags: (result, error, id) => [
+        'Dashboard',
+        { type: 'DashboardNotification', id }
+      ],
       transformResponse: (response) => response
     }),
 
-    // Mark all dashboard notifications as read
     markAllDashboardNotificationsRead: builder.mutation({
       query: () => ({
         url: 'notifications/read-all',
@@ -144,9 +157,9 @@ export const {
   useGetCompletionTrendsQuery,
   useGetActivityFeedQuery,
   useGetPerformanceMetricsQuery,
-  useGetDashboardStatsQuery, // NEW
-  useGetUserWorkloadQuery, // NEW  
-  useGetTeamOverviewQuery, // NEW
+  useGetDashboardStatsQuery,
+  useGetUserWorkloadQuery,
+  useGetTeamOverviewQuery,
   useMarkDashboardNotificationReadMutation,
   useMarkAllDashboardNotificationsReadMutation,
 } = dashboardApi;

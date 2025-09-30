@@ -1,4 +1,4 @@
-// redux/api/tasksApi.js - Enhanced with better cache invalidation and real-time updates
+// redux/api/tasksApi.js - OPTIMIZED VERSION
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 const baseQuery = fetchBaseQuery({
@@ -26,12 +26,12 @@ export const tasksApi = createApi({
   baseQuery: baseQueryWithReauth,
   tagTypes: ['Task', 'TaskBucket', 'TaskVersion', 'TaskComment', 'ExchangeApproval', 'TaskStats', 'TaskHealth'],
 
-  // Enhanced cache configuration
-  keepUnusedDataFor: 60, // Keep cache for 1 minute
-  refetchOnMountOrArgChange: 30, // Refetch if data is older than 30 seconds
+  // OPTIMIZED: Increased cache retention to reduce refetches
+  keepUnusedDataFor: 300, // 5 minutes instead of 1 minute
+  refetchOnMountOrArgChange: 300, // Only refetch if data is older than 5 minutes
 
   endpoints: (builder) => ({
-    // Enhanced getTasks with more specific cache invalidation
+    // OPTIMIZED: getTasks - removed aggressive refetch config
     getTasks: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -59,7 +59,6 @@ export const tasksApi = createApi({
       transformResponse: (response) => response,
     }),
 
-    // Enhanced createTask with optimistic updates
     createTask: builder.mutation({
       query: (taskData) => ({
         url: '',
@@ -94,29 +93,28 @@ export const tasksApi = createApi({
       transformResponse: (response) => response
     }),
 
-    // Enhanced getTaskById with better caching
+    // OPTIMIZED: getTaskById - removed aggressive refetch
     getTaskById: builder.query({
       query: (id) => id,
       providesTags: (result, error, id) => [{ type: 'Task', id }],
       transformResponse: (response) => response,
-      // Keep individual task data fresh
-      keepUnusedDataFor: 60,
-      // Force refetch on mount for critical task data
-      refetchOnMountOrArgChange: true,
+      keepUnusedDataFor: 300, // 5 minutes
     }),
 
-    // Enhanced updateTaskStatus with immediate cache updates
+    // OPTIMIZED: updateTaskStatus - simplified optimistic updates
     updateTaskStatus: builder.mutation({
       query: ({ id, status, reason }) => ({
         url: `${id}/status`,
         method: 'PUT',
         body: { status, reason }
       }),
-      // Immediate cache invalidation for real-time updates
       invalidatesTags: (result, error, { id }) => {
-        const tags = [{ type: 'Task', id }];
+        const tags = [
+          { type: 'Task', id },
+          { type: 'Task', id: 'LIST' }
+        ];
 
-        // Only invalidate specific buckets based on the new status
+        // Conditionally invalidate specific buckets
         if (result?.data?.status === 'APPROVED') {
           tags.push({ type: 'TaskBucket', id: 'APPROVED_NOT_PUBLISHED' });
         }
@@ -125,17 +123,11 @@ export const tasksApi = createApi({
           tags.push({ type: 'TaskBucket', id: 'EXPIRING_SOON' });
         }
 
-        // Only invalidate list if status actually changed
-        if (result?.data?.previousStatus !== result?.data?.status) {
-          tags.push({ type: 'Task', id: 'LIST' });
-        }
-
         return tags;
       },
-      // Optimistic cache update
-      onQueryStarted: async ({ id, status }, { dispatch, queryFulfilled }) => {
-        // Update individual task cache
-        const taskPatchResult = dispatch(
+      // OPTIMIZED: Simplified optimistic update - only update the specific task
+      async onQueryStarted({ id, status }, { dispatch, queryFulfilled }) {
+        const patchResult = dispatch(
           tasksApi.util.updateQueryData('getTaskById', id, (draft) => {
             if (draft) {
               draft.status = status;
@@ -147,16 +139,12 @@ export const tasksApi = createApi({
         try {
           await queryFulfilled;
         } catch {
-          // Revert optimistic updates on error
-          taskPatchResult.undo();
+          patchResult.undo();
         }
       },
       transformResponse: (response) => response,
-      //refetchOnFocus: true,
-      refetchOnReconnect: true,
     }),
 
-    // Enhanced classifyTask with cache updates
     classifyTask: builder.mutation({
       query: ({ id, taskType }) => ({
         url: `${id}/classify`,
@@ -165,11 +153,9 @@ export const tasksApi = createApi({
       }),
       invalidatesTags: (result, error, { id }) => [
         { type: 'Task', id },
-        { type: 'Task', id: 'LIST' },
-        { type: 'TaskBucket', id: 'LIST' }
+        { type: 'Task', id: 'LIST' }
       ],
-      // Optimistic update for task type
-      onQueryStarted: async ({ id, taskType }, { dispatch, queryFulfilled }) => {
+      async onQueryStarted({ id, taskType }, { dispatch, queryFulfilled }) {
         const patchResult = dispatch(
           tasksApi.util.updateQueryData('getTaskById', id, (draft) => {
             if (draft) {
@@ -188,7 +174,6 @@ export const tasksApi = createApi({
       transformResponse: (response) => response
     }),
 
-    // Enhanced uploadVersion with better cache management
     uploadVersion: builder.mutation({
       query: ({ id, files, remarks }) => ({
         url: `${id}/versions`,
@@ -209,7 +194,7 @@ export const tasksApi = createApi({
       }
     }),
 
-    // Enhanced addComment with real-time updates
+    // OPTIMIZED: addComment - simplified optimistic update
     addComment: builder.mutation({
       query: ({ id, content, isGlobal = false, versionId, attachments, requiresVersionUpdate = false }) => ({
         url: `${id}/comments`,
@@ -220,11 +205,10 @@ export const tasksApi = createApi({
         { type: 'Task', id },
         { type: 'TaskComment', id: 'LIST' }
       ],
-      // Optimistic comment addition
-      onQueryStarted: async ({ id, content }, { dispatch, queryFulfilled, getState }) => {
+      async onQueryStarted({ id, content }, { dispatch, queryFulfilled, getState }) {
         const { auth } = getState();
         const tempComment = {
-          id: Date.now(), // Temporary ID
+          id: Date.now(),
           content,
           createdAt: new Date().toISOString(),
           createdBy: auth.user,
@@ -233,26 +217,14 @@ export const tasksApi = createApi({
 
         const patchResult = dispatch(
           tasksApi.util.updateQueryData('getTaskById', id, (draft) => {
-            if (draft) {
-              if (!draft.comments) draft.comments = [];
+            if (draft && draft.comments) {
               draft.comments.push(tempComment);
             }
           })
         );
 
         try {
-          const result = await queryFulfilled;
-          // Replace optimistic comment with real one
-          dispatch(
-            tasksApi.util.updateQueryData('getTaskById', id, (draft) => {
-              if (draft?.comments) {
-                const optimisticIndex = draft.comments.findIndex(c => c.isOptimistic);
-                if (optimisticIndex !== -1) {
-                  draft.comments[optimisticIndex] = result.data.comment;
-                }
-              }
-            })
-          );
+          await queryFulfilled;
         } catch {
           patchResult.undo();
         }
@@ -260,7 +232,6 @@ export const tasksApi = createApi({
       transformResponse: (response) => response
     }),
 
-    // Enhanced approveTask with cache updates
     approveTask: builder.mutation({
       query: ({ id, approvalDate, expiryDate, approvalProofUrl }) => ({
         url: `${id}/approve`,
@@ -270,11 +241,9 @@ export const tasksApi = createApi({
       invalidatesTags: (result, error, { id }) => [
         { type: 'Task', id },
         { type: 'TaskBucket', id: 'APPROVED_NOT_PUBLISHED' },
-        // Only invalidate list for approved tasks
         { type: 'Task', id: 'LIST' }
       ],
-      // Optimistic approval update
-      onQueryStarted: async ({ id, approvalDate, expiryDate, approvalProofUrl }, { dispatch, queryFulfilled }) => {
+      async onQueryStarted({ id, approvalDate, expiryDate, approvalProofUrl }, { dispatch, queryFulfilled }) {
         const patchResult = dispatch(
           tasksApi.util.updateQueryData('getTaskById', id, (draft) => {
             if (draft) {
@@ -296,7 +265,6 @@ export const tasksApi = createApi({
       transformResponse: (response) => response
     }),
 
-    // Enhanced publishTask with cache updates
     publishTask: builder.mutation({
       query: ({ id, publishDate, publishedCopyUrl }) => ({
         url: `${id}/publish`,
@@ -308,9 +276,7 @@ export const tasksApi = createApi({
         { type: 'TaskBucket', id: 'APPROVED_NOT_PUBLISHED' },
         { type: 'Task', id: 'LIST' }
       ],
-
-      // Optimistic publish update
-      onQueryStarted: async ({ id, publishDate, publishedCopyUrl }, { dispatch, queryFulfilled }) => {
+      async onQueryStarted({ id, publishDate, publishedCopyUrl }, { dispatch, queryFulfilled }) {
         const patchResult = dispatch(
           tasksApi.util.updateQueryData('getTaskById', id, (draft) => {
             if (draft) {
@@ -328,11 +294,8 @@ export const tasksApi = createApi({
         }
       },
       transformResponse: (response) => response,
-      // //refetchOnFocus: true,
-      refetchOnReconnect: true,
     }),
 
-    // Enhanced closeTask with cache updates
     closeTask: builder.mutation({
       query: ({ id, closureType, closureComments }) => ({
         url: `${id}/close`,
@@ -342,11 +305,9 @@ export const tasksApi = createApi({
       invalidatesTags: (result, error, { id }) => [
         { type: 'Task', id },
         { type: 'Task', id: 'LIST' },
-        { type: 'TaskBucket', id: 'LIST' },
         { type: 'TaskStats', id: 'DASHBOARD' }
       ],
-      // Optimistic closure update
-      onQueryStarted: async ({ id, closureType, closureComments }, { dispatch, queryFulfilled }) => {
+      async onQueryStarted({ id, closureType, closureComments }, { dispatch, queryFulfilled }) {
         const patchResult = dispatch(
           tasksApi.util.updateQueryData('getTaskById', id, (draft) => {
             if (draft) {
@@ -366,7 +327,6 @@ export const tasksApi = createApi({
       transformResponse: (response) => response
     }),
 
-    // Existing endpoints with enhanced cache management
     followUpTask: builder.mutation({
       query: ({ id, message, urgency }) => ({
         url: `${id}/follow-up`,
@@ -408,7 +368,6 @@ export const tasksApi = createApi({
       transformResponse: (response) => response
     }),
 
-    // Enhanced exchange approval endpoints with better cache management
     addExchangeApproval: builder.mutation({
       query: ({ id, exchangeName }) => ({
         url: `${id}/exchange-approvals`,
@@ -447,31 +406,31 @@ export const tasksApi = createApi({
       transformResponse: (response) => response
     }),
 
-    // Task bucket queries with auto-refresh
     getApprovedNotPublished: builder.query({
       query: () => 'buckets/approved-not-published',
       providesTags: [{ type: 'TaskBucket', id: 'APPROVED_NOT_PUBLISHED' }],
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 300,
     }),
 
+    // FIXED: Removed duplicate definition - kept only one
     getExpiringSoon: builder.query({
-  query: (params) => {
-    const days = typeof params === 'object' ? (params?.days || 15) : (params || 15);
-    return `buckets/expiring-soon?days=${days}`;
-  },
-  providesTags: [{ type: 'TaskBucket', id: 'EXPIRING_SOON' }],
-  transformResponse: (response) => response,
-  refetchOnReconnect: true,
-}),
+      query: (params) => {
+        const days = typeof params === 'object' ? (params?.days || 15) : (params || 15);
+        return `buckets/expiring-soon?days=${days}`;
+      },
+      providesTags: [{ type: 'TaskBucket', id: 'EXPIRING_SOON' }],
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 300,
+    }),
 
-    // Dashboard stats with frequent updates
     getDashboardStats: builder.query({
       query: () => 'dashboard-stats',
       providesTags: [{ type: 'TaskStats', id: 'DASHBOARD' }],
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 300,
     }),
 
-    // Advanced search with caching
     advancedTaskSearch: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -484,39 +443,29 @@ export const tasksApi = createApi({
       },
       providesTags: [{ type: 'Task', id: 'SEARCH' }],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 300, // Keep search results for 5 minutes
+      keepUnusedDataFor: 600, // 10 minutes for search results
     }),
 
-    // User and team endpoints
     getUserWorkload: builder.query({
       query: (userId) => `user-workload/${userId}`,
       transformResponse: (response) => response,
-      keepUnusedDataFor: 300,
+      keepUnusedDataFor: 600,
     }),
 
     getTeamOverview: builder.query({
       query: () => 'team-overview',
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 300,
     }),
 
-    getExpiringSoon: builder.query({
-  query: (params) => {
-    const days = typeof params === 'object' ? (params?.days || 15) : (params || 15);
-    return `buckets/expiring-soon?days=${days}`;
-  },
-  providesTags: [{ type: 'TaskBucket', id: 'EXPIRING_SOON' }],
-  transformResponse: (response) => response,
-  refetchOnReconnect: true,
-}),
-
-    // System health with frequent polling
     getTaskHealthCheck: builder.query({
       query: () => 'system/health-check',
       providesTags: [{ type: 'TaskHealth', id: 'CHECK' }],
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 600,
     }),
 
-    // Enhanced bulk operations with cache invalidation
+    // OPTIMIZED: Simplified bulk operations
     bulkTaskOperations: builder.mutation({
       query: ({ operation, taskIds, ...data }) => ({
         url: 'bulk-operations',
@@ -525,44 +474,20 @@ export const tasksApi = createApi({
       }),
       invalidatesTags: [
         { type: 'Task', id: 'LIST' },
-        { type: 'TaskBucket', id: 'LIST' },
         { type: 'TaskStats', id: 'DASHBOARD' }
       ],
-      // Optimistic updates for bulk operations
-      onQueryStarted: async ({ operation, taskIds, ...data }, { dispatch, queryFulfilled }) => {
-        // Only update individual task caches for status updates
-        if (operation === 'bulk_status_update' && data.status) {
-          const patchResults = taskIds.map(id =>
-            dispatch(
-              tasksApi.util.updateQueryData('getTaskById', id, (draft) => {
-                if (draft) {
-                  draft.status = data.status;
-                  draft.updatedAt = new Date().toISOString();
-                }
-              })
-            )
-          );
-
-          try {
-            await queryFulfilled;
-          } catch {
-            patchResults.forEach(patch => patch.undo());
-          }
-        }
-      },
       transformResponse: (response) => response
     }),
 
-    // Absent user tasks
     getAbsentUserTasks: builder.query({
       query: (userId) => `absent-users/${userId}/tasks`,
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 300,
     }),
   })
 });
 
 export const {
-  // Existing hooks
   useGetTasksQuery,
   useCreateTaskMutation,
   useGetTaskByIdQuery,
@@ -577,8 +502,6 @@ export const {
   useGetApprovedNotPublishedQuery,
   useGetExpiringSoonQuery,
   useBulkTaskOperationsMutation,
-
-  // Backend endpoint hooks
   useUpdateTaskStatusMutation,
   useClassifyTaskMutation,
   useFollowUpTaskMutation,
@@ -589,13 +512,12 @@ export const {
   useAdvancedTaskSearchQuery,
   useGetUserWorkloadQuery,
   useGetTeamOverviewQuery,
-  useGetPerformanceMetricsQuery,
   useGetTaskHealthCheckQuery,
   useGetAbsentUserTasksQuery,
   useUpdateTaskNameMutation,
 } = tasksApi;
 
-// Utility function to manually invalidate cache
+// OPTIMIZED: Simplified utility functions
 export const invalidateTaskCache = (dispatch, taskId) => {
   dispatch(tasksApi.util.invalidateTags([
     { type: 'Task', id: taskId },
@@ -603,7 +525,6 @@ export const invalidateTaskCache = (dispatch, taskId) => {
   ]));
 };
 
-// Utility function to manually update task in cache
 export const updateTaskInCache = (dispatch, taskId, updates) => {
   dispatch(
     tasksApi.util.updateQueryData('getTaskById', taskId, (draft) => {
