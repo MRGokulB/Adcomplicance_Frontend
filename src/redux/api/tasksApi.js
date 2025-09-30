@@ -455,13 +455,14 @@ export const tasksApi = createApi({
     }),
 
     getExpiringSoon: builder.query({
-      query: (days = 15) => `buckets/expiring-soon?days=${days}`,
-      providesTags: [{ type: 'TaskBucket', id: 'EXPIRING_SOON' }],
-      transformResponse: (response) => response,
-      //refetchOnFocus: true,
-      refetchOnReconnect: true,
-
-    }),
+  query: (params) => {
+    const days = typeof params === 'object' ? (params?.days || 15) : (params || 15);
+    return `buckets/expiring-soon?days=${days}`;
+  },
+  providesTags: [{ type: 'TaskBucket', id: 'EXPIRING_SOON' }],
+  transformResponse: (response) => response,
+  refetchOnReconnect: true,
+}),
 
     // Dashboard stats with frequent updates
     getDashboardStats: builder.query({
@@ -498,19 +499,19 @@ export const tasksApi = createApi({
       transformResponse: (response) => response
     }),
 
-    getPerformanceMetrics: builder.query({
-      query: (params = {}) => {
-        const searchParams = new URLSearchParams();
-        if (params.period) searchParams.append('period', params.period);
-        return `performance/metrics?${searchParams.toString()}`;
-      },
-      transformResponse: (response) => response,
-      keepUnusedDataFor: 600, // Keep metrics for 10 minutes
-    }),
+    getExpiringSoon: builder.query({
+  query: (params) => {
+    const days = typeof params === 'object' ? (params?.days || 15) : (params || 15);
+    return `buckets/expiring-soon?days=${days}`;
+  },
+  providesTags: [{ type: 'TaskBucket', id: 'EXPIRING_SOON' }],
+  transformResponse: (response) => response,
+  refetchOnReconnect: true,
+}),
 
     // System health with frequent polling
     getTaskHealthCheck: builder.query({
-      query: () => 'health-check',
+      query: () => 'system/health-check',
       providesTags: [{ type: 'TaskHealth', id: 'CHECK' }],
       transformResponse: (response) => response
     }),

@@ -111,7 +111,7 @@ export default function AdvancedTable() {
         data: healthCheckData,
         refetch: refetchHealthCheck
     } = useGetTaskHealthCheckQuery(undefined, {
-        skip: !canViewHealthCheck,
+        skip: true,
         pollingInterval: 300000 // 5 minutes
     });
 
@@ -186,27 +186,45 @@ export default function AdvancedTable() {
     }, [activeView, refetch, refetchApproved, refetchExpiring]);
 
     // Apply local filters to tasks (already filtered for active tasks)
-    const filteredData = useMemo(() => {
-        return tasks.filter(task => {
-            const matchesCreatedBy = !localFilters.createdBy ||
-                task.createdBy?.fullName?.toLowerCase().includes(localFilters.createdBy.toLowerCase()) ||
-                task.createdBy?.toLowerCase().includes(localFilters.createdBy.toLowerCase());
+    // Apply local filters to tasks (already filtered for active tasks)
+const filteredData = useMemo(() => {
+  return tasks.filter(task => {
+    const matchesCreatedBy = !localFilters.createdBy ||
+      task.createdBy?.fullName?.toLowerCase().includes(localFilters.createdBy.toLowerCase()) ||
+      task.createdBy?.toLowerCase().includes(localFilters.createdBy.toLowerCase());
 
-            const matchesAssignedTo = !localFilters.assignedTo ||
-                task.assignedProducts?.some(product =>
-                    (typeof product === 'string' ? product : product.fullName)?.toLowerCase().includes(localFilters.assignedTo.toLowerCase())
-                );
+    const matchesAssignedTo = !localFilters.assignedTo ||
+      task.assignedProducts?.some(product =>
+        (typeof product === 'string' ? product : product.fullName)?.toLowerCase().includes(localFilters.assignedTo.toLowerCase())
+      );
 
-            const matchesRefNo = !localFilters.refNo ||
-                (task.uin && task.uin.toLowerCase().includes(localFilters.refNo.toLowerCase()));
+    const matchesRefNo = !localFilters.refNo ||
+      (task.uin && task.uin.toLowerCase().includes(localFilters.refNo.toLowerCase()));
 
-            const matchesSearch = !localFilters.searchQuery ||
-                [task.title, task.description, task.uin, task.platform, task.category]
-                    .some(value => value && value.toString().toLowerCase().includes(localFilters.searchQuery.toLowerCase()));
+    const matchesSearch = !localFilters.searchQuery ||
+      [task.title, task.description, task.uin, task.platform, task.category]
+        .some(value => value && value.toString().toLowerCase().includes(localFilters.searchQuery.toLowerCase()));
 
-            return matchesCreatedBy && matchesAssignedTo && matchesRefNo && matchesSearch;
-        });
-    }, [tasks, localFilters]);
+    // Date filtering
+    const matchesDateFrom = !localFilters.dateFrom ||
+      (task.createdAt && new Date(task.createdAt) >= new Date(localFilters.dateFrom));
+
+    const matchesDateTo = !localFilters.dateTo ||
+      (task.createdAt && new Date(task.createdAt) <= new Date(localFilters.dateTo + 'T23:59:59'));
+
+    // Priority filtering (from main filters state)
+    const matchesPriority = !filters.priority ||
+      task.priority === filters.priority;
+
+    return matchesCreatedBy && 
+           matchesAssignedTo && 
+           matchesRefNo && 
+           matchesSearch && 
+           matchesDateFrom && 
+           matchesDateTo && 
+           matchesPriority;
+  });
+}, [tasks, localFilters, filters.priority]);
 
     // Pagination for filtered data
     const totalPages = Math.ceil(filteredData.length / filters.limit);

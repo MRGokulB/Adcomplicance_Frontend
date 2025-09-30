@@ -21,13 +21,10 @@ const baseQuery = fetchBaseQuery({
 
 // Wrapper to handle token expiration and add debugging
 const baseQueryWithReauth = async (args, api, extraOptions) => {
-  console.log('API Request:', args, 'to', apiUrl)
   let result = await baseQuery(args, api, extraOptions)
-  console.log('API Response:', result)
-  
+   
   // Handle 401 unauthorized responses
   if (result?.error?.status === 401) {
-    console.log('Token expired, logging out...')
     api.dispatch(logout())
   }
   

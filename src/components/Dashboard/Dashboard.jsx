@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
+import { useNavigate } from "react-router-dom";
 import { selectCurrentUser, selectUserRole } from '../../redux/slices/authSlice';
 import { usePermissions, CanCreateTask, AdminOnly, ManagerAccess, ComplianceAccess } from '../PermissionWrapper';
 import { 
@@ -19,6 +20,7 @@ const Dashboard = () => {
   const currentUser = useSelector(selectCurrentUser);
   const userRole = useSelector(selectUserRole);
   const permissions = usePermissions();
+  const navigate = useNavigate();
 
   // API Queries - Auto-refresh every 30 seconds
   const { 
@@ -59,11 +61,11 @@ const Dashboard = () => {
   });
 
   const { 
-    data: performanceMetrics, 
-    isLoading: isMetricsLoading 
-  } = useGetPerformanceMetricsQuery(undefined, {
-    pollingInterval: 60000,
-  });
+  data: performanceMetrics, 
+  isLoading: isMetricsLoading 
+} = useGetPerformanceMetricsQuery({ }, {   
+  pollingInterval: 60000,
+});
 
   // Get role-specific welcome message
   const getWelcomeMessage = () => {
@@ -198,14 +200,109 @@ const Dashboard = () => {
   };
 
   // Format activity feed item
-  const formatActivityItem = (item) => {
-    const timeAgo = new Date(item.timestamp).toLocaleString();
-    return {
-      ...item,
-      timeAgo,
-      displayText: item.message || `${item.user} performed ${item.type}`
-    };
+// Format activity feed item with better message formatting
+const formatActivityItem = (item) => {
+  const timeAgo = new Date(item.timestamp).toLocaleString();
+  
+  // Format display text based on action type
+  let displayText = '';
+  const user = item.user || 'Someone';
+  const taskInfo = item.task ? ` "${item.task.title}"` : '';
+  
+  switch (item.action) {
+    case 'TASK_CREATED':
+      displayText = `${user} created a new task${taskInfo}`;
+      break;
+    case 'TASK_UPDATED':
+      displayText = `${user} updated task${taskInfo}`;
+      break;
+    case 'STATUS_CHANGED':
+      displayText = `${user} changed status of${taskInfo}`;
+      break;
+    case 'COMMENT_ADDED':
+      displayText = `${user} commented on${taskInfo}`;
+      break;
+    case 'VERSION_UPLOADED':
+      displayText = `${user} uploaded a version for${taskInfo}`;
+      break;
+    case 'TASK_APPROVED':
+      displayText = `${user} approved${taskInfo}`;
+      break;
+    case 'TASK_PUBLISHED':
+      displayText = `${user} published${taskInfo}`;
+      break;
+    default:
+      // Use details if available, otherwise construct generic message
+      displayText = item.details || `${user} performed ${item.action}${taskInfo}`;
+  }
+  
+  return {
+    ...item,
+    timeAgo,
+    displayText
   };
+};
+
+  // Get activity type styling and icon
+const getActivityType = (text) => {
+  const lowerText = text.toLowerCase();
+  
+  if (lowerText.includes('uploaded') || lowerText.includes('created')) {
+    return {
+      bgColor: 'bg-green-50',
+      textColor: 'text-green-600',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        </svg>
+      )
+    };
+  } else if (lowerText.includes('comment') || lowerText.includes('added')) {
+    return {
+      bgColor: 'bg-blue-50',
+      textColor: 'text-blue-600',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+      )
+    };
+  } else if (lowerText.includes('status') || lowerText.includes('changed') || lowerText.includes('updated')) {
+    return {
+      bgColor: 'bg-yellow-50',
+      textColor: 'text-yellow-600',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      ),
+      badge: 'Updated',
+      badgeClass: 'badge-warning'
+    };
+  } else if (lowerText.includes('approved') || lowerText.includes('published')) {
+    return {
+      bgColor: 'bg-green-50',
+      textColor: 'text-green-600',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+      ),
+      badge: 'Success',
+      badgeClass: 'badge-success'
+    };
+  } else {
+    return {
+      bgColor: 'bg-gray-50',
+      textColor: 'text-gray-600',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
+    };
+  }
+};
 
   return (
     <>
@@ -269,7 +366,10 @@ const Dashboard = () => {
 
             {/* Compliance Quick Actions */}
             <ComplianceAccess>
-              <button className="btn btn-secondary">
+  <button 
+    className="btn btn-secondary"
+    onClick={() => navigate('/tasks?status=COMPLIANCE_REVIEW')}
+  >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -279,7 +379,8 @@ const Dashboard = () => {
 
             {/* Manager Quick Actions */}
             <ManagerAccess>
-              <button className="btn btn-outline">
+              <button className="btn btn-outline"
+              onClick={() => navigate('/admin/user-management')}>
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
@@ -301,94 +402,58 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Activity Feed */}
-        {/* Enhanced Activity Feed - Minimal Version */}
+        {/* Recent Activity - Clean Minimal Design */}
 {activityFeed && activityFeed.length > 0 && (
   <div className="mt-8">
-    <h2 className="text-lg font-semibold mb-4">Recent Activity</h2>
-    <div className="info-card">
+    <div className="flex-between items-center mb-4">
+      <h2 className="text-heading-3">Recent Activity</h2>
+      <button className="btn btn-ghost btn-sm text-blue-600">
+        View All
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+    </div>
+    
+    <div className="card">
       <div className="card-body">
         {isActivityLoading ? (
           <div className="flex-col-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-            <p className="text-gray-600">Loading recent activity...</p>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+            <p className="text-caption">Loading activity...</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {activityFeed.slice(0, 5).map((item, index) => {
               const formattedItem = formatActivityItem(item);
-              
-              // Determine activity type for styling
-              const getActivityStyle = (text) => {
-                if (text.includes('uploaded') || text.includes('created')) {
-                  return {
-                    iconBg: 'bg-green-100',
-                    iconColor: 'text-green-600',
-                    icon: (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
-                    )
-                  };
-                } else if (text.includes('comment') || text.includes('added')) {
-                  return {
-                    iconBg: 'bg-blue-100',
-                    iconColor: 'text-blue-600',
-                    icon: (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                      </svg>
-                    )
-                  };
-                } else if (text.includes('status') || text.includes('changed') || text.includes('updated')) {
-                  return {
-                    iconBg: 'bg-yellow-100',
-                    iconColor: 'text-yellow-600',
-                    icon: (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                    )
-                  };
-                } else if (text.includes('approved') || text.includes('published')) {
-                  return {
-                    iconBg: 'bg-green-100',
-                    iconColor: 'text-green-600',
-                    icon: (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    )
-                  };
-                } else {
-                  return {
-                    iconBg: 'bg-gray-100',
-                    iconColor: 'text-gray-600',
-                    icon: (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    )
-                  };
-                }
-              };
-              
-              const activityStyle = getActivityStyle(formattedItem.displayText);
+              const activityType = getActivityType(formattedItem.displayText);
               
               return (
-                <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                  <div className={`flex-shrink-0 w-8 h-8 ${activityStyle.iconBg} rounded-lg flex items-center justify-center ${activityStyle.iconColor}`}>
-                    {activityStyle.icon}
+                <div 
+                  key={index} 
+                  className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                >
+                  {/* Activity Icon */}
+                  <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex-center ${activityType.bgColor} ${activityType.textColor}`}>
+                    {activityType.icon}
                   </div>
                   
+                  {/* Activity Content */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-900 leading-relaxed">
+                    <p className="text-sm text-gray-900">
                       {formattedItem.displayText}
                     </p>
                     <p className="text-xs text-gray-500 mt-1">
                       {formattedItem.timeAgo}
                     </p>
                   </div>
+                  
+                  {/* Activity Badge (optional) */}
+                  {activityType.badge && (
+                    <span className={`badge ${activityType.badgeClass}`}>
+                      {activityType.badge}
+                    </span>
+                  )}
                 </div>
               );
             })}

@@ -80,14 +80,18 @@ export const dashboardApi = createApi({
 
     // Performance metrics - Updated
     getPerformanceMetrics: builder.query({
-      query: (period = '30d') => {
-        const searchParams = new URLSearchParams();
-        if (period) searchParams.append('period', period);
-        return `performance-metrics?${searchParams.toString()}`;
-      },
-      providesTags: ['Dashboard'],
-      transformResponse: (response) => response
-    }),
+  query: (params = {}) => {
+    const searchParams = new URLSearchParams();
+     const period = params?.period || '30d';
+     if (typeof period === 'string' && period) {
+      searchParams.append('period', period);
+    };
+    const queryString = searchParams.toString();
+    return queryString ? `performance-metrics?${queryString}` : 'performance-metrics';
+  },
+  providesTags: ['Dashboard'],
+  transformResponse: (response) => response
+}),
 
     // NEW: Dashboard stats - From backend /api/tasks/dashboard-stats
     getDashboardStats: builder.query({
