@@ -1,3 +1,4 @@
+// src/redux/middleware/websocketMiddleware.js
 import { io } from 'socket.io-client'
 import { notificationsApi } from '../api/notificationsApi'
 
@@ -5,95 +6,122 @@ let socket = null
 let reconnectTimer = null
 let initialized = false
 
-const connect = (store, token) => {
-  if (!token || socket) return
+const connect = (store) => {
+  if (socket) return
+  
   const wsUrl = import.meta.env.VITE_WS_URL || (import.meta.env.VITE_API_URL || 'http://localhost:5000')
+  
   socket = io(wsUrl, {
-    transports: ['websocket'],
-    auth: { token },
+    transports: ['websocket', 'polling'],
+    withCredentials: true, // Send session cookies
     reconnection: true,
-    reconnectionAttempts: Infinity,
+    reconnectionAttempts: 10,
     reconnectionDelay: 1000,
-    reconnectionDelayMax: 10000,
+    reconnectionDelayMax: 5000,
+    timeout: 10000,
   })
 
   socket.on('connect', () => {
-    // console.log('WS connected', socket.id)
+    console.log('WebSocket connected:', socket.id)
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer)
+      reconnectTimer = null
+    }
   })
 
   const invalidate = () => {
     store.dispatch(notificationsApi.util.invalidateTags(['Notification']))
   }
 
-  socket.on('notification:new', () => invalidate())
-  socket.on('notification:update', () => invalidate())
-  socket.on('notification:unreadCount', () => {
-    // We can optimistically update cache if needed; simplest is to invalidate
+  socket.on('notification:new', (data) => {
+    console.log('New notification received:', data)
+    invalidate()
+  })
+  
+  socket.on('notification:update', (data) => {
+    console.log('Notification updated:', data)
+    invalidate()
+  })
+  
+  socket.on('notification:unreadCount', (data) => {
+    console.log('Unread count updated:', data)
     invalidate()
   })
 
-  socket.on('disconnect', () => {
-    // Attempt reconnection handled by socket.io
+  socket.on('disconnect', (reason) => {
+    console.log('WebSocket disconnected:', reason)
+    // Auto-reconnect is handled by socket.io
   })
 
-  socket.on('connect_error', () => {
-    // throttle reconnection attempts if needed
-    if (reconnectTimer) return
-    reconnectTimer = setTimeout(() => {
-      reconnectTimer = null
-    }, 3000)
+  socket.on('connect_error', (error) => {
+    console.error('WebSocket connection error:', error.message)
+    
+    // If authentication error, the session might have expired
+    if (error.message === 'Authentication required' || error.message === 'Invalid token') {
+      console.warn('Session expired - WebSocket authentication failed')
+      // Optionally dispatch logout
+      // store.dispatch({ type: 'auth/logout' })
+    }
+    
+    // Throttle reconnection attempts
+    if (!reconnectTimer) {
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null
+      }, 3000)
+    }
+  })
+
+  socket.on('error', (error) => {
+    console.error('WebSocket error:', error)
   })
 }
 
 const disconnect = () => {
   if (socket) {
+    console.log('Disconnecting WebSocket...')
     socket.removeAllListeners()
     socket.disconnect()
     socket = null
   }
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
 }
 
 export const websocketMiddleware = (store) => (next) => (action) => {
-  // On first middleware run, try to connect if token already present (e.g., after refresh)
+  // Initialize connection on first run if authenticated
   if (!initialized) {
     initialized = true
-    const token = store.getState()?.auth?.token
-    if (token) {
-      connect(store, token)
+    const isAuthenticated = store.getState()?.auth?.isAuthenticated
+    if (isAuthenticated) {
+      setTimeout(() => connect(store), 1000) // Delay to ensure session is established
     }
   }
 
+  // Connect on login
   if (action.type === 'auth/setCredentials') {
-    const token = action.payload?.token
-    connect(store, token)
+    setTimeout(() => connect(store), 500) // Small delay after login
   }
+
+  // Disconnect on logout
   if (action.type === 'auth/logout') {
     disconnect()
   }
 
+  // Manual connection/disconnection
   if (action.type === 'websocket/connect') {
-    connect(store, action.payload)
+    connect(store)
   }
   if (action.type === 'websocket/disconnect') {
     disconnect()
   }
 
-  const result = next(action)
-
-  // After state rehydration, connect using the rehydrated token
-  if (action.type === 'persist/REHYDRATE') {
-    const token = store.getState()?.auth?.token || action.payload?.auth?.token
-    if (token) {
-      connect(store, token)
-    }
-  }
-
-  return result
+  return next(action)
 }
 
-export const connectWebSocket = (token) => ({
+export const connectWebSocket = () => ({
   type: 'websocket/connect',
-  payload: token,
 })
 
 export const disconnectWebSocket = () => ({

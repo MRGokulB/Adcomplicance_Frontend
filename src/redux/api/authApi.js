@@ -1,29 +1,23 @@
+// src/redux/api/authApi.js
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 import { logout, setCredentials } from '../slices/authSlice'
 
-// Debug: Log the API URL being used
 const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/`
 console.log('Auth API Base URL:', apiUrl)
 
 const baseQuery = fetchBaseQuery({
   baseUrl: apiUrl,
-  prepareHeaders: (headers, { getState }) => {
-    // Get token from auth state
-    const token = getState().auth.token
-    if (token) {
-      headers.set('authorization', `Bearer ${token}`)
-    }
-    // Debug: Log headers
-    console.log('API Headers:', Object.fromEntries(headers.entries()))
+  credentials: 'include', // Important for session cookies
+  prepareHeaders: (headers) => {
+    // Remove Authorization header - using sessions now
+    headers.set('Content-Type', 'application/json')
     return headers
   },
 })
 
-// Wrapper to handle token expiration and add debugging
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions)
    
-  // Handle 401 unauthorized responses
   if (result?.error?.status === 401) {
     api.dispatch(logout())
   }
@@ -36,7 +30,6 @@ export const authApi = createApi({
   baseQuery: baseQueryWithReauth,
   tagTypes: ['Auth', 'User'],
   endpoints: (builder) => ({
-    // Login mutation - Updated to match new response structure
     login: builder.mutation({
       query: (credentials) => ({
         url: 'login',
@@ -47,10 +40,8 @@ export const authApi = createApi({
         try {
           const { data } = await queryFulfilled
           console.log('Login successful:', data)
-          // Store credentials in Redux state with rememberMe from request
           dispatch(setCredentials({
             user: data.user,
-            token: data.token,
             rememberMe: arg.rememberMe || false
           }))
         } catch (error) {
@@ -60,7 +51,6 @@ export const authApi = createApi({
       invalidatesTags: ['Auth'],
     }),
 
-    // Register mutation - Updated to match new response structure
     register: builder.mutation({
       query: (userData) => ({
         url: 'register',
@@ -71,28 +61,20 @@ export const authApi = createApi({
       invalidatesTags: ['Auth'],
     }),
 
-    // Refresh token query - Updated to match new endpoint
-    refreshToken: builder.mutation({
-      query: () => ({
-        url: 'refresh',
-        method: 'POST',
-      }),
+    getCurrentUser: builder.query({
+      query: () => 'me',
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled
-          dispatch(setCredentials({
-            user: data.user,
-            token: data.token
-          }))
+          dispatch(setCredentials({ user: data.user }))
         } catch (error) {
-          console.error('Token refresh failed:', error)
+          console.error('Get current user failed:', error)
           dispatch(logout())
         }
       },
-      invalidatesTags: ['Auth'],
+      providesTags: ['Auth'],
     }),
 
-    // Change password mutation - Updated endpoint
     changePassword: builder.mutation({
       query: (passwordData) => ({
         url: 'change-password',
@@ -102,7 +84,6 @@ export const authApi = createApi({
       transformResponse: (response) => response.message,
     }),
 
-    // Logout mutation - Updated to match new response
     logoutUser: builder.mutation({
       query: () => ({
         url: 'logout',
@@ -114,7 +95,6 @@ export const authApi = createApi({
         } catch (error) {
           console.error('Logout API call failed:', error)
         } finally {
-          // Always clear local state regardless of API call success
           dispatch(logout())
         }
       },
@@ -126,7 +106,7 @@ export const authApi = createApi({
 export const {
   useLoginMutation,
   useRegisterMutation,
-  useRefreshTokenMutation, // Changed from Query to Mutation
+  useGetCurrentUserQuery,
   useChangePasswordMutation,
   useLogoutUserMutation,
 } = authApi

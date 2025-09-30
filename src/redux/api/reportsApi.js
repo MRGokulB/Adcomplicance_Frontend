@@ -1,13 +1,12 @@
-// src/redux/api/reportsApi.js - Complete reports API for all report types
+// src/redux/api/reportsApi.js - Session-based with CSRF
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 const baseQuery = fetchBaseQuery({
   baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports/`,
-  prepareHeaders: (headers, { getState }) => {
-    const token = getState().auth.token;
-    if (token) {
-      headers.set('authorization', `Bearer ${token}`);
-    }
+  credentials: 'include', // Send session cookies
+  prepareHeaders: (headers) => {
+    // No Authorization header needed - using sessions
+    headers.set('Content-Type', 'application/json');
     return headers;
   }
 });
@@ -15,7 +14,7 @@ const baseQuery = fetchBaseQuery({
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
   if (result?.error?.status === 401) {
-    console.log('Token expired, redirecting to login...');
+    console.log('Session expired, redirecting to login...');
     api.dispatch({ type: 'auth/logout' });
   }
   return result;
@@ -25,8 +24,9 @@ export const reportsApi = createApi({
   reducerPath: 'reportsApi',
   baseQuery: baseQueryWithReauth,
   tagTypes: ['Report', 'ReportData'],
+  keepUnusedDataFor: 600, // 10 minutes cache for reports
   endpoints: (builder) => ({
-    // Internal Tasks Report - Updated to match backend structure
+    // Internal Tasks Report
     getInternalTasksReport: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -41,10 +41,11 @@ export const reportsApi = createApi({
         return `internal-tasks?${searchParams.toString()}`;
       },
       providesTags: [{ type: 'Report', id: 'INTERNAL_TASKS' }],
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 600,
     }),
 
-    // Exchange Tasks Report - Updated to match backend structure
+    // Exchange Tasks Report
     getExchangeTasksReport: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -61,10 +62,11 @@ export const reportsApi = createApi({
         return `exchange-tasks?${searchParams.toString()}`;
       },
       providesTags: [{ type: 'Report', id: 'EXCHANGE_TASKS' }],
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 600,
     }),
 
-    // Compliance Users Report - Updated structure
+    // Compliance Users Report
     getComplianceUsersReport: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -75,10 +77,11 @@ export const reportsApi = createApi({
         return `compliance-users?${searchParams.toString()}`;
       },
       providesTags: [{ type: 'Report', id: 'COMPLIANCE_USERS' }],
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 600,
     }),
 
-    // Product Users Report - Updated structure
+    // Product Users Report
     getProductUsersReport: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -89,10 +92,11 @@ export const reportsApi = createApi({
         return `product-users?${searchParams.toString()}`;
       },
       providesTags: [{ type: 'Report', id: 'PRODUCT_USERS' }],
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 600,
     }),
 
-    // Expiring Soon Report - Updated with urgency levels
+    // Expiring Soon Report
     getExpiringSoonReport: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -101,10 +105,11 @@ export const reportsApi = createApi({
         return `expiring-soon?${searchParams.toString()}`;
       },
       providesTags: [{ type: 'Report', id: 'EXPIRING_SOON' }],
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 300, // 5 minutes - more time-sensitive
     }),
 
-    // Daily Movement Report - Updated with detailed analytics
+    // Daily Movement Report
     getDailyMovementReport: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -113,10 +118,11 @@ export const reportsApi = createApi({
         return `daily-movement?${searchParams.toString()}`;
       },
       providesTags: [{ type: 'Report', id: 'DAILY_MOVEMENT' }],
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 600,
     }),
 
-    // Rejected Tasks Report - Updated structure
+    // Rejected Tasks Report
     getRejectedTasksReport: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -127,7 +133,40 @@ export const reportsApi = createApi({
         return `rejected-tasks?${searchParams.toString()}`;
       },
       providesTags: [{ type: 'Report', id: 'REJECTED_TASKS' }],
-      transformResponse: (response) => response
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 600,
+    }),
+
+    // Export report data
+    exportReport: builder.mutation({
+      query: ({ reportType, format = 'xlsx', ...params }) => {
+        const searchParams = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            searchParams.append(key, value);
+          }
+        });
+        
+        return {
+          url: `${reportType}/export?format=${format}&${searchParams.toString()}`,
+          method: 'GET',
+          responseHandler: (response) => response.blob(), // Handle file download
+        };
+      },
+    }),
+
+    // Get report summary
+    getReportSummary: builder.query({
+      query: (params = {}) => {
+        const searchParams = new URLSearchParams();
+        if (params.dateFrom) searchParams.append('dateFrom', params.dateFrom);
+        if (params.dateTo) searchParams.append('dateTo', params.dateTo);
+        
+        return `summary?${searchParams.toString()}`;
+      },
+      providesTags: [{ type: 'Report', id: 'SUMMARY' }],
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 300,
     }),
   })
 });
@@ -140,4 +179,6 @@ export const {
   useGetExpiringSoonReportQuery,
   useGetDailyMovementReportQuery,
   useGetRejectedTasksReportQuery,
+  useExportReportMutation,
+  useGetReportSummaryQuery,
 } = reportsApi;

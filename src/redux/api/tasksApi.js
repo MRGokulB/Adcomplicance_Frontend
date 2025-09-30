@@ -1,13 +1,12 @@
-// redux/api/tasksApi.js - OPTIMIZED VERSION
+// redux/api/tasksApi.js - Session-based with CSRF
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 const baseQuery = fetchBaseQuery({
   baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/tasks/`,
-  prepareHeaders: (headers, { getState }) => {
-    const token = getState().auth.token;
-    if (token) {
-      headers.set('authorization', `Bearer ${token}`);
-    }
+  credentials: 'include', // Send session cookies
+  prepareHeaders: (headers) => {
+    // No Authorization header needed - using sessions
+    headers.set('Content-Type', 'application/json');
     return headers;
   }
 });
@@ -15,7 +14,7 @@ const baseQuery = fetchBaseQuery({
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
   if (result?.error?.status === 401) {
-    console.log('Token expired, redirecting to login...');
+    console.log('Session expired, redirecting to login...');
     api.dispatch({ type: 'auth/logout' });
   }
   return result;
@@ -26,12 +25,10 @@ export const tasksApi = createApi({
   baseQuery: baseQueryWithReauth,
   tagTypes: ['Task', 'TaskBucket', 'TaskVersion', 'TaskComment', 'ExchangeApproval', 'TaskStats', 'TaskHealth'],
 
-  // OPTIMIZED: Increased cache retention to reduce refetches
-  keepUnusedDataFor: 300, // 5 minutes instead of 1 minute
-  refetchOnMountOrArgChange: 300, // Only refetch if data is older than 5 minutes
+  keepUnusedDataFor: 300,
+  refetchOnMountOrArgChange: 300,
 
   endpoints: (builder) => ({
-    // OPTIMIZED: getTasks - removed aggressive refetch config
     getTasks: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -70,14 +67,12 @@ export const tasksApi = createApi({
         { type: 'TaskBucket', id: 'LIST' },
         { type: 'TaskStats', id: 'DASHBOARD' }
       ],
-      transformResponse: (response) => {
-        return {
-          ...response.data,
-          message: response.message,
-          nextSteps: response.nextSteps,
-          warnings: response.warnings
-        };
-      }
+      transformResponse: (response) => ({
+        ...response.data,
+        message: response.message,
+        nextSteps: response.nextSteps,
+        warnings: response.warnings
+      })
     }),
 
     updateTaskName: builder.mutation({
@@ -93,15 +88,13 @@ export const tasksApi = createApi({
       transformResponse: (response) => response
     }),
 
-    // OPTIMIZED: getTaskById - removed aggressive refetch
     getTaskById: builder.query({
       query: (id) => id,
       providesTags: (result, error, id) => [{ type: 'Task', id }],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 300, // 5 minutes
+      keepUnusedDataFor: 300,
     }),
 
-    // OPTIMIZED: updateTaskStatus - simplified optimistic updates
     updateTaskStatus: builder.mutation({
       query: ({ id, status, reason }) => ({
         url: `${id}/status`,
@@ -114,7 +107,6 @@ export const tasksApi = createApi({
           { type: 'Task', id: 'LIST' }
         ];
 
-        // Conditionally invalidate specific buckets
         if (result?.data?.status === 'APPROVED') {
           tags.push({ type: 'TaskBucket', id: 'APPROVED_NOT_PUBLISHED' });
         }
@@ -125,7 +117,6 @@ export const tasksApi = createApi({
 
         return tags;
       },
-      // OPTIMIZED: Simplified optimistic update - only update the specific task
       async onQueryStarted({ id, status }, { dispatch, queryFulfilled }) {
         const patchResult = dispatch(
           tasksApi.util.updateQueryData('getTaskById', id, (draft) => {
@@ -184,17 +175,14 @@ export const tasksApi = createApi({
         { type: 'Task', id },
         { type: 'TaskVersion', id: 'LIST' }
       ],
-      transformResponse: (response) => {
-        return {
-          version: response.data?.version,
-          task: response.data?.task,
-          message: response.message,
-          nextSteps: response.nextSteps
-        };
-      }
+      transformResponse: (response) => ({
+        version: response.data?.version,
+        task: response.data?.task,
+        message: response.message,
+        nextSteps: response.nextSteps
+      })
     }),
 
-    // OPTIMIZED: addComment - simplified optimistic update
     addComment: builder.mutation({
       query: ({ id, content, isGlobal = false, versionId, attachments, requiresVersionUpdate = false }) => ({
         url: `${id}/comments`,
@@ -211,7 +199,7 @@ export const tasksApi = createApi({
           id: Date.now(),
           content,
           createdAt: new Date().toISOString(),
-          createdBy: auth.user,
+          author: auth.user,
           isOptimistic: true
         };
 
@@ -413,7 +401,6 @@ export const tasksApi = createApi({
       keepUnusedDataFor: 300,
     }),
 
-    // FIXED: Removed duplicate definition - kept only one
     getExpiringSoon: builder.query({
       query: (params) => {
         const days = typeof params === 'object' ? (params?.days || 15) : (params || 15);
@@ -443,7 +430,7 @@ export const tasksApi = createApi({
       },
       providesTags: [{ type: 'Task', id: 'SEARCH' }],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 600, // 10 minutes for search results
+      keepUnusedDataFor: 600,
     }),
 
     getUserWorkload: builder.query({
@@ -465,7 +452,6 @@ export const tasksApi = createApi({
       keepUnusedDataFor: 600,
     }),
 
-    // OPTIMIZED: Simplified bulk operations
     bulkTaskOperations: builder.mutation({
       query: ({ operation, taskIds, ...data }) => ({
         url: 'bulk-operations',
@@ -517,7 +503,6 @@ export const {
   useUpdateTaskNameMutation,
 } = tasksApi;
 
-// OPTIMIZED: Simplified utility functions
 export const invalidateTaskCache = (dispatch, taskId) => {
   dispatch(tasksApi.util.invalidateTags([
     { type: 'Task', id: taskId },

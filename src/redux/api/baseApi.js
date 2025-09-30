@@ -1,7 +1,6 @@
-// Base API configuration
+// src/redux/api/baseApi.js
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
-// Common API endpoints
 export const API_ENDPOINTS = {
   AUTH: '/api/auth',
   USERS: '/api/users',
@@ -10,15 +9,14 @@ export const API_ENDPOINTS = {
   REPORTS: '/api/reports',
   UPLOAD: '/api/upload',
   AUDIT: '/api/audit',
+  CSRF: '/api/csrf-token'
 }
 
-// Common headers
-export const getAuthHeaders = (token) => ({
+// Updated to not include Authorization header (using sessions now)
+export const getAuthHeaders = () => ({
   'Content-Type': 'application/json',
-  ...(token && { Authorization: `Bearer ${token}` })
 })
 
-// HTTP status codes
 export const HTTP_STATUS = {
   OK: 200,
   CREATED: 201,

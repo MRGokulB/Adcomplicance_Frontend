@@ -1,13 +1,12 @@
-// src/redux/api/dashboardApi.js - OPTIMIZED VERSION
+// src/redux/api/dashboardApi.js - Session-based with CSRF
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 const baseQuery = fetchBaseQuery({
   baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/dashboard/`,
-  prepareHeaders: (headers, { getState }) => {
-    const token = getState().auth.token;
-    if (token) {
-      headers.set('authorization', `Bearer ${token}`);
-    }
+  credentials: 'include', // Send session cookies
+  prepareHeaders: (headers) => {
+    // No Authorization header needed - using sessions
+    headers.set('Content-Type', 'application/json');
     return headers;
   }
 });
@@ -15,7 +14,7 @@ const baseQuery = fetchBaseQuery({
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
   if (result?.error?.status === 401) {
-    console.log('Token expired, redirecting to login...');
+    console.log('Session expired, redirecting to login...');
     api.dispatch({ type: 'auth/logout' });
   }
   return result;
@@ -26,12 +25,11 @@ export const dashboardApi = createApi({
   baseQuery: baseQueryWithReauth,
   tagTypes: ['Dashboard', 'DashboardStats', 'DashboardNotification', 'UserWorkload', 'TeamOverview'],
   
-  // OPTIMIZED: Add default cache retention
   keepUnusedDataFor: 300, // 5 minutes
-  refetchOnMountOrArgChange: 300, // Only refetch if data is older than 5 minutes
+  refetchOnMountOrArgChange: 300,
   
   endpoints: (builder) => ({
-    // Main dashboard data - aggregate view
+    // Main dashboard data
     getDashboard: builder.query({
       query: () => '',
       providesTags: ['Dashboard'],
@@ -39,44 +37,43 @@ export const dashboardApi = createApi({
       keepUnusedDataFor: 300,
     }),
 
-    // OPTIMIZED: Quick stats with longer cache
+    // Quick stats
     getQuickStats: builder.query({
       query: () => 'quick-stats',
       providesTags: ['DashboardStats'],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 180, // 3 minutes - frequently viewed
+      keepUnusedDataFor: 180,
     }),
 
-    // Task buckets - no polling needed, refetch on user action
+    // Task buckets
     getTaskBuckets: builder.query({
       query: () => 'task-buckets',
       providesTags: ['Dashboard'],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 600, // 10 minutes - relatively static
+      keepUnusedDataFor: 600,
     }),
 
-    // Workload chart - less critical, longer cache
+    // Workload chart
     getWorkloadChart: builder.query({
       query: () => 'workload-chart',
       providesTags: ['Dashboard'],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 600, // 10 minutes
+      keepUnusedDataFor: 600,
     }),
 
-    // Completion trends - analytics data, can be cached longer
+    // Completion trends
     getCompletionTrends: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
-        if (params.from) searchParams.append('from', params.from);
-        if (params.to) searchParams.append('to', params.to);
+        if (params.days) searchParams.append('days', params.days);
         return `completion-trends?${searchParams.toString()}`;
       },
       providesTags: ['Dashboard'],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 900, // 15 minutes - historical data
+      keepUnusedDataFor: 900,
     }),
 
-    // Activity feed - needs fresher data
+    // Activity feed
     getActivityFeed: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -86,10 +83,10 @@ export const dashboardApi = createApi({
       },
       providesTags: ['Dashboard'],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 120, // 2 minutes - recent activity
+      keepUnusedDataFor: 120,
     }),
 
-    // OPTIMIZED: Performance metrics - simplified query construction
+    // Performance metrics
     getPerformanceMetrics: builder.query({
       query: (params = {}) => {
         const period = params?.period || '30d';
@@ -97,40 +94,39 @@ export const dashboardApi = createApi({
       },
       providesTags: ['Dashboard'],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 600, // 10 minutes - metrics don't change frequently
+      keepUnusedDataFor: 600,
     }),
 
-    // Dashboard-specific stats (different from tasksApi)
+    // Dashboard stats
     getDashboardStats: builder.query({
       query: () => 'dashboard-stats',
       providesTags: ['DashboardStats'],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 180, // 3 minutes
+      keepUnusedDataFor: 180,
     }),
 
-    // User workload with caching per user
+    // User workload
     getUserWorkload: builder.query({
       query: (userId) => `user-workload/${userId}`,
       providesTags: (result, error, userId) => [{ type: 'UserWorkload', id: userId }],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 300, // 5 minutes per user
+      keepUnusedDataFor: 300,
     }),
 
-    // Team overview - less frequently changing
+    // Team overview
     getTeamOverview: builder.query({
       query: () => 'team-overview',
       providesTags: ['TeamOverview'],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 600, // 10 minutes
+      keepUnusedDataFor: 600,
     }),
 
-    // Mutations for notifications
+    // Mark notification as read
     markDashboardNotificationRead: builder.mutation({
       query: (id) => ({
         url: `notifications/${id}/read`,
         method: 'PATCH'
       }),
-      // OPTIMIZED: Only invalidate specific tags
       invalidatesTags: (result, error, id) => [
         'Dashboard',
         { type: 'DashboardNotification', id }
@@ -138,6 +134,7 @@ export const dashboardApi = createApi({
       transformResponse: (response) => response
     }),
 
+    // Mark all notifications as read
     markAllDashboardNotificationsRead: builder.mutation({
       query: () => ({
         url: 'notifications/read-all',

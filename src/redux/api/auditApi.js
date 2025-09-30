@@ -1,14 +1,12 @@
-// src/redux/api/auditApi.js - FIXED VERSION
+// src/redux/api/auditApi.js - Session-based with CSRF
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 const baseQuery = fetchBaseQuery({
-  // FIXED: Correct base URL structure - no trailing slash in base URL, add it in endpoint
   baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api`,
-  prepareHeaders: (headers, { getState }) => {
-    const token = getState().auth.token;
-    if (token) {
-      headers.set('authorization', `Bearer ${token}`);
-    }
+  credentials: 'include', // Send session cookies
+  prepareHeaders: (headers) => {
+    // No Authorization header needed - using sessions
+    headers.set('Content-Type', 'application/json');
     return headers;
   }
 });
@@ -16,7 +14,7 @@ const baseQuery = fetchBaseQuery({
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
   if (result?.error?.status === 401) {
-    console.log('Token expired, redirecting to login...');
+    console.log('Session expired, redirecting to login...');
     api.dispatch({ type: 'auth/logout' });
   }
   return result;
@@ -26,14 +24,13 @@ export const auditApi = createApi({
   reducerPath: 'auditApi',
   baseQuery: baseQueryWithReauth,
   tagTypes: ['Audit', 'AuditStats'],
+  keepUnusedDataFor: 300, // 5 minutes cache for audit logs
   endpoints: (builder) => ({
     // Get audit logs with comprehensive filtering
-    // FIXED: Correct route path with /audit prefix
     getAuditLogs: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
         
-        // Only add parameters that have values
         if (params.page) searchParams.append('page', params.page);
         if (params.limit) searchParams.append('limit', params.limit);
         if (params.dateFrom) searchParams.append('dateFrom', params.dateFrom);
@@ -42,7 +39,6 @@ export const auditApi = createApi({
         if (params.performedBy) searchParams.append('performedBy', params.performedBy);
         if (params.taskId) searchParams.append('taskId', params.taskId);
         
-        // FIXED: Correct endpoint construction
         const queryString = searchParams.toString();
         return `/audit${queryString ? `?${queryString}` : ''}`;
       },
@@ -53,6 +49,8 @@ export const auditApi = createApi({
               { type: 'Audit', id: 'LIST' }
             ]
           : [{ type: 'Audit', id: 'LIST' }],
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 300,
     }),
 
     // Get audit logs for specific task
@@ -68,6 +66,8 @@ export const auditApi = createApi({
       providesTags: (result, error, { taskId }) => [
         { type: 'Audit', id: `TASK_${taskId}` }
       ],
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 300,
     }),
 
     // Get audit logs for specific user  
@@ -85,6 +85,8 @@ export const auditApi = createApi({
       providesTags: (result, error, { userId }) => [
         { type: 'Audit', id: `USER_${userId}` }
       ],
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 300,
     }),
 
     // Get audit statistics
@@ -93,11 +95,29 @@ export const auditApi = createApi({
         const searchParams = new URLSearchParams();
         if (params.dateFrom) searchParams.append('dateFrom', params.dateFrom);
         if (params.dateTo) searchParams.append('dateTo', params.dateTo);
+        if (params.groupBy) searchParams.append('groupBy', params.groupBy);
         
         const queryString = searchParams.toString();
         return `/audit/stats${queryString ? `?${queryString}` : ''}`;
       },
       providesTags: [{ type: 'AuditStats', id: 'STATS' }],
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 600, // 10 minutes for stats
+    }),
+
+    // Get recent activity
+    getRecentActivity: builder.query({
+      query: (params = {}) => {
+        const searchParams = new URLSearchParams();
+        if (params.limit) searchParams.append('limit', params.limit);
+        if (params.hours) searchParams.append('hours', params.hours);
+        
+        const queryString = searchParams.toString();
+        return `/audit/recent${queryString ? `?${queryString}` : ''}`;
+      },
+      providesTags: [{ type: 'Audit', id: 'RECENT' }],
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 60, // 1 minute for recent activity
     }),
 
     // Export audit data
@@ -108,10 +128,19 @@ export const auditApi = createApi({
         if (params.dateTo) searchParams.append('dateTo', params.dateTo);
         if (params.action) searchParams.append('action', params.action);
         if (params.performedBy) searchParams.append('performedBy', params.performedBy);
+        if (params.format) searchParams.append('format', params.format); // csv, json, xlsx
         
         const queryString = searchParams.toString();
         return `/audit/export${queryString ? `?${queryString}` : ''}`;
       },
+      transformResponse: (response) => response,
+    }),
+
+    // Get action types (for filtering)
+    getActionTypes: builder.query({
+      query: () => '/audit/action-types',
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 3600, // 1 hour - action types rarely change
     }),
   })
 });
@@ -121,5 +150,7 @@ export const {
   useGetTaskAuditLogsQuery,
   useGetUserAuditLogsQuery,
   useGetAuditStatsQuery,
+  useGetRecentActivityQuery,
   useLazyExportAuditDataQuery,
+  useGetActionTypesQuery,
 } = auditApi;
