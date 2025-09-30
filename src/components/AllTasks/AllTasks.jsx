@@ -1,7 +1,7 @@
-// src/components/AllTasks/AllTasks.jsx - Updated with new API endpoints and permissions
-import React, { useState, useMemo, useEffect } from 'react';
+// src/components/AllTasks/AllTasks.jsx - OPTIMIZED VERSION
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { selectUserRole } from '../../redux/slices/authSlice';
 import {
     useGetTasksQuery,
@@ -13,50 +13,79 @@ import {
     useGetTaskHealthCheckQuery,
     useUpdateTaskStatusMutation,
 } from '../../redux/api/tasksApi';
-import { hasPermission, PERMISSIONS } from '../../utils/roles';
 import {
     usePermissions,
-    CanReassignTask,
     CanValidateFiles,
     CanPerformBulkOperations,
-    CanViewHealthCheck,
-    CanViewDashboardStats,
+    CanReassignTask,
 } from '../PermissionWrapper';
 import CreateNewAdTask from '../Tasks/NewTask';
 import TaskDetailPanel from './TaskDetailPanel';
 import FileValidationModal from './FlieValidationModal';
-import TaskReassignmentModal from './TaskReassignmentModal'
-import BulkOperationsModal from './BulkOperationsModal'
+import TaskReassignmentModal from './TaskReassignmentModal';
+import BulkOperationsModal from './BulkOperationsModal';
+
+// OPTIMIZED: Debounce hook
+const useDebounce = (value, delay = 500) => {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+        return () => clearTimeout(handler);
+    }, [value, delay]);
+
+    return debouncedValue;
+};
 
 export default function AllTasksPage() {
     const navigate = useNavigate();
     const currentUserRole = useSelector(selectUserRole);
     const permissions = usePermissions();
-    const dispatch = useDispatch();
 
+    // OPTIMIZED: Single unified filters state - all server-side
     const [filters, setFilters] = useState({
         taskType: '',
         status: '',
-        search: '',
         priority: '',
-        page: 1,
-        limit: 10
-    });
-
-    const [localFilters, setLocalFilters] = useState({
         createdBy: '',
         assignedTo: '',
         dateFrom: '',
         dateTo: '',
-        refNo: '',
-        searchQuery: ''
+        search: '',
+        page: 1,
+        limit: 10
     });
+
+    // OPTIMIZED: Separate state for immediate UI update
+    const [searchInput, setSearchInput] = useState('');
+    const [createdByInput, setCreatedByInput] = useState('');
+    const [assignedToInput, setAssignedToInput] = useState('');
+
+    // OPTIMIZED: Debounced values
+    const debouncedSearch = useDebounce(searchInput, 500);
+    const debouncedCreatedBy = useDebounce(createdByInput, 500);
+    const debouncedAssignedTo = useDebounce(assignedToInput, 500);
+
+    // Update filters when debounced values change
+    useEffect(() => {
+        setFilters(prev => ({ ...prev, search: debouncedSearch, page: 1 }));
+    }, [debouncedSearch]);
+
+    useEffect(() => {
+        setFilters(prev => ({ ...prev, createdBy: debouncedCreatedBy, page: 1 }));
+    }, [debouncedCreatedBy]);
+
+    useEffect(() => {
+        setFilters(prev => ({ ...prev, assignedTo: debouncedAssignedTo, page: 1 }));
+    }, [debouncedAssignedTo]);
 
     // Advanced search state
     const [advancedSearch, setAdvancedSearch] = useState({
         enabled: false,
         query: '',
-        type: 'all' // 'title', 'description', 'uin', 'all'
+        type: 'all'
     });
 
     const [selectedRows, setSelectedRows] = useState([]);
@@ -67,29 +96,17 @@ export default function AllTasksPage() {
     const [selectedTaskForDetail, setSelectedTaskForDetail] = useState(null);
     const [showTaskDetail, setShowTaskDetail] = useState(false);
 
-    // Modal states for new features
+    // Modal states
     const [showFileValidation, setShowFileValidation] = useState(false);
     const [showReassignment, setShowReassignment] = useState(false);
     const [showBulkOperations, setShowBulkOperations] = useState(false);
     const [bulkOperationType, setBulkOperationType] = useState('');
 
-    // Bulk operations mutation
-    const [performBulkOperation, {
-        isLoading: isBulkLoading,
-        error: bulkError
-    }] = useBulkTaskOperationsMutation();
+    // Mutations
+    const [performBulkOperation, { isLoading: isBulkLoading }] = useBulkTaskOperationsMutation();
+    const [validateFiles, { isLoading: isValidating }] = useValidateFilesMutation();
 
-    // File validation mutation
-    const [validateFiles, {
-        isLoading: isValidating
-    }] = useValidateFilesMutation();
-
-    // Status update mutation
-    const [updateTaskStatus, {
-        isLoading: isUpdatingStatus
-    }] = useUpdateTaskStatusMutation();
-
-    // Permission checks - Updated with new permissions
+    // Permission checks
     const canCreateTasks = permissions.canCreateTask;
     const canViewTaskBuckets = permissions.canViewTaskBuckets;
     const canPerformBulkOps = permissions.canPerformBulkOperations;
@@ -98,26 +115,35 @@ export default function AllTasksPage() {
     const canViewHealthCheck = permissions.canViewHealthCheck;
     const canAdvancedSearch = permissions.canAdvancedSearch;
 
-    // API queries based on active view
+    // OPTIMIZED: API queries - conditional based on view
     const {
         data: tasksData,
         isLoading,
         isError,
         error,
-        refetch
-    } = useGetTasksQuery(filters, { skip: activeView !== 'all' });
+        refetch,
+        isFetching
+    } = useGetTasksQuery(filters, { 
+        skip: activeView !== 'all' || advancedSearch.enabled 
+    });
 
     const {
         data: approvedNotPublishedData,
         isLoading: isLoadingApproved,
         refetch: refetchApproved
-    } = useGetApprovedNotPublishedQuery(undefined, { skip: activeView !== 'approved-not-published' });
+    } = useGetApprovedNotPublishedQuery(undefined, { 
+        skip: activeView !== 'approved-not-published',
+        pollingInterval: 0
+    });
 
     const {
         data: expiringSoonData,
         isLoading: isLoadingExpiring,
         refetch: refetchExpiring
-    } = useGetExpiringSoonQuery({ days: 15 });
+    } = useGetExpiringSoonQuery({ days: 15 }, {
+        skip: activeView !== 'expiring-soon',
+        pollingInterval: 0
+    });
 
     // Advanced search query
     const {
@@ -136,59 +162,58 @@ export default function AllTasksPage() {
         }
     );
 
-    // Health check query for system monitoring
-    const {
-        data: healthCheckData,
-        refetch: refetchHealthCheck
-    } = useGetTaskHealthCheckQuery(undefined, {
+    // Health check
+    const { data: healthCheckData, refetch: refetchHealthCheck } = useGetTaskHealthCheckQuery(undefined, {
         skip: !canViewHealthCheck,
-        pollingInterval: 300000 // 5 minutes
+        pollingInterval: 300000
     });
 
-    // Get current data based on active view - Updated with advanced search
-    const getCurrentData = () => {
+    // OPTIMIZED: Get current data - no client-side filtering
+    const getCurrentData = useCallback(() => {
         if (advancedSearch.enabled && advancedSearchData) {
             return {
                 tasks: advancedSearchData?.results || [],
                 pagination: advancedSearchData?.pagination || null,
-                count: advancedSearchData?.pagination?.totalCount || 0,
+                totalCount: advancedSearchData?.pagination?.totalCount || 0,
                 isLoading: isAdvancedSearchLoading
             };
         }
 
         switch (activeView) {
             case 'approved-not-published':
+                const approvedTasks = approvedNotPublishedData?.tasks || approvedNotPublishedData || [];
                 return {
-                    tasks: approvedNotPublishedData?.tasks || approvedNotPublishedData || [],
+                    tasks: approvedTasks,
                     pagination: null,
-                    count: approvedNotPublishedData?.count || (Array.isArray(approvedNotPublishedData) ? approvedNotPublishedData.length : 0),
+                    totalCount: approvedNotPublishedData?.count || approvedTasks.length,
                     isLoading: isLoadingApproved
                 };
+                
             case 'expiring-soon':
+                const expiringTasks = expiringSoonData?.tasks || expiringSoonData?.data || [];
                 return {
-                    tasks: expiringSoonData?.tasks || expiringSoonData?.data || [],
+                    tasks: expiringTasks,
                     pagination: null,
-                    count: expiringSoonData?.summary?.totalExpiring || (Array.isArray(expiringSoonData?.data) ? expiringSoonData.data.length : 0),
+                    totalCount: expiringSoonData?.summary?.totalExpiring || expiringTasks.length,
                     isLoading: isLoadingExpiring
                 };
+                
             default:
                 return {
                     tasks: tasksData?.tasks || [],
                     pagination: tasksData?.pagination || null,
-                    count: tasksData?.pagination?.totalCount || 0,
+                    totalCount: tasksData?.pagination?.totalCount || 0,
                     isLoading: isLoading
                 };
         }
-    };
+    }, [advancedSearch, advancedSearchData, activeView, tasksData, approvedNotPublishedData, expiringSoonData, isLoading, isLoadingApproved, isLoadingExpiring, isAdvancedSearchLoading]);
 
-    const { tasks, pagination, count, isLoading: currentLoading } = getCurrentData();
+    const { tasks, pagination, totalCount, isLoading: currentLoading } = getCurrentData();
 
-
-    // Add focus handling to refresh data when tab becomes active
+    // Tab visibility handler
     useEffect(() => {
-        const handleFocus = () => {
+        const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
-                // Refresh current view when tab becomes visible
                 switch (activeView) {
                     case 'approved-not-published':
                         refetchApproved();
@@ -202,156 +227,117 @@ export default function AllTasksPage() {
             }
         };
 
-        document.addEventListener('visibilitychange', handleFocus);
-        return () => document.removeEventListener('visibilitychange', handleFocus);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [activeView, refetch, refetchApproved, refetchExpiring]);
-    // Apply local filters to tasks
-    const filteredData = useMemo(() => {
-        return tasks.filter(task => {
-            const matchesCreatedBy = !localFilters.createdBy ||
-                task.createdBy?.fullName?.toLowerCase().includes(localFilters.createdBy.toLowerCase()) ||
-                task.createdBy?.toLowerCase().includes(localFilters.createdBy.toLowerCase());
 
-            const matchesAssignedTo = !localFilters.assignedTo ||
-                task.assignedProducts?.some(product =>
-                    (typeof product === 'string' ? product : product.fullName)?.toLowerCase().includes(localFilters.assignedTo.toLowerCase())
-                );
+    // OPTIMIZED: Server-side pagination
+    const totalPages = pagination 
+        ? Math.ceil(pagination.totalCount / filters.limit)
+        : Math.ceil(totalCount / filters.limit);
 
-            const matchesRefNo = !localFilters.refNo ||
-                (task.uin && task.uin.toLowerCase().includes(localFilters.refNo.toLowerCase()));
+    // OPTIMIZED: Simplified handlers
+    const handleFilterChange = useCallback((field, value) => {
+        setFilters(prev => ({ 
+            ...prev, 
+            [field]: value,
+            page: 1
+        }));
+    }, []);
 
-            const matchesSearch = !localFilters.searchQuery ||
-                [task.title, task.description, task.uin, task.platform, task.category]
-                    .some(value => value && value.toString().toLowerCase().includes(localFilters.searchQuery.toLowerCase()));
-
-            return matchesCreatedBy && matchesAssignedTo && matchesRefNo && matchesSearch;
-        });
-    }, [tasks, localFilters]);
-
-    // Pagination for filtered data
-    const totalPages = Math.ceil(filteredData.length / filters.limit);
-    const startIndex = (filters.page - 1) * filters.limit;
-    const paginatedData = filteredData.slice(startIndex, startIndex + filters.limit);
-
-    const handleFilterChange = (field, value) => {
-        if (['taskType', 'status', 'search', 'priority'].includes(field)) {
-            setFilters(prev => ({ ...prev, [field]: value, page: 1 }));
-        } else {
-            setLocalFilters(prev => ({ ...prev, [field]: value }));
-        }
-    };
-
-    // Handle advanced search
-    const handleAdvancedSearch = () => {
+    const handleAdvancedSearch = useCallback(() => {
         if (advancedSearch.query.trim()) {
             setAdvancedSearch(prev => ({ ...prev, enabled: true }));
             refetchAdvancedSearch();
         }
-    };
+    }, [advancedSearch.query, refetchAdvancedSearch]);
 
-    const clearAdvancedSearch = () => {
+    const clearAdvancedSearch = useCallback(() => {
         setAdvancedSearch({ enabled: false, query: '', type: 'all' });
-    };
+    }, []);
 
-    const handleViewChange = (view) => {
+    const handleViewChange = useCallback((view) => {
         setActiveView(view);
         setSelectedRows([]);
         setFilters(prev => ({ ...prev, page: 1 }));
-        // Close task detail when switching views
         setShowTaskDetail(false);
         setSelectedTaskForDetail(null);
-        // Clear advanced search when switching views
         clearAdvancedSearch();
-    };
+    }, [clearAdvancedSearch]);
 
-    // Handle row selection with task detail logic
-    const handleRowSelect = (id, task) => {
+    const handleRowSelect = useCallback((id, task) => {
         setSelectedRows(prev => {
-            const newSelection = prev.includes(id) ?
-                prev.filter(rowId => rowId !== id) :
-                [...prev, id];
+            const newSelection = prev.includes(id) 
+                ? prev.filter(rowId => rowId !== id)
+                : [...prev, id];
 
-            // Show task detail only if exactly one task is selected
             if (newSelection.length === 1) {
-                const selectedTask = paginatedData.find(t => t.id === newSelection[0]);
+                const selectedTask = tasks.find(t => t.id === newSelection[0]);
                 setSelectedTaskForDetail(selectedTask?.id || null);
                 setShowTaskDetail(true);
             } else {
-                // Hide task detail if multiple or no tasks selected
                 setShowTaskDetail(false);
                 setSelectedTaskForDetail(null);
             }
 
             return newSelection;
         });
-    };
+    }, [tasks]);
 
-    const handleSelectAll = () => {
-        if (selectedRows.length === paginatedData.length) {
+    const handleSelectAll = useCallback(() => {
+        if (selectedRows.length === tasks.length) {
             setSelectedRows([]);
             setShowTaskDetail(false);
             setSelectedTaskForDetail(null);
         } else {
-            const allIds = paginatedData.map(row => row.id);
-            setSelectedRows(allIds);
-            // Don't show details for multiple selections
+            setSelectedRows(tasks.map(task => task.id));
             setShowTaskDetail(false);
             setSelectedTaskForDetail(null);
         }
-    };
+    }, [selectedRows.length, tasks]);
 
-    // Handle task detail close
-    const handleCloseTaskDetail = () => {
+    const handleCloseTaskDetail = useCallback(() => {
         setShowTaskDetail(false);
         setSelectedTaskForDetail(null);
-        setSelectedRows([]); // Also clear selection
-    };
+        setSelectedRows([]);
+    }, []);
 
-    const handleReset = () => {
+    const handleReset = useCallback(() => {
         setFilters({
             taskType: '',
             status: '',
-            search: '',
             priority: '',
-            page: 1,
-            limit: 10
-        });
-        setLocalFilters({
             createdBy: '',
             assignedTo: '',
             dateFrom: '',
             dateTo: '',
-            refNo: '',
-            searchQuery: ''
+            search: '',
+            page: 1,
+            limit: 10
         });
+        setSearchInput('');
+        setCreatedByInput('');
+        setAssignedToInput('');
         setSelectedRows([]);
-        // Close task detail on reset
         setShowTaskDetail(false);
         setSelectedTaskForDetail(null);
-        // Clear advanced search
         clearAdvancedSearch();
-    };
+    }, [clearAdvancedSearch]);
 
-    // Handle bulk operations
     const handleBulkOperation = async (operation, data = {}) => {
         if (selectedRows.length === 0) return;
 
         try {
-            const result = await performBulkOperation({
+            await performBulkOperation({
                 operation,
                 taskIds: selectedRows,
                 ...data
             }).unwrap();
 
-            // Show success message
-            console.log('Bulk operation completed:', result);
-
-            // Clear selection and refresh data
             setSelectedRows([]);
             setShowTaskDetail(false);
             setSelectedTaskForDetail(null);
 
-            // Refresh current view
             switch (activeView) {
                 case 'approved-not-published':
                     refetchApproved();
@@ -362,17 +348,14 @@ export default function AllTasksPage() {
                 default:
                     refetch();
             }
-
         } catch (error) {
             console.error('Bulk operation failed:', error);
         }
     };
 
-    // Handle file validation
     const handleFileValidation = async (files) => {
         try {
             const result = await validateFiles(files).unwrap();
-            console.log('File validation result:', result);
             return result;
         } catch (error) {
             console.error('File validation failed:', error);
@@ -380,11 +363,11 @@ export default function AllTasksPage() {
         }
     };
 
-    const handleExportCSV = () => {
+    const handleExportCSV = useCallback(() => {
         const headers = ['UIN', 'Title', 'Task Type', 'Created By', 'Assigned Products', 'Assigned Compliance', 'Status', 'Priority', 'Last Updated'];
         const csvContent = [
             headers.join(','),
-            ...filteredData.map(task => [
+            ...tasks.map(task => [
                 task.uin || '',
                 `"${task.title || ''}"`,
                 task.taskType || '',
@@ -406,7 +389,7 @@ export default function AllTasksPage() {
         a.download = `tasks_${activeView}_export_${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
         window.URL.revokeObjectURL(url);
-    };
+    }, [tasks, activeView]);
 
     const getStatusBadge = (status) => {
         switch (status) {
@@ -424,15 +407,6 @@ export default function AllTasksPage() {
 
     const getTaskTypeLabel = (taskType) => {
         return taskType === 'EXCHANGE' ? 'Exchange' : 'Internal';
-    };
-
-    const formatDate = (dateString) => {
-        if (!dateString) return '-';
-        return new Date(dateString).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
     };
 
     const formatDateTime = (dateString) => {
@@ -470,9 +444,7 @@ export default function AllTasksPage() {
                     </div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to load tasks</h3>
                     <p className="text-gray-600 mb-4">{error?.data?.message || 'An error occurred while fetching tasks'}</p>
-                    <button onClick={refetch} className="btn btn-primary">
-                        Try Again
-                    </button>
+                    <button onClick={refetch} className="btn btn-primary">Try Again</button>
                 </div>
             </div>
         );
@@ -480,7 +452,6 @@ export default function AllTasksPage() {
 
     return (
         <div className="container-lg section-md">
-            {/* Page Header */}
             <div className="flex-between items-center mb-6">
                 <div>
                     <h1 className="text-heading-2">All Tasks</h1>
@@ -496,11 +467,9 @@ export default function AllTasksPage() {
                 </div>
                 <div className="flex gap-2">
                     <button className="btn btn-outline" onClick={handleExportCSV}>Export CSV</button>
-                    <button className="btn btn-outline">Export Excel</button>
                 </div>
             </div>
 
-            {/* Task Bucket Views */}
             {canViewTaskBuckets && (
                 <div className="mb-6">
                     <div className="flex gap-2 mb-4">
@@ -516,15 +485,15 @@ export default function AllTasksPage() {
                         >
                             Approved Not Published
                         </button>
-                         
                     </div>
                 </div>
             )}
 
-            {/* Filter Panel */}
+            {/* Filter Panel - OPTIMIZED with debouncing */}
             <div className="filter-panel">
                 <div className="card-header">
                     <h3 className="card-title">Filters</h3>
+                    {isFetching && <span className="text-xs text-blue-600">Updating...</span>}
                 </div>
                 <div className="card-body">
                     <div className="filter-grid">
@@ -577,8 +546,8 @@ export default function AllTasksPage() {
                                 type="text"
                                 className="input"
                                 placeholder="Search by creator"
-                                value={localFilters.createdBy}
-                                onChange={(e) => handleFilterChange('createdBy', e.target.value)}
+                                value={createdByInput}
+                                onChange={(e) => setCreatedByInput(e.target.value)}
                             />
                         </div>
 
@@ -588,8 +557,8 @@ export default function AllTasksPage() {
                                 type="text"
                                 className="input"
                                 placeholder="Search assignee"
-                                value={localFilters.assignedTo}
-                                onChange={(e) => handleFilterChange('assignedTo', e.target.value)}
+                                value={assignedToInput}
+                                onChange={(e) => setAssignedToInput(e.target.value)}
                             />
                         </div>
 
@@ -598,7 +567,7 @@ export default function AllTasksPage() {
                             <input
                                 type="date"
                                 className="input"
-                                value={localFilters.dateFrom}
+                                value={filters.dateFrom}
                                 onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
                             />
                         </div>
@@ -608,7 +577,7 @@ export default function AllTasksPage() {
                             <input
                                 type="date"
                                 className="input"
-                                value={localFilters.dateTo}
+                                value={filters.dateTo}
                                 onChange={(e) => handleFilterChange('dateTo', e.target.value)}
                             />
                         </div>
@@ -619,34 +588,32 @@ export default function AllTasksPage() {
                                 type="text"
                                 className="input"
                                 placeholder="Search everything..."
-                                value={localFilters.searchQuery}
-                                onChange={(e) => handleFilterChange('searchQuery', e.target.value)}
+                                value={searchInput}
+                                onChange={(e) => setSearchInput(e.target.value)}
                             />
                         </div>
                     </div>
 
                     <div className="filter-actions">
                         <div className="filter-summary">
-                            Showing {filteredData.length} of {count} tasks
+                            Showing {tasks.length} of {totalCount} tasks
                             {activeView !== 'all' && ` (${activeView.replace('-', ' ')})`}
                             {advancedSearch.enabled && ` • Advanced search: "${advancedSearch.query}"`}
                         </div>
                         <div className="filter-buttons">
                             <button className="btn btn-secondary" onClick={handleReset}>Reset</button>
-                            <button className="btn btn-primary">Apply Filters</button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Table */}
+            {/* Table with server-side pagination */}
             <div className="table-container">
                 <div className="table-toolbar">
                     <div className="table-toolbar-left">
                         <h3 className="text-heading-4">Task Management</h3>
                     </div>
                     <div className="table-toolbar-right">
-                        {/* NEW: File Validation Button */}
                         <CanValidateFiles>
                             <button
                                 className="btn btn-outline btn-sm"
@@ -667,7 +634,6 @@ export default function AllTasksPage() {
                     </div>
                 </div>
 
-                {/* NEW: Enhanced selection bar with bulk operations */}
                 {selectedRows.length > 0 && (
                     <div className="table-selection-bar">
                         <div className="table-selection-info">
@@ -675,7 +641,6 @@ export default function AllTasksPage() {
                             {selectedRows.length === 1 && ' (details shown below)'}
                         </div>
                         <div className="table-selection-actions">
-                            {/* NEW: Bulk Operations */}
                             <CanPerformBulkOperations>
                                 <div className="flex gap-2">
                                     <button
@@ -701,7 +666,6 @@ export default function AllTasksPage() {
                                 </div>
                             </CanPerformBulkOperations>
 
-                            {/* NEW: Individual Reassignment */}
                             <CanReassignTask>
                                 {selectedRows.length === 1 && (
                                     <button
@@ -715,11 +679,7 @@ export default function AllTasksPage() {
 
                             <button
                                 className="btn btn-ghost btn-sm"
-                                onClick={() => {
-                                    setSelectedRows([]);
-                                    setShowTaskDetail(false);
-                                    setSelectedTaskForDetail(null);
-                                }}
+                                onClick={handleCloseTaskDetail}
                             >
                                 Clear Selection
                             </button>
@@ -733,7 +693,7 @@ export default function AllTasksPage() {
                             <th>
                                 <input
                                     type="checkbox"
-                                    checked={selectedRows.length === paginatedData.length && paginatedData.length > 0}
+                                    checked={selectedRows.length === tasks.length && tasks.length > 0}
                                     onChange={handleSelectAll}
                                     className="w-4 h-4 accent-blue-600"
                                 />
@@ -749,7 +709,7 @@ export default function AllTasksPage() {
                         </tr>
                     </thead>
                     <tbody className="table-body">
-                        {paginatedData.length > 0 ? paginatedData.map((task) => (
+                        {tasks.length > 0 ? tasks.map((task) => (
                             <tr
                                 key={task.id}
                                 className={`group ${selectedRows.includes(task.id) ? 'bg-blue-50' : ''}`}
@@ -776,9 +736,10 @@ export default function AllTasksPage() {
                                 </td>
                                 <td>
                                     {task.priority && (
-                                        <span className={`badge ${task.priority === 'HIGH' ? 'badge-error' :
-                                                task.priority === 'MEDIUM' ? 'badge-warning' : 'badge-success'
-                                            }`}>
+                                        <span className={`badge ${
+                                            task.priority === 'HIGH' ? 'badge-error' :
+                                            task.priority === 'MEDIUM' ? 'badge-warning' : 'badge-success'
+                                        }`}>
                                             {task.priority}
                                         </span>
                                     )}
@@ -813,7 +774,7 @@ export default function AllTasksPage() {
                                         <h3 className="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
                                         <p className="text-gray-500">
                                             {activeView === 'all' ?
-                                                'No tasks match your current filters. Try adjusting your search criteria.' :
+                                                'No tasks match your current filters.' :
                                                 `No ${activeView.replace('-', ' ')} tasks found.`
                                             }
                                         </p>
@@ -824,18 +785,18 @@ export default function AllTasksPage() {
                     </tbody>
                 </table>
 
-                {/* Pagination Footer */}
+                {/* Server-side pagination */}
                 <div className="card-footer">
                     <div className="flex-between">
                         <div className="text-sm text-gray-600">
-                            {selectedRows.length} of {filteredData.length} row(s) selected.
+                            {selectedRows.length} of {totalCount} row(s) selected.
                         </div>
                         <div className="flex gap-2 items-center">
                             <div className="flex items-center gap-2 mr-4">
                                 <span className="text-sm text-gray-600">Rows per page:</span>
                                 <select
                                     value={filters.limit}
-                                    onChange={(e) => setFilters(prev => ({ ...prev, limit: Number(e.target.value), page: 1 }))}
+                                    onChange={(e) => handleFilterChange('limit', Number(e.target.value))}
                                     className="select"
                                 >
                                     <option value={5}>5</option>
@@ -850,29 +811,29 @@ export default function AllTasksPage() {
                                 </span>
                                 <button
                                     className="btn btn-secondary btn-sm"
-                                    disabled={filters.page === 1}
-                                    onClick={() => setFilters(prev => ({ ...prev, page: 1 }))}
+                                    disabled={filters.page === 1 || currentLoading}
+                                    onClick={() => handleFilterChange('page', 1)}
                                 >
                                     ⟨⟨
                                 </button>
                                 <button
                                     className="btn btn-secondary btn-sm"
-                                    disabled={filters.page === 1}
-                                    onClick={() => setFilters(prev => ({ ...prev, page: prev.page - 1 }))}
+                                    disabled={filters.page === 1 || currentLoading}
+                                    onClick={() => handleFilterChange('page', filters.page - 1)}
                                 >
                                     ⟨
                                 </button>
                                 <button
                                     className="btn btn-secondary btn-sm"
-                                    disabled={filters.page === totalPages}
-                                    onClick={() => setFilters(prev => ({ ...prev, page: prev.page + 1 }))}
+                                    disabled={filters.page === totalPages || currentLoading}
+                                    onClick={() => handleFilterChange('page', filters.page + 1)}
                                 >
                                     ⟩
                                 </button>
                                 <button
                                     className="btn btn-secondary btn-sm"
-                                    disabled={filters.page === totalPages}
-                                    onClick={() => setFilters(prev => ({ ...prev, page: totalPages }))}
+                                    disabled={filters.page === totalPages || currentLoading}
+                                    onClick={() => handleFilterChange('page', totalPages)}
                                 >
                                     ⟩⟩
                                 </button>
@@ -882,7 +843,6 @@ export default function AllTasksPage() {
                 </div>
             </div>
 
-            {/* Task Detail Panel - Only show when exactly one task is selected */}
             {showTaskDetail && selectedTaskForDetail && selectedRows.length === 1 && (
                 <TaskDetailPanel
                     taskId={selectedTaskForDetail}
@@ -890,12 +850,10 @@ export default function AllTasksPage() {
                 />
             )}
 
-            {/* Create Task Modal */}
             {showCreateModal && (
                 <CreateNewAdTask onClose={() => setShowCreateModal(false)} />
             )}
 
-            {/* NEW: File Validation Modal */}
             {showFileValidation && (
                 <FileValidationModal
                     onClose={() => setShowFileValidation(false)}
@@ -904,19 +862,17 @@ export default function AllTasksPage() {
                 />
             )}
 
-            {/* NEW: Task Reassignment Modal */}
             {showReassignment && selectedRows.length === 1 && (
                 <TaskReassignmentModal
                     taskId={selectedRows[0]}
                     onClose={() => setShowReassignment(false)}
                     onSuccess={() => {
                         setShowReassignment(false);
-                        refetch(); // Refresh data
+                        refetch();
                     }}
                 />
             )}
 
-            {/* NEW: Bulk Operations Modal */}
             {showBulkOperations && (
                 <BulkOperationsModal
                     operationType={bulkOperationType}
@@ -928,4 +884,4 @@ export default function AllTasksPage() {
             )}
         </div>
     );
-};
+}

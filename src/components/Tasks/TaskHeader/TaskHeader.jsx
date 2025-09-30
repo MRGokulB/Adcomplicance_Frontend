@@ -1,11 +1,10 @@
-// src/components/Tasks/TaskHeader/TaskHeader.jsx - Enhanced with task name editing
-import React, { useState, useEffect } from 'react';
+// src/components/Tasks/TaskHeader/TaskHeader.jsx - OPTIMIZED VERSION
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUserRole, selectCurrentUser } from '../../../redux/slices/authSlice';
 import {
   useUpdateTaskStatusMutation,
   useClassifyTaskMutation,
-  useReassignTaskMutation,
   useFollowUpTaskMutation,
   useAddCommentMutation,
   useApproveTaskMutation,
@@ -15,11 +14,9 @@ import {
 } from '../../../redux/api/tasksApi';
 import { usePermissions } from '../../../components/PermissionWrapper';
 import { CanReassignTask } from '../../../components/PermissionWrapper';
-// ADDED: Import enhanced permission helpers
 import {
   USER_ROLES,
   canClassifyOrReclassifyTask,
-  canCloseSpecificTask,
   getClassificationActions,
   getClosureActions
 } from '../../../utils/roles';
@@ -30,26 +27,28 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
   const currentUser = useSelector(selectCurrentUser);
   const permissions = usePermissions();
 
+  // OPTIMIZED: Consolidated modal state
+  const [modals, setModals] = useState({
+    followUp: false,
+    comments: false,
+    reassignment: false,
+    approval: false,
+    publish: false,
+    closure: false,
+    status: false
+  });
+
   // Local state
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(task?.title || '');
-  const [showFollowUp, setShowFollowUp] = useState(false);
-  const [showCommentsSidebar, setShowCommentsSidebar] = useState(false);
-  const [showReassignment, setShowReassignment] = useState(false);
   const [selectedTaskType, setSelectedTaskType] = useState(task?.taskType || '');
   const [showClassificationSubmit, setShowClassificationSubmit] = useState(false);
   const [followUpMessage, setFollowUpMessage] = useState('');
-
-  // Status-specific modals
-  const [showApprovalModal, setShowApprovalModal] = useState(false);
-  const [showPublishModal, setShowPublishModal] = useState(false);
-  const [showClosureModal, setShowClosureModal] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedNewStatus, setSelectedNewStatus] = useState('');
   const [statusReason, setStatusReason] = useState('');
   const [closureType, setClosureType] = useState('');
 
-  // Form data for status-specific actions
+  // OPTIMIZED: Consolidated form data
   const [formData, setFormData] = useState({
     approvalDate: new Date().toISOString().split('T')[0],
     expiryDate: '',
@@ -68,15 +67,18 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
   const [publishTask, { isLoading: isPublishing }] = usePublishTaskMutation();
   const [closeTask, { isLoading: isClosing }] = useCloseTaskMutation();
   const [updateTaskName, { isLoading: isUpdatingName }] = useUpdateTaskNameMutation();
+
+  // OPTIMIZED: Reset state when task changes
   useEffect(() => {
     if (task) {
       setSelectedTaskType(task.taskType || '');
       setShowClassificationSubmit(false);
+      setEditedTitle(task.title || '');
     }
-  }, [task?.taskType, task?.id]);
+  }, [task?.taskType, task?.id, task?.title]);
 
-  // ADDED: Helper function to get correct CSS class for buttons
-  const getButtonClass = (buttonType) => {
+  // OPTIMIZED: Memoized helper functions
+  const getButtonClass = useCallback((buttonType) => {
     const buttonClasses = {
       'primary': 'btn-primary',
       'secondary': 'btn-secondary',
@@ -85,21 +87,33 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
       'error': 'btn-error',
       'outline': 'btn-outline',
       'ghost': 'btn-ghost',
-      'info': 'btn-primary' // fallback to primary for info
+      'info': 'btn-primary'
     };
     return buttonClasses[buttonType] || 'btn-secondary';
-  };
+  }, []);
 
-  // Check if user can act on this specific task
-  const canUserActOnThisTask = () => {
-    if (!task || !currentUser) return false
+  const getStatusBadgeClass = useCallback((status) => {
+    const statusStyles = {
+      'OPEN': 'bg-blue-100 text-blue-800',
+      'COMPLIANCE_REVIEW': 'bg-yellow-100 text-yellow-800',
+      'PRODUCT_REVIEW': 'bg-orange-100 text-orange-800',
+      'APPROVED': 'bg-green-100 text-green-800',
+      'PUBLISHED': 'bg-purple-100 text-purple-800',
+      'CLOSED_INTERNAL': 'bg-gray-100 text-gray-800',
+      'CLOSED_EXCHANGE': 'bg-red-100 text-red-800',
+      'EXPIRED': 'bg-red-100 text-red-800'
+    };
+    return statusStyles[status] || 'bg-gray-100 text-gray-800';
+  }, []);
 
-    if (permissions.isAdmin) return true
+  // OPTIMIZED: Memoized permission checks
+  const canUserActOnThisTask = useMemo(() => {
+    if (!task || !currentUser) return false;
+    if (permissions.isAdmin) return true;
 
-    // ENHANCED: Compliance users with more permissions when assigned
     if (permissions.isComplianceUser) {
       return task.assignedComplianceId === currentUser.id ||
-        task.assignedCompliance?.id === currentUser.id
+        task.assignedCompliance?.id === currentUser.id;
     }
 
     if (permissions.isProductUser) {
@@ -107,46 +121,39 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
         task.assignedProductIds?.includes(currentUser.id) ||
         (task.assignedProducts && task.assignedProducts.some(user =>
           typeof user === 'object' ? user.id === currentUser.id : false
-        ))
+        ));
     }
 
-    return false
-  }
+    return false;
+  }, [task, currentUser, permissions.isAdmin, permissions.isComplianceUser, permissions.isProductUser]);
 
-  // UPDATED: Enhanced classification check using new helper function
-  const canUserClassifyThisTask = () => {
-  if (!currentUser) return false
-  
-  // FIXED: COMPLIANCE_ADMIN and ADMIN can classify/reclassify any task
-  if ([USER_ROLES.COMPLIANCE_ADMIN, USER_ROLES.ADMIN].includes(userRole)) {
-    return canClassifyOrReclassifyTask(userRole, task, currentUser.id)
-  }
-  
-  // For other roles, check both classification permission AND task access
-  return canClassifyOrReclassifyTask(userRole, task, currentUser.id) && canUserActOnThisTask()
-}
-  const canUserEditTask = () => {
-    if (!permissions.isComplianceUser && !permissions.isAdmin) return false;
-    if (permissions.isAdmin) return true;
-    return task?.assignedComplianceId === currentUser?.id;
-  };
-  const handleTaskTypeSelection = (taskType) => {
-    setSelectedTaskType(taskType);
-    // Show submit button only if different from current task type
-    setShowClassificationSubmit(taskType && taskType !== task.taskType);
-  };
-  // ADDED: Get classification actions for better UI feedback
-  const classificationActions = task && currentUser ? getClassificationActions(userRole, task, currentUser.id) : { canClassify: false, canReclassify: false };
-  const closureActions = task && currentUser ? getClosureActions(userRole, task, currentUser.id) : { canClose: false, reason: '' };
+  const canUserClassifyThisTask = useMemo(() => {
+    if (!currentUser) return false;
+    
+    if ([USER_ROLES.COMPLIANCE_ADMIN, USER_ROLES.ADMIN].includes(userRole)) {
+      return canClassifyOrReclassifyTask(userRole, task, currentUser.id);
+    }
+    
+    return canClassifyOrReclassifyTask(userRole, task, currentUser.id) && canUserActOnThisTask;
+  }, [userRole, task, currentUser, canUserActOnThisTask]);
 
-  // Get workflow buttons based on current status and permissions
-  const getWorkflowButtons = () => {
+  const classificationActions = useMemo(() => 
+    task && currentUser ? getClassificationActions(userRole, task, currentUser.id) : { canClassify: false, canReclassify: false },
+    [userRole, task, currentUser]
+  );
+
+  const closureActions = useMemo(() => 
+    task && currentUser ? getClosureActions(userRole, task, currentUser.id) : { canClose: false, reason: '' },
+    [userRole, task, currentUser]
+  );
+
+  // OPTIMIZED: Memoized workflow buttons
+  const workflowButtons = useMemo(() => {
     const buttons = [];
-    const canAct = canUserActOnThisTask();
+    const canAct = canUserActOnThisTask;
 
-    if (!canAct) return buttons;
+    if (!canAct || !task) return buttons;
 
-    // Classification required first
     if (!task.taskType && task.status === 'OPEN') {
       return [{
         type: 'warning',
@@ -156,7 +163,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
       }];
     }
 
-    // ADDED: Submit button for classified tasks in OPEN status
     if (task.taskType && task.status === 'OPEN') {
       buttons.push({
         type: 'primary',
@@ -166,14 +172,13 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
       });
     }
 
-    // Status-specific workflow buttons
     switch (task.status) {
       case 'COMPLIANCE_REVIEW':
         if (permissions.isComplianceUser && canAct) {
           buttons.push({
             type: 'success',
             text: 'Approve Task',
-            action: () => setShowApprovalModal(true),
+            action: () => toggleModal('approval', true),
             disabled: isApproving
           });
           buttons.push({
@@ -201,7 +206,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
           buttons.push({
             type: 'success',
             text: 'Publish Task',
-            action: () => setShowPublishModal(true),
+            action: () => toggleModal('publish', true),
             disabled: isPublishing
           });
         }
@@ -225,37 +230,30 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
         }
     }
 
-    // Admin manual override option
     if (permissions.isAdmin && !task.status?.includes('CLOSED')) {
       buttons.push({
         type: 'outline',
         text: 'Manual Status Change',
-        action: () => setShowStatusModal(true)
+        action: () => toggleModal('status', true)
       });
     }
 
     return buttons;
-  };
+  }, [canUserActOnThisTask, task, isUpdatingStatus, isApproving, isPublishing, permissions.isComplianceUser, permissions.isProductUser, permissions.isAdmin]);
 
-  // Get status badge styling
-  const getStatusBadgeClass = (status) => {
-    const statusStyles = {
-      'OPEN': 'bg-blue-100 text-blue-800',
-      'COMPLIANCE_REVIEW': 'bg-yellow-100 text-yellow-800',
-      'PRODUCT_REVIEW': 'bg-orange-100 text-orange-800',
-      'APPROVED': 'bg-green-100 text-green-800',
-      'PUBLISHED': 'bg-purple-100 text-purple-800',
-      'CLOSED_INTERNAL': 'bg-gray-100 text-gray-800',
-      'CLOSED_EXCHANGE': 'bg-red-100 text-red-800',
-      'EXPIRED': 'bg-red-100 text-red-800'
-    };
-    return statusStyles[status] || 'bg-gray-100 text-gray-800';
-  };
+  // OPTIMIZED: Toggle modal helper
+  const toggleModal = useCallback((modalName, value) => {
+    setModals(prev => ({ ...prev, [modalName]: value }));
+  }, []);
 
+  // OPTIMIZED: All handlers with useCallback
+  const handleTaskTypeSelection = useCallback((taskType) => {
+    setSelectedTaskType(taskType);
+    setShowClassificationSubmit(taskType && taskType !== task?.taskType);
+  }, [task?.taskType]);
 
-  // HANDLERS
-  const handleSubmitClassification = async () => {
-    if (!selectedTaskType || selectedTaskType === task.taskType) return;
+  const handleSubmitClassification = useCallback(async () => {
+    if (!selectedTaskType || selectedTaskType === task?.taskType) return;
 
     try {
       await classifyTask({
@@ -266,57 +264,40 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
     } catch (error) {
       console.error('Failed to classify task:', error);
       alert(error?.data?.message || 'Failed to classify task');
-      // Reset on error
-      setSelectedTaskType(task.taskType || '');
+      setSelectedTaskType(task?.taskType || '');
       setShowClassificationSubmit(false);
     }
-  };
+  }, [selectedTaskType, task?.taskType, task?.id, classifyTask]);
 
-  const handleCancelClassification = () => {
-    setSelectedTaskType(task.taskType || '');
+  const handleCancelClassification = useCallback(() => {
+    setSelectedTaskType(task?.taskType || '');
     setShowClassificationSubmit(false);
-  };
-  const handleQuickStatusChange = async (newStatus) => {
+  }, [task?.taskType]);
+
+  const handleQuickStatusChange = useCallback(async (newStatus) => {
     const defaultReasons = {
       'COMPLIANCE_REVIEW': 'Task ready for compliance review',
       'PRODUCT_REVIEW': 'Changes requested by compliance team',
       'APPROVED': 'Task approved by compliance',
       'PUBLISHED': 'Task published successfully'
     };
+
     try {
       await updateTaskStatus({
         id: task.id,
         status: newStatus,
         reason: defaultReasons[newStatus] || `Status changed to ${newStatus}`
       }).unwrap();
-      //onRefresh?.();
-      // refetch?.();
     } catch (error) {
       console.error('Failed to update status:', error);
       alert(error?.data?.message || 'Failed to update status');
     }
-  };
+  }, [task?.id, updateTaskStatus]);
 
-  const handleTaskTypeChange = async (newTaskType) => {
-    if (!canUserClassifyThisTask()) return;
-
-    try {
-      await classifyTask({
-        id: task.id,
-        taskType: newTaskType
-      }).unwrap();
-      //onRefresh?.();
-    } catch (error) {
-      console.error('Failed to classify task:', error);
-      alert(error?.data?.message || 'Failed to classify task');
-    }
-  };
-
-  // NEW: Handle task name update
-  const handleTaskNameUpdate = async () => {
-    if (!editedTitle.trim() || editedTitle.trim() === task.title) {
+  const handleTaskNameUpdate = useCallback(async () => {
+    if (!editedTitle.trim() || editedTitle.trim() === task?.title) {
       setIsEditingTitle(false);
-      setEditedTitle(task.title);
+      setEditedTitle(task?.title || '');
       return;
     }
 
@@ -331,17 +312,16 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
     } catch (error) {
       console.error('Failed to update task name:', error);
       alert(error?.data?.message || 'Failed to update task name');
-      setEditedTitle(task.title); // Reset to original title on error
+      setEditedTitle(task?.title || '');
     }
-  };
+  }, [editedTitle, task?.title, task?.id, updateTaskName, onRefresh]);
 
-  // NEW: Handle edit cancellation
-  const handleCancelEdit = () => {
-    setEditedTitle(task.title);
+  const handleCancelEdit = useCallback(() => {
+    setEditedTitle(task?.title || '');
     setIsEditingTitle(false);
-  };
+  }, [task?.title]);
 
-  const handleApprovalSubmit = async () => {
+  const handleApprovalSubmit = useCallback(async () => {
     if (!formData.approvalDate || !formData.expiryDate) {
       alert('Approval date and expiry date are required');
       return;
@@ -355,15 +335,14 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
         approvalProofUrl: formData.approvalProofUrl
       }).unwrap();
 
-      setShowApprovalModal(false);
-      //onRefresh?.();
+      toggleModal('approval', false);
     } catch (error) {
       console.error('Failed to approve task:', error);
       alert(error?.data?.message || 'Failed to approve task');
     }
-  };
+  }, [formData, task?.id, approveTask, toggleModal]);
 
-  const handlePublishSubmit = async () => {
+  const handlePublishSubmit = useCallback(async () => {
     if (!formData.publishDate || !formData.publishedCopyUrl) {
       alert('Publish date and published copy URL are required');
       return;
@@ -376,15 +355,15 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
         publishedCopyUrl: formData.publishedCopyUrl
       }).unwrap();
 
-      setShowPublishModal(false);
+      toggleModal('publish', false);
       onRefresh?.();
     } catch (error) {
       console.error('Failed to publish task:', error);
       alert(error?.data?.message || 'Failed to publish task');
     }
-  };
+  }, [formData, task?.id, publishTask, toggleModal, onRefresh]);
 
-  const handleManualStatusChange = async () => {
+  const handleManualStatusChange = useCallback(async () => {
     if (!selectedNewStatus || !statusReason.trim()) {
       alert('Please select a status and provide a reason');
       return;
@@ -397,7 +376,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
         reason: statusReason
       }).unwrap();
 
-      setShowStatusModal(false);
+      toggleModal('status', false);
       setSelectedNewStatus('');
       setStatusReason('');
       onRefresh?.();
@@ -405,9 +384,9 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
       console.error('Failed to update status:', error);
       alert(error?.data?.message || 'Failed to update status');
     }
-  };
+  }, [selectedNewStatus, statusReason, task?.id, updateTaskStatus, toggleModal, onRefresh]);
 
-  const handleClosureSubmit = async () => {
+  const handleClosureSubmit = useCallback(async () => {
     if (!formData.closureComments.trim()) {
       alert('Closure comments are required');
       return;
@@ -420,15 +399,15 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
         closureComments: formData.closureComments
       }).unwrap();
 
-      setShowClosureModal(false);
+      toggleModal('closure', false);
       onRefresh?.();
     } catch (error) {
       console.error('Failed to close task:', error);
       alert(error?.data?.message || 'Failed to close task');
     }
-  };
+  }, [formData.closureComments, task?.id, closureType, closeTask, toggleModal, onRefresh]);
 
-  const handleFollowUp = async () => {
+  const handleFollowUp = useCallback(async () => {
     try {
       await followUpTask({
         id: task.id,
@@ -436,16 +415,16 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
         urgency: 'MEDIUM'
       }).unwrap();
 
-      setShowFollowUp(false);
+      toggleModal('followUp', false);
       setFollowUpMessage('');
       onRefresh?.();
     } catch (error) {
       console.error('Failed to follow up:', error);
       alert(error?.data?.message || 'Failed to send follow-up');
     }
-  };
+  }, [task?.id, followUpMessage, followUpTask, toggleModal, onRefresh]);
 
-  const handleAddComment = async () => {
+  const handleAddComment = useCallback(async () => {
     if (!comment.trim()) return;
 
     try {
@@ -461,11 +440,9 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
       console.error('Failed to add comment:', error);
       alert(error?.data?.message || 'Failed to add comment');
     }
-  };
+  }, [comment, task?.id, addComment, setComment, onRefresh]);
 
   if (!task) return null;
-
-  const workflowButtons = getWorkflowButtons();
 
   return (
     <div className="info-section">
@@ -536,11 +513,9 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
 
             {/* Task Type and Status */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-
-              {/* Enhanced Classification Section */}
               <div>
                 <label className="exchange-form-label">Task Type</label>
-                {canUserClassifyThisTask() ? (
+                {canUserClassifyThisTask ? (
                   <div className="space-y-2">
                     <select
                       className="exchange-form-select"
@@ -553,7 +528,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
                       <option value="EXCHANGE">Exchange</option>
                     </select>
 
-                    {/* Submit Classification Button */}
                     {showClassificationSubmit && (
                       <div className="flex gap-2">
                         <button
@@ -573,7 +547,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
                       </div>
                     )}
 
-                    {/* Show current classification if exists and no pending changes */}
                     {task.taskType && !showClassificationSubmit && (
                       <div className="text-sm text-green-600 mt-1">
                         ✓ Currently classified as: {task.taskType === 'EXCHANGE' ? 'Exchange' : 'Internal'} 
@@ -588,8 +561,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
                   </div>
                 )}
 
-                {/* UPDATED: Better user feedback for classification permissions */}
-                {!canUserClassifyThisTask() && !task.taskType && (
+                {!canUserClassifyThisTask && !task.taskType && (
                   <p className="text-xs text-amber-600 mt-1">
                     {permissions.isComplianceUser
                       ? 'You can only classify tasks assigned to you'
@@ -607,7 +579,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
                   </span>
                 </div>
 
-                {/* Workflow Buttons */}
                 <div className="space-y-2">
                   {workflowButtons.map((button, index) => (
                     <button
@@ -621,7 +592,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
                     </button>
                   ))}
 
-                  {/* UPDATED: Enhanced closure options with better permission checking */}
                   {closureActions.canClose && !task.status?.includes('CLOSED') && task.status !== 'PUBLISHED' && (
                     <details className="mt-2">
                       <summary className="text-sm text-red-600 cursor-pointer">
@@ -630,14 +600,14 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
                       <div className="flex gap-2 mt-2">
                         <button
                           className="btn btn-error btn-sm flex-1"
-                          onClick={() => { setClosureType('CLOSED_INTERNAL'); setShowClosureModal(true); }}
+                          onClick={() => { setClosureType('CLOSED_INTERNAL'); toggleModal('closure', true); }}
                           disabled={isClosing}
                         >
                           Close Internal
                         </button>
                         <button
                           className="btn btn-error btn-sm flex-1"
-                          onClick={() => { setClosureType('CLOSED_EXCHANGE'); setShowClosureModal(true); }}
+                          onClick={() => { setClosureType('CLOSED_EXCHANGE'); toggleModal('closure', true); }}
                           disabled={isClosing}
                         >
                           Close Exchange
@@ -646,21 +616,20 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
                     </details>
                   )}
 
-                  {/* Fallback: Admin closure options (keep existing logic for backwards compatibility) */}
                   {!closureActions.canClose && permissions.isAdmin && !task.status?.includes('CLOSED') && task.status !== 'PUBLISHED' && (
                     <details className="mt-2">
                       <summary className="text-sm text-red-600 cursor-pointer">Admin: Close Task</summary>
                       <div className="flex gap-2 mt-2">
                         <button
                           className="btn btn-error btn-sm flex-1"
-                          onClick={() => { setClosureType('CLOSED_INTERNAL'); setShowClosureModal(true); }}
+                          onClick={() => { setClosureType('CLOSED_INTERNAL'); toggleModal('closure', true); }}
                           disabled={isClosing}
                         >
                           Close Internal
                         </button>
                         <button
                           className="btn btn-error btn-sm flex-1"
-                          onClick={() => { setClosureType('CLOSED_EXCHANGE'); setShowClosureModal(true); }}
+                          onClick={() => { setClosureType('CLOSED_EXCHANGE'); toggleModal('closure', true); }}
                           disabled={isClosing}
                         >
                           Close Exchange
@@ -676,7 +645,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 mb-2">
               <div>
                 <label className="exchange-form-label">Platform</label>
-                <div className="bg-gray-50 rounded-lg ">
+                <div className="bg-gray-50 rounded-lg">
                   <span className="text-sm text-gray-700">
                     {task.platform || 'Not specified'}
                   </span>
@@ -693,11 +662,10 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
               </div>
             </div>
 
-            {/* Description */}
             {task.description && (
               <div className="mb-4">
                 <label className="exchange-form-label">Description</label>
-                <div className="bg-gray-50 rounded-lg ">
+                <div className="bg-gray-50 rounded-lg">
                   <p className="text-sm text-gray-700 whitespace-pre-wrap">
                     {task.description}
                   </p>
@@ -750,7 +718,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
             {(permissions.isComplianceUser || permissions.isAdmin || permissions.isSeniorManager) && (
               <button
                 className="btn btn-secondary btn-sm"
-                onClick={() => setShowFollowUp(true)}
+                onClick={() => toggleModal('followUp', true)}
                 disabled={isFollowingUp}
               >
                 Follow-Up
@@ -760,7 +728,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
             <CanReassignTask>
               <button
                 className="btn btn-outline btn-sm"
-                onClick={() => setShowReassignment(true)}
+                onClick={() => toggleModal('reassignment', true)}
               >
                 Reassign
               </button>
@@ -768,7 +736,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
 
             <button
               className="btn btn-ghost btn-sm"
-              onClick={() => setShowCommentsSidebar(!showCommentsSidebar)}
+              onClick={() => toggleModal('comments', !modals.comments)}
             >
               Comments
             </button>
@@ -776,14 +744,13 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
         </div>
       </div>
 
-      {/* ALL EXISTING MODALS REMAIN THE SAME - No changes needed */}
-      {/* Approval Modal */}
-      {showApprovalModal && (
-        <div className="modal-overlay" onClick={() => setShowApprovalModal(false)}>
+      {/* MODALS - Using optimized modal state */}
+      {modals.approval && (
+        <div className="modal-overlay" onClick={() => toggleModal('approval', false)}>
           <div className="modal max-w-lg" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="text-lg font-semibold text-gray-900">Approve Task</h3>
-              <button onClick={() => setShowApprovalModal(false)}>×</button>
+              <button onClick={() => toggleModal('approval', false)}>×</button>
             </div>
             <div className="modal-body">
               <div className="grid grid-cols-1 gap-4">
@@ -807,11 +774,10 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
                     required
                   />
                 </div>
-
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowApprovalModal(false)}>Cancel</button>
+              <button className="btn btn-secondary" onClick={() => toggleModal('approval', false)}>Cancel</button>
               <button
                 className="btn btn-primary"
                 onClick={handleApprovalSubmit}
@@ -824,13 +790,12 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
         </div>
       )}
 
-      {/* Publish Modal */}
-      {showPublishModal && (
-        <div className="modal-overlay" onClick={() => setShowPublishModal(false)}>
+      {modals.publish && (
+        <div className="modal-overlay" onClick={() => toggleModal('publish', false)}>
           <div className="modal max-w-lg" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="text-lg font-semibold text-gray-900">Publish Task</h3>
-              <button onClick={() => setShowPublishModal(false)}>×</button>
+              <button onClick={() => toggleModal('publish', false)}>×</button>
             </div>
             <div className="modal-body">
               <div className="grid grid-cols-1 gap-4">
@@ -843,6 +808,8 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
                     onChange={(e) => setFormData(prev => ({ ...prev, publishDate: e.target.value }))}
                     required
                   />
+                </div>
+                <div>
                   <label className="exchange-form-label">Published Copy URL *</label>
                   <input
                     type="url"
@@ -853,15 +820,14 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
                     required
                   />
                 </div>
-
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowPublishModal(false)}>Cancel</button>
+              <button className="btn btn-secondary" onClick={() => toggleModal('publish', false)}>Cancel</button>
               <button
                 className="btn btn-primary"
                 onClick={handlePublishSubmit}
-                disabled={isPublishing || !formData.publishDate}
+                disabled={isPublishing || !formData.publishDate || !formData.publishedCopyUrl}
               >
                 {isPublishing ? 'Publishing...' : 'Publish Task'}
               </button>
@@ -870,13 +836,12 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
         </div>
       )}
 
-      {/* Manual Status Change Modal (Admin) */}
-      {showStatusModal && (
-        <div className="modal-overlay" onClick={() => setShowStatusModal(false)}>
+      {modals.status && (
+        <div className="modal-overlay" onClick={() => toggleModal('status', false)}>
           <div className="modal max-w-lg" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="text-lg font-semibold text-gray-900">Manual Status Change</h3>
-              <button onClick={() => setShowStatusModal(false)}>×</button>
+              <button onClick={() => toggleModal('status', false)}>×</button>
             </div>
             <div className="modal-body">
               <div className="space-y-4">
@@ -912,7 +877,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowStatusModal(false)}>Cancel</button>
+              <button className="btn btn-secondary" onClick={() => toggleModal('status', false)}>Cancel</button>
               <button
                 className="btn btn-primary"
                 onClick={handleManualStatusChange}
@@ -925,74 +890,60 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
         </div>
       )}
 
-      {/* Closure Modal */}
-      {showClosureModal && (
-  <div className="modal-overlay" onClick={() => setShowClosureModal(false)}>
-    <div className="modal max-w-lg" onClick={(e) => e.stopPropagation()}>
-      <div className="modal-header">
-        <h3 className="text-lg font-semibold text-gray-900">
-          {closureType === 'CLOSED_INTERNAL' ? 'Close Internal Task' : 'Close Exchange Task'}
-        </h3>
-        <button onClick={() => setShowClosureModal(false)}>×</button>
-      </div>
-      <div className="modal-body">
-        <div className="mb-4">
-          <p className="text-sm text-gray-600">
-            Closing task as: <strong>
-              {closureType === 'CLOSED_INTERNAL' ? 'Internal Closure' : 'Exchange Closure'}
-            </strong>
-          </p>
-          {closureType === 'CLOSED_INTERNAL' && (
-            <p className="text-xs text-gray-500 mt-1">
-              This will mark the task as resolved internally without exchange submission.
-            </p>
-          )}
-          {closureType === 'CLOSED_EXCHANGE' && (
-            <p className="text-xs text-gray-500 mt-1">
-              This will mark the task as closed due to exchange-related issues.
-            </p>
-          )}
+      {modals.closure && (
+        <div className="modal-overlay" onClick={() => toggleModal('closure', false)}>
+          <div className="modal max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {closureType === 'CLOSED_INTERNAL' ? 'Close Internal Task' : 'Close Exchange Task'}
+              </h3>
+              <button onClick={() => toggleModal('closure', false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="mb-4">
+                <p className="text-sm text-gray-600">
+                  Closing task as: <strong>
+                    {closureType === 'CLOSED_INTERNAL' ? 'Internal Closure' : 'Exchange Closure'}
+                  </strong>
+                </p>
+              </div>
+              <div>
+                <label className="exchange-form-label">Closure Comments *</label>
+                <textarea
+                  className="input resize-none min-h-[100px]"
+                  placeholder={
+                    closureType === 'CLOSED_INTERNAL' 
+                      ? "Explain why this task is being resolved internally..."
+                      : "Explain the exchange-related reason for closure..."
+                  }
+                  value={formData.closureComments}
+                  onChange={(e) => setFormData(prev => ({ ...prev, closureComments: e.target.value }))}
+                  required
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => toggleModal('closure', false)}>Cancel</button>
+              <button
+                className="btn btn-error"
+                onClick={handleClosureSubmit}
+                disabled={isClosing || !formData.closureComments.trim()}
+              >
+                {isClosing ? 'Closing...' : 
+                  (closureType === 'CLOSED_INTERNAL' ? 'Close Internal' : 'Close Exchange')
+                }
+              </button>
+            </div>
+          </div>
         </div>
-        <div>
-          <label className="exchange-form-label">Closure Comments *</label>
-          <textarea
-            className="input resize-none min-h-[100px]"
-            placeholder={
-              closureType === 'CLOSED_INTERNAL' 
-                ? "Explain why this task is being resolved internally..."
-                : "Explain the exchange-related reason for closure..."
-            }
-            value={formData.closureComments}
-            onChange={(e) => setFormData(prev => ({ ...prev, closureComments: e.target.value }))}
-            required
-          />
-        </div>
-      </div>
-      <div className="modal-footer">
-        <button className="btn btn-secondary" onClick={() => setShowClosureModal(false)}>
-          Cancel
-        </button>
-        <button
-          className="btn btn-error"
-          onClick={handleClosureSubmit}
-          disabled={isClosing || !formData.closureComments.trim()}
-        >
-          {isClosing ? 'Closing...' : 
-            (closureType === 'CLOSED_INTERNAL' ? 'Close Internal' : 'Close Exchange')
-          }
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      )}
 
-      {/* Follow-Up Modal */}
-      {showFollowUp && (
-        <div className="modal-overlay" onClick={() => setShowFollowUp(false)}>
+      {modals.followUp && (
+        <div className="modal-overlay" onClick={() => toggleModal('followUp', false)}>
           <div className="modal max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="text-lg font-semibold text-gray-900">Follow-Up Task</h3>
-              <button onClick={() => setShowFollowUp(false)}>×</button>
+              <button onClick={() => toggleModal('followUp', false)}>×</button>
             </div>
             <div className="modal-body">
               <p className="text-gray-700 mb-4">Send a follow-up reminder for this task?</p>
@@ -1004,7 +955,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
               />
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowFollowUp(false)}>Cancel</button>
+              <button className="btn btn-secondary" onClick={() => toggleModal('followUp', false)}>Cancel</button>
               <button
                 className="btn btn-primary"
                 onClick={handleFollowUp}
@@ -1017,119 +968,82 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
         </div>
       )}
 
-      {/* Comments Sidebar */}
-      {showCommentsSidebar && (
-  <>
-    {/* Overlay for mobile */}
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-      onClick={() => setShowCommentsSidebar(false)}
-    />
-    
-    {/* Comments Sidebar */}
-    <div className="fixed inset-y-0 right-0 w-full sm:w-96 lg:w-80 bg-white border-l border-gray-200 shadow-lg z-50 flex flex-col">
-      
-      {/* Fixed Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white flex-shrink-0">
-        <h3 className="text-lg font-semibold text-gray-900">Comments</h3>
-        <button 
-          onClick={() => setShowCommentsSidebar(false)}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
-          aria-label="Close comments"
-        >
-          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-      
-      {/* Scrollable Comments Area */}
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="space-y-4">
-          {task.comments && task.comments.length > 0 ? (
-            task.comments.map((comment, index) => (
-              <div key={index} className="bg-gray-50 rounded-lg p-3 break-words">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <span className="text-sm font-medium text-gray-900 break-words">
-                    {comment.author?.fullName || comment.createdBy?.fullName || comment.createdBy || 'User'}
-                  </span>
-                  <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">
-                    {new Date(comment.createdAt).toLocaleString()}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-700 break-words leading-relaxed">{comment.content}</p>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-8">
-              <svg className="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              <p className="text-sm text-gray-500 mb-2">No comments yet</p>
-              <p className="text-xs text-gray-400">Be the first to add a comment below</p>
-            </div>
-          )}
-        </div>
-      </div>
-      
-      {/* Fixed Input Area */}
-      <div className="border-t border-gray-200 p-4 bg-white flex-shrink-0">
-        <div className="space-y-3">
-          <textarea
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-            rows={3}
-            placeholder="Add a comment..."
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            maxLength={500}
+      {modals.comments && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+            onClick={() => toggleModal('comments', false)}
           />
           
-          {/* Character count and actions */}
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">
-              {comment.length}/500 characters
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setComment('')}
-                className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800 transition-colors duration-200"
-                disabled={!comment.trim()}
+          <div className="fixed inset-y-0 right-0 w-full sm:w-96 lg:w-80 bg-white border-l border-gray-200 shadow-lg z-50 flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white flex-shrink-0">
+              <h3 className="text-lg font-semibold text-gray-900">Comments</h3>
+              <button 
+                onClick={() => toggleModal('comments', false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
               >
-                Clear
-              </button>
-              <button
-                type="button"
-                className="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                onClick={handleAddComment}
-                disabled={isAddingComment || !comment.trim()}
-              >
-                {isAddingComment ? (
-                  <div className="flex items-center gap-2">
-                    <svg className="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Adding...
-                  </div>
-                ) : (
-                  'Add Comment'
-                )}
+                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
+            
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-4">
+                {task.comments && task.comments.length > 0 ? (
+                  task.comments.map((comment, index) => (
+                    <div key={index} className="bg-gray-50 rounded-lg p-3 break-words">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <span className="text-sm font-medium text-gray-900 break-words">
+                          {comment.author?.fullName || comment.createdBy?.fullName || comment.createdBy || 'User'}
+                        </span>
+                        <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">
+                          {new Date(comment.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700 break-words leading-relaxed">{comment.content}</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-gray-500">No comments yet</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="border-t border-gray-200 p-4 bg-white flex-shrink-0">
+              <div className="space-y-3">
+                <textarea
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="Add a comment..."
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  maxLength={500}
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400">{comment.length}/500</span>
+                  <button
+                    className="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    onClick={handleAddComment}
+                    disabled={isAddingComment || !comment.trim()}
+                  >
+                    {isAddingComment ? 'Adding...' : 'Add Comment'}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
-  </>
-)}
+        </>
+      )}
 
-      {/* Task Reassignment Modal */}
-      {showReassignment && (
+      {modals.reassignment && (
         <TaskReassignmentModal
           taskId={task.id}
-          onClose={() => setShowReassignment(false)}
+          onClose={() => toggleModal('reassignment', false)}
           onSuccess={() => {
-            setShowReassignment(false);
+            toggleModal('reassignment', false);
             onRefresh?.();
           }}
         />

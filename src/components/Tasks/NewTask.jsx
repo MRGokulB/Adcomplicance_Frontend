@@ -1,10 +1,39 @@
-import React, { useState, useEffect } from 'react';
+// src/components/Tasks/NewTask.jsx - OPTIMIZED VERSION
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSelector } from 'react-redux';
-import { selectUserRole, selectCurrentUser } from '../../redux/slices/authSlice';
+import { selectCurrentUser, selectUserRole } from '../../redux/slices/authSlice';
 import { useCreateTaskMutation } from '../../redux/api/tasksApi';
 import { useGetUsersQuery } from '../../redux/api/usersApi';
 import { useUploadFilesMutation } from '../../redux/api/uploadApi';
 import { hasPermission, PERMISSIONS, USER_ROLES } from '../../utils/roles';
+
+// OPTIMIZED: Validation function memoized outside component
+const validateFormField = (field, value, allValues) => {
+  switch (field) {
+    case 'title':
+      if (!value.trim()) return 'Task title is required';
+      if (value.length > 200) return 'Title must be less than 200 characters';
+      return null;
+    case 'description':
+      if (!value.trim()) return 'Description is required';
+      if (value.length > 1000) return 'Description must be less than 1000 characters';
+      return null;
+    case 'category':
+      if (!value.trim()) return 'Product category is required';
+      return null;
+    case 'platform':
+      if (!value.trim()) return 'Platform is required';
+      return null;
+    case 'assignedProductIds':
+      if (!value || value.length === 0) return 'At least one product user must be assigned';
+      return null;
+    case 'selectedFiles':
+      if (value && value.length > 5) return 'Maximum 5 files allowed';
+      return null;
+    default:
+      return null;
+  }
+};
 
 export default function CreateNewAdTask({ onClose, onSuccess }) {
   const currentUser = useSelector(selectCurrentUser);
@@ -30,28 +59,26 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
   const [createTask] = useCreateTaskMutation();
   const [uploadFiles, { isLoading: isUploading }] = useUploadFilesMutation();
   
-  // Get product users
-  const { data: usersData, isLoading: isLoadingUsers } = useGetUsersQuery({
-    role: USER_ROLES.PRODUCT_USER,
+  // OPTIMIZED: Memoized user query parameters
+  const userQueryParams = useMemo(() => ({
     isActive: true,
     limit: 100
-  });
+  }), []);
 
-  // Get all users and filter product users
-  const { data: allUsersData } = useGetUsersQuery({
-    isActive: true,
-    limit: 100
-  });
+  const { data: allUsersData } = useGetUsersQuery(userQueryParams);
 
   // Permission check
   const canCreateTasks = hasPermission(currentUserRole, PERMISSIONS.TASK_CREATE);
 
-  // Filter product users from all users
-  const productUsers = (allUsersData?.users || []).filter(user => 
-    user.role === USER_ROLES.PRODUCT_USER || user.role === USER_ROLES.PRODUCT_ADMIN
-  );
+  // OPTIMIZED: Memoized product users filter
+  const productUsers = useMemo(() => {
+    if (!allUsersData?.users) return [];
+    return allUsersData.users.filter(user => 
+      user.role === USER_ROLES.PRODUCT_USER || user.role === USER_ROLES.PRODUCT_ADMIN
+    );
+  }, [allUsersData]);
 
-  // Auto-assign current user if they're a product user
+  // OPTIMIZED: Auto-assign current user only once on mount
   useEffect(() => {
     if (currentUser && 
         (currentUser.role === USER_ROLES.PRODUCT_USER || currentUser.role === USER_ROLES.PRODUCT_ADMIN) &&
@@ -61,7 +88,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
         assignedProductIds: [currentUser.id]
       }));
     }
-  }, [currentUser, formData.assignedProductIds.length]);
+  }, []); // Empty deps - only run once on mount
 
   useEffect(() => {
     if (!canCreateTasks) {
@@ -69,85 +96,74 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     }
   }, [canCreateTasks, onClose]);
 
-  const validateForm = () => {
+  // OPTIMIZED: Validate all fields at once
+  const validateForm = useCallback(() => {
     const newErrors = {};
-
-    if (!formData.title.trim()) {
-      newErrors.title = 'Task title is required';
-    } else if (formData.title.length > 200) {
-      newErrors.title = 'Title must be less than 200 characters';
-    }
-
-    if (!formData.description.trim()) {
-      newErrors.description = 'Description is required';
-    } else if (formData.description.length > 1000) {
-      newErrors.description = 'Description must be less than 1000 characters';
-    }
-
-    if (!formData.category.trim()) {
-      newErrors.category = 'Product category is required';
-    }
-
-    if (!formData.platform.trim()) {
-      newErrors.platform = 'Platform is required';
-    }
-
-    // Removed expectedPublishDate validation
-
-    if (formData.assignedProductIds.length === 0) {
-      newErrors.assignedProductIds = 'At least one product user must be assigned';
-    }
-
-    if (formData.selectedFiles.length > 5) {
-      newErrors.selectedFiles = 'Maximum 5 files allowed';
-    }
+    
+    Object.keys(formData).forEach(field => {
+      if (field === 'remarks') return; // Optional field
+      const error = validateFormField(field, formData[field], formData);
+      if (error) newErrors[field] = error;
+    });
 
     return newErrors;
-  };
+  }, [formData]);
 
-  const handleInputChange = (field, value) => {
+  // OPTIMIZED: Debounced field validation
+  const handleInputChange = useCallback((field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     
-    // Clear error when user starts typing
+    // Clear error immediately when user starts typing
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
     }
-  };
+  }, [errors]);
 
-  const handleUserSelect = (userId) => {
-    if (!formData.assignedProductIds.includes(userId)) {
-      setFormData(prev => ({
+  // OPTIMIZED: Memoized handlers
+  const handleUserSelect = useCallback((userId) => {
+    setFormData(prev => {
+      if (prev.assignedProductIds.includes(userId)) {
+        return prev;
+      }
+      return {
         ...prev,
         assignedProductIds: [...prev.assignedProductIds, userId]
-      }));
-    }
+      };
+    });
     setShowUserDropdown(false);
     
-    // Clear error
     if (errors.assignedProductIds) {
-      setErrors(prev => ({ ...prev, assignedProductIds: '' }));
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.assignedProductIds;
+        return newErrors;
+      });
     }
-  };
+  }, [errors.assignedProductIds]);
 
-  const removeUser = (userIdToRemove) => {
+  const removeUser = useCallback((userIdToRemove) => {
     setFormData(prev => ({
       ...prev,
       assignedProductIds: prev.assignedProductIds.filter(id => id !== userIdToRemove)
     }));
-  };
+  }, []);
 
-  const handleFileChange = (e) => {
+  // OPTIMIZED: File validation with better error handling
+  const handleFileChange = useCallback((e) => {
     const files = Array.from(e.target.files);
     
-    // Validate file types and sizes
+    const validTypes = ['image/', 'video/', 'application/pdf', 'application/msword', 
+                       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                       'application/vnd.ms-powerpoint', 
+                       'application/vnd.openxmlformats-officedocument.presentationml.presentation'];
+    
     const validFiles = files.filter(file => {
-      const validTypes = ['image/', 'video/', 'application/pdf', 'application/msword', 
-                         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                         'application/vnd.ms-powerpoint', 
-                         'application/vnd.openxmlformats-officedocument.presentationml.presentation'];
       const isValidType = validTypes.some(type => file.type.startsWith(type));
-      const isValidSize = file.size <= 50 * 1024 * 1024; // 50MB limit
-      
+      const isValidSize = file.size <= 50 * 1024 * 1024; // 50MB
       return isValidType && isValidSize;
     });
 
@@ -156,23 +172,23 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
         ...prev,
         selectedFiles: 'Some files were rejected. Only images, videos, PDF, Word, and PowerPoint files under 50MB are allowed.'
       }));
+    } else if (errors.selectedFiles) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.selectedFiles;
+        return newErrors;
+      });
     }
 
     setFormData(prev => ({ ...prev, selectedFiles: validFiles }));
-    
-    // Clear error if files are valid
-    if (validFiles.length === files.length && errors.selectedFiles) {
-      setErrors(prev => ({ ...prev, selectedFiles: '' }));
-    }
-  };
+  }, [errors.selectedFiles]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setFormData({
       title: '',
       description: '',
       category: '',
       platform: '',
-      // Removed expectedPublishDate
       assignedProductIds: [],
       selectedFiles: [],
       remarks: ''
@@ -181,9 +197,10 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     setTaskCreationStatus(null);
     setUploadedFiles([]);
     onClose();
-  };
+  }, [onClose]);
 
-  const handleCreateTask = async () => {
+  // OPTIMIZED: Streamlined task creation
+  const handleCreateTask = useCallback(async () => {
     const validationErrors = validateForm();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
@@ -194,10 +211,10 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     setTaskCreationStatus({ status: 'uploading', message: 'Preparing task creation...' });
 
     try {
-      // Step 1: Upload files first if any are selected
       let fileUrls = [];
       let uploadedFileDetails = [];
       
+      // Upload files if any
       if (formData.selectedFiles.length > 0) {
         setTaskCreationStatus({ status: 'uploading', message: 'Uploading files...' });
         
@@ -206,44 +223,31 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
           fileFormData.append('files', file);
         });
 
-        console.log('Uploading files...', formData.selectedFiles.length);
-        
         const uploadResult = await uploadFiles(fileFormData).unwrap();
-        console.log('Upload result:', uploadResult);
         
-        // Extract file URLs from upload response
         if (uploadResult.files && uploadResult.files.length > 0) {
           fileUrls = uploadResult.files.map(file => file.url);
           uploadedFileDetails = uploadResult.files;
           setUploadedFiles(uploadResult.files);
-          console.log('Extracted file URLs:', fileUrls);
-        } else {
-          console.warn('No files in upload response:', uploadResult);
         }
       }
 
       setTaskCreationStatus({ status: 'creating', message: 'Creating task...' });
 
-      // Step 2: Create task with uploaded file URLs (removed expectedPublishDate)
+      // Create task with uploaded file URLs
       const taskData = {
         title: formData.title.trim(),
         description: formData.description.trim(),
         assignedProductIds: formData.assignedProductIds,
-        // Removed expectedPublishDate from taskData
         platform: formData.platform.trim(),
         category: formData.category.trim(),
         remarks: formData.remarks.trim(),
-        priority: 'LOW', // Set default priority
-        // IMPORTANT: Include files in task creation
-        files: fileUrls // This ensures files are attached to the task
+        priority: 'LOW',
+        files: fileUrls
       };
 
-      console.log('Creating task with data:', taskData);
-
       const result = await createTask(taskData).unwrap();
-      console.log('Task creation result:', result);
       
-      // Handle successful creation
       setTaskCreationStatus({ 
         status: 'success', 
         message: result.message || 'Task created successfully!',
@@ -252,7 +256,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
         fileCount: fileUrls.length
       });
 
-      // Call success callback if provided
       if (onSuccess) {
         onSuccess({
           ...result,
@@ -269,12 +272,10 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
       console.error('Failed to create task:', error);
       setTaskCreationStatus(null);
       
-      // Handle different types of errors
       let errorMessage = 'Failed to create task. Please try again.';
       if (error?.data?.message) {
         errorMessage = error.data.message;
       } else if (error?.data?.errors) {
-        // Handle validation errors from backend
         const backendErrors = error.data.errors;
         if (Array.isArray(backendErrors)) {
           errorMessage = backendErrors.map(err => err.message).join(', ');
@@ -286,23 +287,26 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
         errorMessage = 'Network error occurred. Please check your connection.';
       }
       
-      setErrors({
-        submit: errorMessage
-      });
+      setErrors({ submit: errorMessage });
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [formData, validateForm, uploadFiles, createTask, onSuccess, onClose]);
 
-  const getUserName = (userId) => {
+  // OPTIMIZED: Memoized user lookup
+  const getUserName = useCallback((userId) => {
     const user = productUsers.find(u => u.id === userId);
     return user ? user.fullName : 'Unknown User';
-  };
+  }, [productUsers]);
 
-  const getUserDetails = (userId) => {
-    const user = productUsers.find(u => u.id === userId);
-    return user || null;
-  };
+  const getUserDetails = useCallback((userId) => {
+    return productUsers.find(u => u.id === userId) || null;
+  }, [productUsers]);
+
+  // OPTIMIZED: Memoized available users for dropdown
+  const availableUsers = useMemo(() => {
+    return productUsers.filter(user => !formData.assignedProductIds.includes(user.id));
+  }, [productUsers, formData.assignedProductIds]);
 
   if (!canCreateTasks) {
     return null;
@@ -460,8 +464,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
                 )}
               </div>
 
-              {/* Expected Publish Date field has been completely removed */}
-
               {/* Remarks */}
               <div>
                 <label className="exchange-form-label">Remarks (Optional)</label>
@@ -487,8 +489,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
               {/* Assign Product Users */}
               <div>
                 <label className="exchange-form-label">
-                  Assign Product Users * 
-                  {isLoadingUsers && <span className="text-gray-500">(Loading users...)</span>}
+                  Assign Product Users *
                 </label>
                 
                 {/* Selected Users */}
@@ -526,43 +527,38 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
                       errors.assignedProductIds ? 'border-red-300' : ''
                     }`}
                     onClick={() => setShowUserDropdown(!showUserDropdown)}
-                    disabled={isSubmitting || isLoadingUsers}
+                    disabled={isSubmitting}
                   >
-                    <span className="text-gray-500">
-                      {isLoadingUsers ? 'Loading users...' : 'Select product users...'}
-                    </span>
+                    <span className="text-gray-500">Select product users...</span>
                     <span className="text-gray-400">▼</span>
                   </button>
                   
-                  {showUserDropdown && !isLoadingUsers && (
+                  {showUserDropdown && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
-                      {productUsers
-                        .filter(user => !formData.assignedProductIds.includes(user.id))
-                        .map((user) => (
-                          <button
-                            key={user.id}
-                            type="button"
-                            className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm flex items-center gap-2"
-                            onClick={() => handleUserSelect(user.id)}
-                          >
-                            <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
-                              <span className="text-xs font-medium text-blue-700">
-                                {user.fullName?.charAt(0) || 'U'}
-                              </span>
+                      {availableUsers.map((user) => (
+                        <button
+                          key={user.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm flex items-center gap-2"
+                          onClick={() => handleUserSelect(user.id)}
+                        >
+                          <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                            <span className="text-xs font-medium text-blue-700">
+                              {user.fullName?.charAt(0) || 'U'}
+                            </span>
+                          </div>
+                          <div>
+                            <div className="font-medium">{user.fullName}</div>
+                            <div className="text-xs text-gray-500">
+                              {user.email} • {user.role === USER_ROLES.PRODUCT_ADMIN ? 'Product Admin' : 'Product User'}
                             </div>
-                            <div>
-                              <div className="font-medium">{user.fullName}</div>
-                              <div className="text-xs text-gray-500">
-                                {user.email} • {user.role === USER_ROLES.PRODUCT_ADMIN ? 'Product Admin' : 'Product User'}
-                              </div>
-                            </div>
-                            {user.id === currentUser?.id && (
-                              <span className="ml-auto text-xs text-blue-600 font-medium">(You)</span>
-                            )}
-                          </button>
-                        ))
-                      }
-                      {productUsers.filter(user => !formData.assignedProductIds.includes(user.id)).length === 0 && (
+                          </div>
+                          {user.id === currentUser?.id && (
+                            <span className="ml-auto text-xs text-blue-600 font-medium">(You)</span>
+                          )}
+                        </button>
+                      ))}
+                      {availableUsers.length === 0 && (
                         <div className="px-3 py-2 text-sm text-gray-500">
                           {productUsers.length === 0 ? 'No product users found' : 'No more users available'}
                         </div>
