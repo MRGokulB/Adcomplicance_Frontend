@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+// src/components/Admin/AbsenceTracker/AddAbsenceModal.jsx - OPTIMIZED VERSION
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useGetUsersQuery } from '../../../redux/api/usersApi';
 import { USER_ROLES } from '../../../utils/roles';
 
@@ -12,18 +13,30 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Get compliance users only
+  // OPTIMIZED: Memoize query params
+  const usersQueryParams = useMemo(() => ({
+    role: USER_ROLES.COMPLIANCE_USER,
+    isActive: true,
+    limit: 100
+  }), []);
+
+  // OPTIMIZED: Only fetch users when modal is open
   const {
     data: usersData,
     isLoading: isLoadingUsers
-  } = useGetUsersQuery({
-    role: USER_ROLES.COMPLIANCE_USER,
-    isActive: true,
-    limit: 100 // Get all active compliance users
+  } = useGetUsersQuery(usersQueryParams, {
+    skip: !isOpen, // Skip query when modal is closed
+    refetchOnMountOrArgChange: 600, // 10 minutes
   });
 
-  // Sample tasks for demo - in real app, this would come from tasks API
-  const getSampleTasksForUser = (userId) => {
+  // OPTIMIZED: Memoize compliance users list
+  const complianceUsers = useMemo(() => 
+    usersData?.users || [], 
+    [usersData?.users]
+  );
+
+  // OPTIMIZED: Memoize sample tasks function
+  const getSampleTasksForUser = useCallback((userId) => {
     const taskSets = {
       1: [
         { id: 1, title: 'Review Compliance Documents', status: 'In Progress', dueDate: '2025-01-30' },
@@ -39,7 +52,13 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
       ]
     };
     return taskSets[userId] || taskSets.default;
-  };
+  }, []);
+
+  // OPTIMIZED: Memoize selected user tasks
+  const selectedUserTasks = useMemo(() => 
+    formData.user ? getSampleTasksForUser(formData.user) : [], 
+    [formData.user, getSampleTasksForUser]
+  );
 
   // Reset form when modal closes
   useEffect(() => {
@@ -55,7 +74,8 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
     }
   }, [isOpen]);
 
-  const getStatusBadgeClass = (status) => {
+  // OPTIMIZED: Memoize status badge class function
+  const getStatusBadgeClass = useCallback((status) => {
     switch (status) {
       case 'In Progress':
         return 'badge-status-process';
@@ -66,17 +86,16 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
       default:
         return 'badge-secondary';
     }
-  };
+  }, []);
 
-  const validateForm = () => {
+  // OPTIMIZED: Memoize validation function
+  const validateForm = useCallback(() => {
     const newErrors = {};
 
-    // User validation
     if (!formData.user) {
       newErrors.user = 'Please select a user';
     }
 
-    // Date validations
     if (!formData.fromDate) {
       newErrors.fromDate = 'From date is required';
     }
@@ -85,7 +104,6 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
       newErrors.toDate = 'To date is required';
     }
 
-    // Date range validation
     if (formData.fromDate && formData.toDate) {
       const fromDate = new Date(formData.fromDate);
       const toDate = new Date(formData.toDate);
@@ -94,7 +112,6 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
         newErrors.toDate = 'To date must be after from date';
       }
 
-      // Check if dates are in the past (optional business rule)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
@@ -104,24 +121,25 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
     }
 
     return newErrors;
-  };
+  }, [formData]);
 
-  const handleInputChange = (field, value) => {
+  // OPTIMIZED: Memoize input change handler
+  const handleInputChange = useCallback((field, value) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
     
-    // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({
         ...prev,
         [field]: ''
       }));
     }
-  };
+  }, [errors]);
 
-  const handleSubmit = async (e) => {
+  // OPTIMIZED: Memoize submit handler
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     
     const validationErrors = validateForm();
@@ -147,21 +165,31 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [formData, validateForm, onAddAbsence]);
+
+  // OPTIMIZED: Memoize close handler
+  const handleClose = useCallback(() => {
+    if (!isSubmitting) {
+      onClose();
+    }
+  }, [isSubmitting, onClose]);
+
+  // OPTIMIZED: Memoize submit button disabled state
+  const isSubmitDisabled = useMemo(() => 
+    isSubmitting || !formData.user || !formData.fromDate || !formData.toDate,
+    [isSubmitting, formData.user, formData.fromDate, formData.toDate]
+  );
 
   if (!isOpen) return null;
 
-  const complianceUsers = usersData?.users || [];
-  const selectedUserTasks = formData.user ? getSampleTasksForUser(formData.user) : [];
-
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={handleClose}>
       <div className="modal max-w-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3 className="text-lg font-semibold text-gray-900">Add Absence Entry</h3>
           <button 
             className="text-gray-400 hover:text-gray-600"
-            onClick={onClose}
+            onClick={handleClose}
             disabled={isSubmitting}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -172,7 +200,6 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
 
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            {/* Submit Error */}
             {errors.submit && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                 <p className="text-sm text-red-700">{errors.submit}</p>
@@ -180,9 +207,7 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Left Column - Form Fields */}
               <div className="space-y-4">
-                {/* User Selection */}
                 <div>
                   <label className="exchange-form-label">
                     Compliance User *
@@ -211,11 +236,8 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
                   )}
                 </div>
 
-                {/* From Date */}
                 <div>
-                  <label className="exchange-form-label">
-                    From Date *
-                  </label>
+                  <label className="exchange-form-label">From Date *</label>
                   <div className="relative">
                     <input
                       type="date"
@@ -235,11 +257,8 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
                   )}
                 </div>
 
-                {/* To Date */}
                 <div>
-                  <label className="exchange-form-label">
-                    To Date *
-                  </label>
+                  <label className="exchange-form-label">To Date *</label>
                   <div className="relative">
                     <input
                       type="date"
@@ -259,11 +278,8 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
                   )}
                 </div>
 
-                {/* Reason */}
                 <div>
-                  <label className="exchange-form-label">
-                    Reason (Optional)
-                  </label>
+                  <label className="exchange-form-label">Reason (Optional)</label>
                   <textarea
                     className="input resize-none min-h-[80px]"
                     placeholder="Brief reason for absence"
@@ -274,11 +290,8 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
                 </div>
               </div>
 
-              {/* Right Column - Assigned Tasks */}
               <div>
-                <label className="exchange-form-label">
-                  Assigned Tasks
-                </label>
+                <label className="exchange-form-label">Assigned Tasks</label>
                 <div className="bg-gray-50 rounded-lg p-4 min-h-[200px] max-h-[300px] overflow-y-auto">
                   {formData.user ? (
                     selectedUserTasks.length > 0 ? (
@@ -327,7 +340,7 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
             <button 
               type="button"
               className="btn btn-secondary"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={isSubmitting}
             >
               Cancel
@@ -335,7 +348,7 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
             <button 
               type="submit"
               className="btn btn-primary"
-              disabled={isSubmitting || !formData.user || !formData.fromDate || !formData.toDate}
+              disabled={isSubmitDisabled}
             >
               {isSubmitting ? (
                 <>

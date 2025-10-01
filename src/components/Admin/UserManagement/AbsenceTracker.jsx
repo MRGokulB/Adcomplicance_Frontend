@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+// src/components/Admin/AbsenceTracker/AbsenceTracker.jsx - OPTIMIZED VERSION
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUserRole } from '../../../redux/slices/authSlice';
 import { useGetAbsencesQuery, useCreateAbsenceMutation, useDeleteAbsenceMutation } from '../../../redux/api/usersApi';
@@ -11,29 +12,72 @@ const AbsenceTracker = () => {
   
   const currentUserRole = useSelector(selectUserRole);
 
-  // RTK Query hooks
+  // OPTIMIZED: Page visibility detection for conditional polling
+  const [isPageVisible, setIsPageVisible] = useState(!document.hidden);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsPageVisible(!document.hidden);
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  // OPTIMIZED: Memoize query params
+  const absenceParams = useMemo(() => ({ 
+    page, 
+    limit: 20 
+  }), [page]);
+
+  // OPTIMIZED: Conditional polling based on page visibility
   const {
     data: absencesData,
     isLoading,
     isError,
     error,
     refetch
-  } = useGetAbsencesQuery({ page, limit: 20 });
+  } = useGetAbsencesQuery(absenceParams, {
+    pollingInterval: isPageVisible ? 60000 : 0, // Poll every minute when visible
+    refetchOnMountOrArgChange: 300, // 5 minutes
+    skip: !hasPermission(currentUserRole, PERMISSIONS.ABSENCE_READ_ALL) && 
+          !hasPermission(currentUserRole, PERMISSIONS.ABSENCE_MANAGE),
+  });
 
   const [createAbsence, { isLoading: isCreating }] = useCreateAbsenceMutation();
   const [deleteAbsence, { isLoading: isDeleting }] = useDeleteAbsenceMutation();
 
-  // Permission checks
-  const canManageAbsences = hasPermission(currentUserRole, PERMISSIONS.ABSENCE_MANAGE);
-  const canViewAbsences = hasPermission(currentUserRole, PERMISSIONS.ABSENCE_READ_ALL) || canManageAbsences;
+  // OPTIMIZED: Memoize permission checks
+  const canManageAbsences = useMemo(() => 
+    hasPermission(currentUserRole, PERMISSIONS.ABSENCE_MANAGE), 
+    [currentUserRole]
+  );
 
-  const handleAddAbsence = () => {
+  const canViewAbsences = useMemo(() => 
+    hasPermission(currentUserRole, PERMISSIONS.ABSENCE_READ_ALL) || canManageAbsences, 
+    [currentUserRole, canManageAbsences]
+  );
+
+  // OPTIMIZED: Memoize derived data
+  const absences = useMemo(() => 
+    Array.isArray(absencesData) ? absencesData : (absencesData?.absences || []), 
+    [absencesData]
+  );
+
+  const pagination = useMemo(() => 
+    absencesData?.pagination, 
+    [absencesData?.pagination]
+  );
+
+  // OPTIMIZED: Memoize handlers with useCallback
+  const handleAddAbsence = useCallback(() => {
     if (canManageAbsences) {
       setShowAddAbsenceModal(true);
     }
-  };
+  }, [canManageAbsences]);
 
-  const handleAddAbsenceSubmit = async (absenceData) => {
+  const handleAddAbsenceSubmit = useCallback(async (absenceData) => {
     try {
       await createAbsence({
         userId: absenceData.user,
@@ -43,35 +87,44 @@ const AbsenceTracker = () => {
       }).unwrap();
 
       setShowAddAbsenceModal(false);
-      refetch();
+      // No need to refetch - optimistic update handles it
     } catch (error) {
       console.error('Failed to create absence:', error);
-      throw error; // Re-throw to let modal handle error display
+      throw error;
     }
-  };
+  }, [createAbsence]);
 
-  const handleDeleteAbsence = async (absenceId) => {
+  const handleDeleteAbsence = useCallback(async (absenceId) => {
     if (!canManageAbsences) return;
     
     if (window.confirm('Are you sure you want to delete this absence record?')) {
       try {
         await deleteAbsence(absenceId).unwrap();
-        refetch();
+        // No need to refetch - optimistic update handles it
       } catch (error) {
         console.error('Failed to delete absence:', error);
       }
     }
-  };
+  }, [canManageAbsences, deleteAbsence]);
 
-  const formatDate = (dateString) => {
+  const handleCloseModal = useCallback(() => {
+    setShowAddAbsenceModal(false);
+  }, []);
+
+  const handlePageChange = useCallback((newPage) => {
+    setPage(newPage);
+  }, []);
+
+  // OPTIMIZED: Memoize date formatters
+  const formatDate = useCallback((dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
     });
-  };
+  }, []);
 
-  const formatDateTime = (dateString) => {
+  const formatDateTime = useCallback((dateString) => {
     return new Date(dateString).toLocaleString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -79,7 +132,7 @@ const AbsenceTracker = () => {
       hour: '2-digit',
       minute: '2-digit'
     });
-  };
+  }, []);
 
   // Loading state
   if (isLoading) {
@@ -142,10 +195,6 @@ const AbsenceTracker = () => {
     );
   }
 
-  // Handle both array and object response structures
-  const absences = Array.isArray(absencesData) ? absencesData : (absencesData?.absences || []);
-  const pagination = absencesData?.pagination;
-
   return (
     <div className="container-lg section-md">
       <div className="card">
@@ -188,7 +237,7 @@ const AbsenceTracker = () => {
                 <th>Reason</th>
                 <th>Created By</th>
                 <th>Created At</th>
-               </tr>
+              </tr>
             </thead>
             <tbody className="table-body">
               {absences.length > 0 ? (
@@ -224,12 +273,11 @@ const AbsenceTracker = () => {
                         {formatDateTime(absence.createdAt)}
                       </span>
                     </td>
-                     
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={canManageAbsences ? "7" : "6"} className="text-center py-12">
+                  <td colSpan="6" className="text-center py-12">
                     <div className="table-empty">
                       <svg className="table-empty-icon" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
@@ -257,14 +305,14 @@ const AbsenceTracker = () => {
               <div className="flex gap-2">
                 <button
                   className="btn btn-secondary btn-sm"
-                  onClick={() => setPage(page - 1)}
+                  onClick={() => handlePageChange(page - 1)}
                   disabled={!pagination.hasPrev}
                 >
                   Previous
                 </button>
                 <button
                   className="btn btn-secondary btn-sm"
-                  onClick={() => setPage(page + 1)}
+                  onClick={() => handlePageChange(page + 1)}
                   disabled={!pagination.hasNext}
                 >
                   Next
@@ -278,7 +326,7 @@ const AbsenceTracker = () => {
       {/* Add Absence Modal */}
       <AddAbsenceModal
         isOpen={showAddAbsenceModal}
-        onClose={() => setShowAddAbsenceModal(false)}
+        onClose={handleCloseModal}
         onAddAbsence={handleAddAbsenceSubmit}
       />
     </div>

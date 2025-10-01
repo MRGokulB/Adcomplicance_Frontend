@@ -1,4 +1,5 @@
-import { useState } from 'react';
+// src/components/Notifications/Notifications.jsx - OPTIMIZED VERSION
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   useGetNotificationsQuery,
@@ -9,50 +10,72 @@ import {
 
 const Notifications = () => {
   const navigate = useNavigate();
-  const [filter, setFilter] = useState('all'); // 'all', 'read', 'unread'
+  const [filter, setFilter] = useState('all');
   const [page, setPage] = useState(1);
   const limit = 20;
+
+  // OPTIMIZED: Page visibility detection
+  const [isPageVisible, setIsPageVisible] = useState(!document.hidden);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsPageVisible(!document.hidden);
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
   
-  // API Queries with real-time updates
+  const notificationsParams = useMemo(() => ({
+    page,
+    limit,
+    isRead: filter === 'all' ? undefined : filter === 'read' ? true : false
+  }), [page, limit, filter]);
+
   const { 
     data: notificationsData, 
     isLoading, 
     error,
     refetch 
-  } = useGetNotificationsQuery({
-    page,
-    limit,
-    isRead: filter === 'all' ? undefined : filter === 'read' ? true : false
-  }, {
-    pollingInterval: 30000, // Real-time updates every 30 seconds
-    refetchOnMountOrArgChange: true,
+  } = useGetNotificationsQuery(notificationsParams, {
+    pollingInterval: isPageVisible ? 30000 : 0,
+    refetchOnMountOrArgChange: 180,
+    skip: false,
   });
 
   const { data: counts } = useGetCountsQuery(undefined, {
-    pollingInterval: 30000,
+    pollingInterval: isPageVisible ? 60000 : 0,
+    refetchOnMountOrArgChange: 120,
   });
 
-  // Mutations
   const [markAsRead] = useMarkAsReadMutation();
   const [markAllAsRead] = useMarkAllAsReadMutation();
 
-  // Keep original data structure
-  const notifications = notificationsData?.notifications || [];
-  const summary = {
+  const notifications = useMemo(() => 
+    notificationsData?.notifications || [], 
+    [notificationsData?.notifications]
+  );
+
+  const summary = useMemo(() => ({
     total: counts?.total ?? notificationsData?.pagination?.totalCount ?? 0,
     unread: counts?.unread ?? notificationsData?.unreadCount ?? 0,
-  };
-  const pagination = notificationsData?.pagination || {};
+  }), [counts, notificationsData]);
 
-  const handleMarkAsRead = async (id) => {
+  const pagination = useMemo(() => 
+    notificationsData?.pagination || {}, 
+    [notificationsData?.pagination]
+  );
+
+  const handleMarkAsRead = useCallback(async (id) => {
     try {
       await markAsRead(id).unwrap();
     } catch (error) {
       console.error('Failed to mark as read:', error);
     }
-  };
+  }, [markAsRead]);
 
-  const handleOpenNotification = async (notification) => {
+  const handleOpenNotification = useCallback(async (notification) => {
     try {
       if (!notification.isRead) {
         await markAsRead(notification.id).unwrap();
@@ -65,71 +88,71 @@ const Notifications = () => {
         navigate(`/tasks/${notification.taskId}`);
       }
     }
-  };
+  }, [markAsRead, navigate]);
 
-  const handleMarkAllAsRead = async () => {
+  const handleMarkAllAsRead = useCallback(async () => {
     try {
       await markAllAsRead().unwrap();
     } catch (error) {
       console.error('Failed to mark all as read:', error);
     }
-  };
+  }, [markAllAsRead]);
 
-  const getNotificationIcon = (type) => {
+  const handleFilterChange = useCallback((newFilter) => {
+    setFilter(newFilter);
+    setPage(1);
+  }, []);
+
+  const handlePageChange = useCallback((newPage) => {
+    setPage(newPage);
+  }, []);
+
+  const getNotificationIcon = useCallback((type) => {
     const iconClasses = "w-4 h-4";
-    switch (type) {
-      case 'TASK_ASSIGNED':
-        return (
-          <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
-            <svg className={iconClasses} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-          </div>
-        );
-      case 'TASK_APPROVED':
-        return (
-          <div className="w-8 h-8 bg-green-100 text-green-600 rounded-lg flex items-center justify-center">
-            <svg className={iconClasses} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-        );
-      case 'TASK_REJECTED':
-        return (
-          <div className="w-8 h-8 bg-red-100 text-red-600 rounded-lg flex items-center justify-center">
-            <svg className={iconClasses} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </div>
-        );
-      case 'VERSION_UPLOADED':
-        return (
-          <div className="w-8 h-8 bg-yellow-100 text-yellow-600 rounded-lg flex items-center justify-center">
-            <svg className={iconClasses} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-          </div>
-        );
-      case 'COMMENT_ADDED':
-        return (
-          <div className="w-8 h-8 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center">
-            <svg className={iconClasses} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-          </div>
-        );
-      default:
-        return (
-          <div className="w-8 h-8 bg-gray-100 text-gray-600 rounded-lg flex items-center justify-center">
-            <svg className={iconClasses} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5-5-5h5V3h10z" />
-            </svg>
-          </div>
-        );
-    }
-  };
+    const iconConfig = {
+      TASK_ASSIGNED: {
+        bg: 'bg-blue-100',
+        text: 'text-blue-600',
+        path: 'M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'
+      },
+      TASK_APPROVED: {
+        bg: 'bg-green-100',
+        text: 'text-green-600',
+        path: 'M5 13l4 4L19 7'
+      },
+      TASK_REJECTED: {
+        bg: 'bg-red-100',
+        text: 'text-red-600',
+        path: 'M6 18L18 6M6 6l12 12'
+      },
+      VERSION_UPLOADED: {
+        bg: 'bg-yellow-100',
+        text: 'text-yellow-600',
+        path: 'M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12'
+      },
+      COMMENT_ADDED: {
+        bg: 'bg-purple-100',
+        text: 'text-purple-600',
+        path: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z'
+      }
+    };
 
-  const formatTimeAgo = (timestamp) => {
+    const config = iconConfig[type] || {
+      bg: 'bg-gray-100',
+      text: 'text-gray-600',
+      path: 'M15 17h5l-5 5-5-5h5V3h10z'
+    };
+
+    return (
+      <div className={`w-8 h-8 ${config.bg} ${config.text} rounded-lg flex items-center justify-center`}>
+        <svg className={iconClasses} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={config.path} />
+        </svg>
+      </div>
+    );
+  }, []);
+
+  const formatTimeAgo = useCallback((timestamp) => {
     const now = new Date();
     const notificationTime = new Date(timestamp);
     const diffInMinutes = Math.floor((now - notificationTime) / (1000 * 60));
@@ -138,21 +161,20 @@ const Notifications = () => {
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
     if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
     return `${Math.floor(diffInMinutes / 1440)}d ago`;
-  };
+  }, []);
 
-  const getNotificationTypeLabel = (type) => {
+  const getNotificationTypeLabel = useCallback((type) => {
     const labels = {
-      'TASK_ASSIGNED': 'Task Assigned',
-      'TASK_APPROVED': 'Task Approved',
-      'TASK_REJECTED': 'Task Rejected',
-      'VERSION_UPLOADED': 'Version Uploaded',
-      'COMMENT_ADDED': 'Comment Added',
-      'TASK_PUBLISHED': 'Task Published'
+      TASK_ASSIGNED: 'Task Assigned',
+      TASK_APPROVED: 'Task Approved',
+      TASK_REJECTED: 'Task Rejected',
+      VERSION_UPLOADED: 'Version Uploaded',
+      COMMENT_ADDED: 'Comment Added',
+      TASK_PUBLISHED: 'Task Published'
     };
     return labels[type] || 'Notification';
-  };
+  }, []);
 
-  // Error state
   if (error) {
     return (
       <div className="container-lg section-md">
@@ -174,7 +196,6 @@ const Notifications = () => {
 
   return (
     <div className="container-lg section-md">
-      {/* Page Header */}
       <div className="flex-between items-center mb-6">
         <div>
           <h1 className="text-heading-2">Notifications</h1>
@@ -200,16 +221,12 @@ const Notifications = () => {
         </div>
       </div>
 
-      {/* Filter Tabs */}
       <div className="tabs mb-6">
         <div
           className={`tab flex items-center gap-2 cursor-pointer ${
             filter === 'all' ? 'tab-active' : 'tab-inactive'
           }`}
-          onClick={() => {
-            setFilter('all');
-            setPage(1);
-          }}
+          onClick={() => handleFilterChange('all')}
         >
           <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
           <span>All</span>
@@ -221,10 +238,7 @@ const Notifications = () => {
           className={`tab flex items-center gap-2 cursor-pointer ${
             filter === 'unread' ? 'tab-active' : 'tab-inactive'
           }`}
-          onClick={() => {
-            setFilter('unread');
-            setPage(1);
-          }}
+          onClick={() => handleFilterChange('unread')}
         >
           <div className="w-2 h-2 bg-red-500 rounded-full"></div>
           <span>Unread</span>
@@ -236,10 +250,7 @@ const Notifications = () => {
           className={`tab flex items-center gap-2 cursor-pointer ${
             filter === 'read' ? 'tab-active' : 'tab-inactive'
           }`}
-          onClick={() => {
-            setFilter('read');
-            setPage(1);
-          }}
+          onClick={() => handleFilterChange('read')}
         >
           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
           <span>Read</span>
@@ -249,9 +260,7 @@ const Notifications = () => {
         </div>
       </div>
 
-      {/* Notifications Container */}
       <div className="card">
-        {/* Loading State */}
         {isLoading ? (
           <div className="card-body text-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
@@ -259,7 +268,6 @@ const Notifications = () => {
           </div>
         ) : (
           <div className="card-body">
-            {/* Empty State */}
             {notifications.length === 0 ? (
               <div className="text-center py-12">
                 <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -276,7 +284,6 @@ const Notifications = () => {
                 </p>
               </div>
             ) : (
-              /* Notifications List */
               <div className="space-y-4">
                 {notifications.map(notification => (
                   <div
@@ -289,12 +296,10 @@ const Notifications = () => {
                     onClick={() => handleOpenNotification(notification)}
                   >
                     <div className="flex items-start gap-3">
-                      {/* Notification Icon */}
                       <div className="flex-shrink-0">
                         {getNotificationIcon(notification.type)}
                       </div>
                       
-                      {/* Notification Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex-between items-start mb-2">
                           <h4 className={`text-sm font-semibold ${
@@ -303,7 +308,6 @@ const Notifications = () => {
                             {notification.title}
                           </h4>
                           
-                          {/* Mark as read button - Always visible for unread notifications */}
                           {!notification.isRead && (
                             <button
                               onClick={(e) => {
@@ -331,7 +335,6 @@ const Notifications = () => {
                           {notification.message}
                         </p>
                         
-                        {/* Go to Task Button */}
                         {notification.taskId && (
                           <button
                             onClick={(e) => { 
@@ -355,7 +358,6 @@ const Notifications = () => {
           </div>
         )}
 
-        {/* Pagination Footer */}
         {pagination.totalPages > 1 && (
           <div className="card-footer">
             <div className="flex-between">
@@ -364,14 +366,14 @@ const Notifications = () => {
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => setPage(page - 1)}
+                  onClick={() => handlePageChange(page - 1)}
                   disabled={page === 1}
                   className="btn btn-secondary btn-sm"
                 >
                   Previous
                 </button>
                 <button
-                  onClick={() => setPage(page + 1)}
+                  onClick={() => handlePageChange(page + 1)}
                   disabled={page === pagination.totalPages}
                   className="btn btn-secondary btn-sm"
                 >

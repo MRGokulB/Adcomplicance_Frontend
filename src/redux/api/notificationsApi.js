@@ -4,29 +4,66 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 const baseQuery = fetchBaseQuery({
   baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/notifications/`,
   credentials: 'include', // Send session cookies
-  prepareHeaders: (headers) => {
-    // No Authorization header needed - using sessions
-    headers.set('Content-Type', 'application/json');
+  prepareHeaders: (headers, { getState }) => {
+    const token = getState().auth.token;
+    if (token) {
+      headers.set('authorization', `Bearer ${token}`);
+    }
+    
+    // Add CSRF token for non-GET requests
+    const csrfToken = window.csrfToken;
+    if (csrfToken) {
+      headers.set('X-CSRF-Token', csrfToken);
+    }
+    
     return headers;
   }
 });
 
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
+  
   if (result?.error?.status === 401) {
-    console.log('Session expired, redirecting to login...');
     api.dispatch({ type: 'auth/logout' });
   }
+  
+  // Handle 403 CSRF token errors - refresh token and retry
+  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
+    console.log('CSRF token invalid, fetching new token...');
+    
+    try {
+      const csrfResponse = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/csrf-token`,
+        { credentials: 'include' }
+      );
+      
+      if (csrfResponse.ok) {
+        const data = await csrfResponse.json();
+        window.csrfToken = data.csrfToken;
+        console.log('New CSRF token fetched, retrying request...');
+        
+        // Retry the original request with new token
+        result = await baseQuery(args, api, extraOptions);
+      }
+    } catch (error) {
+      console.error('Failed to refresh CSRF token:', error);
+    }
+  }
+  
   return result;
 };
 
 export const notificationsApi = createApi({
   reducerPath: 'notificationsApi',
   baseQuery: baseQueryWithReauth,
-  tagTypes: ['Notification'],
-  keepUnusedDataFor: 60, // 1 minute cache for notifications (they should be fresh)
+  tagTypes: ['Notification', 'NotificationCount'],
+  
+  // OPTIMIZED: Default cache retention
+  keepUnusedDataFor: 180, // 3 minutes default
+  refetchOnMountOrArgChange: 180,
+  
   endpoints: (builder) => ({
-    // Get notifications with pagination and filters
+    // OPTIMIZED: Get notifications with specific tag invalidation
     getNotifications: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -35,35 +72,40 @@ export const notificationsApi = createApi({
         if (params.isRead !== undefined) searchParams.append('isRead', params.isRead);
         return `?${searchParams.toString()}`;
       },
-      providesTags: ['Notification'],
+      providesTags: (result) =>
+        result?.notifications
+          ? [
+              ...result.notifications.map(({ id }) => ({ type: 'Notification', id })),
+              { type: 'Notification', id: 'LIST' }
+            ]
+          : [{ type: 'Notification', id: 'LIST' }],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 60, // Fresh notification data
+      keepUnusedDataFor: 120,
     }),
 
-    // Get unread count
     getUnreadCount: builder.query({
       query: () => 'unread-count',
-      providesTags: ['Notification'],
+      providesTags: ['NotificationCount'],
       transformResponse: (response) => response.unreadCount,
-      keepUnusedDataFor: 30, // 30 seconds - frequently updated
-    }),
-
-    // Get counts summary (total, unread, read)
-    getCounts: builder.query({
-      query: () => 'counts',
-      providesTags: ['Notification'],
-      transformResponse: (response) => response,
       keepUnusedDataFor: 60,
     }),
 
-    // Mark notification as read
+    getCounts: builder.query({
+      query: () => 'counts',
+      providesTags: ['NotificationCount'],
+      transformResponse: (response) => response,
+      keepUnusedDataFor: 120,
+    }),
+
     markAsRead: builder.mutation({
       query: (id) => ({
         url: `${id}/read`,
         method: 'PATCH'
       }),
-      invalidatesTags: ['Notification'],
-      // Optimistic update
+      invalidatesTags: (result, error, id) => [
+        { type: 'Notification', id },
+        'NotificationCount'
+      ],
       async onQueryStarted(id, { dispatch, queryFulfilled }) {
         const patchResult = dispatch(
           notificationsApi.util.updateQueryData('getNotifications', undefined, (draft) => {
@@ -73,22 +115,34 @@ export const notificationsApi = createApi({
             }
           })
         );
+
+        const countPatch = dispatch(
+          notificationsApi.util.updateQueryData('getCounts', undefined, (draft) => {
+            if (draft.unread > 0) {
+              draft.unread -= 1;
+            }
+          })
+        );
+
         try {
           await queryFulfilled;
         } catch {
           patchResult.undo();
+          countPatch.undo();
         }
       },
       transformResponse: (response) => response
     }),
 
-    // Mark notification as unread
     markAsUnread: builder.mutation({
       query: (id) => ({
         url: `${id}/unread`,
         method: 'PATCH'
       }),
-      invalidatesTags: ['Notification'],
+      invalidatesTags: (result, error, id) => [
+        { type: 'Notification', id },
+        'NotificationCount'
+      ],
       async onQueryStarted(id, { dispatch, queryFulfilled }) {
         const patchResult = dispatch(
           notificationsApi.util.updateQueryData('getNotifications', undefined, (draft) => {
@@ -98,22 +152,32 @@ export const notificationsApi = createApi({
             }
           })
         );
+
+        const countPatch = dispatch(
+          notificationsApi.util.updateQueryData('getCounts', undefined, (draft) => {
+            draft.unread += 1;
+          })
+        );
+
         try {
           await queryFulfilled;
         } catch {
           patchResult.undo();
+          countPatch.undo();
         }
       },
       transformResponse: (response) => response
     }),
 
-    // Mark all as read
     markAllAsRead: builder.mutation({
       query: () => ({
         url: 'mark-all-read',
         method: 'PATCH'
       }),
-      invalidatesTags: ['Notification'],
+      invalidatesTags: [
+        { type: 'Notification', id: 'LIST' },
+        'NotificationCount'
+      ],
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         const patchResult = dispatch(
           notificationsApi.util.updateQueryData('getNotifications', undefined, (draft) => {
@@ -124,30 +188,45 @@ export const notificationsApi = createApi({
             }
           })
         );
+
+        const countPatch = dispatch(
+          notificationsApi.util.updateQueryData('getCounts', undefined, (draft) => {
+            draft.unread = 0;
+          })
+        );
+
         try {
           await queryFulfilled;
         } catch {
           patchResult.undo();
+          countPatch.undo();
         }
       },
       transformResponse: (response) => response
     }),
 
-    // Delete notification
     deleteNotification: builder.mutation({
       query: (id) => ({
         url: id,
         method: 'DELETE'
       }),
-      invalidatesTags: ['Notification'],
+      invalidatesTags: (result, error, id) => [
+        { type: 'Notification', id },
+        { type: 'Notification', id: 'LIST' },
+        'NotificationCount'
+      ],
       async onQueryStarted(id, { dispatch, queryFulfilled }) {
         const patchResult = dispatch(
           notificationsApi.util.updateQueryData('getNotifications', undefined, (draft) => {
             if (draft.notifications) {
               draft.notifications = draft.notifications.filter(n => n.id !== id);
+              if (draft.pagination?.totalCount) {
+                draft.pagination.totalCount -= 1;
+              }
             }
           })
         );
+
         try {
           await queryFulfilled;
         } catch {
@@ -157,13 +236,15 @@ export const notificationsApi = createApi({
       transformResponse: (response) => response
     }),
 
-    // Delete all read notifications
     deleteAllRead: builder.mutation({
       query: () => ({
         url: 'read/all',
         method: 'DELETE'
       }),
-      invalidatesTags: ['Notification'],
+      invalidatesTags: [
+        { type: 'Notification', id: 'LIST' },
+        'NotificationCount'
+      ],
       transformResponse: (response) => response
     }),
   })

@@ -28,12 +28,14 @@ export const CSRFProvider = ({ children }) => {
       if (response.ok) {
         const data = await response.json();
         setCsrfToken(data.csrfToken);
-        console.log('CSRF token fetched successfully');
+        // Set global variable for RTK Query access
+        window.csrfToken = data.csrfToken;
+        console.log('✅ CSRF token fetched and set globally');
       } else {
-        console.error('Failed to fetch CSRF token');
+        console.error('❌ Failed to fetch CSRF token:', response.status);
       }
     } catch (error) {
-      console.error('Error fetching CSRF token:', error);
+      console.error('❌ Error fetching CSRF token:', error);
     } finally {
       setIsLoading(false);
     }
@@ -41,6 +43,8 @@ export const CSRFProvider = ({ children }) => {
 
   const clearCSRFToken = () => {
     setCsrfToken(null);
+    window.csrfToken = null;
+    console.log('🧹 CSRF token cleared');
   };
 
   useEffect(() => {
@@ -56,7 +60,7 @@ export const CSRFProvider = ({ children }) => {
   };
 
   return (
-    <CSRFContext.Provider value={csrfToken}>
+    <CSRFContext.Provider value={value}>
       {children}
     </CSRFContext.Provider>
   );

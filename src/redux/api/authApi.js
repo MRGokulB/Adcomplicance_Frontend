@@ -8,22 +8,57 @@ console.log('Auth API Base URL:', apiUrl)
 const baseQuery = fetchBaseQuery({
   baseUrl: apiUrl,
   credentials: 'include', // Important for session cookies
-  prepareHeaders: (headers) => {
-    // Remove Authorization header - using sessions now
-    headers.set('Content-Type', 'application/json')
-    return headers
+  prepareHeaders: (headers, { getState }) => {
+    // Get token from auth state
+    const token = getState().auth.token;
+    if (token) {
+      headers.set('authorization', `Bearer ${token}`);
+    }
+    
+    // Add CSRF token for non-GET requests
+    const csrfToken = window.csrfToken;
+    if (csrfToken) {
+      headers.set('X-CSRF-Token', csrfToken);
+    }
+    
+    return headers;
   },
 })
 
 const baseQueryWithReauth = async (args, api, extraOptions) => {
-  let result = await baseQuery(args, api, extraOptions)
+  let result = await baseQuery(args, api, extraOptions);
    
+  // Handle 401 unauthorized responses
   if (result?.error?.status === 401) {
-    api.dispatch(logout())
+    api.dispatch(logout());
   }
   
-  return result
-}
+  // Handle 403 CSRF token errors - refresh token and retry
+  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
+    console.log('🔄 CSRF token invalid, fetching new token...');
+    
+    // Fetch new CSRF token
+    try {
+      const csrfResponse = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/csrf-token`,
+        { credentials: 'include' }
+      );
+      
+      if (csrfResponse.ok) {
+        const data = await csrfResponse.json();
+        window.csrfToken = data.csrfToken;
+        console.log('✅ New CSRF token fetched, retrying request...');
+        
+        // Retry the original request with new token
+        result = await baseQuery(args, api, extraOptions);
+      }
+    } catch (error) {
+      console.error('❌ Failed to refresh CSRF token:', error);
+    }
+  }
+  
+  return result;
+};
 
 export const authApi = createApi({
   reducerPath: 'authApi',
