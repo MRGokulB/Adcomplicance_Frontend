@@ -129,11 +129,23 @@ const Dashboard = () => {
   });
 
   // Activity feed - Recent updates
+  // RESTRICTED: Compliance & Product users only see activities for their assigned tasks
+  const activityParams = React.useMemo(() => {
+    const params = { limit: 10 };
+    
+    // Filter by assigned tasks for restricted roles
+    if ([USER_ROLES.COMPLIANCE_USER, USER_ROLES.PRODUCT_USER].includes(userRole)) {
+      params.assignedToMe = true; // Backend should filter by current user's assigned tasks
+    }
+    
+    return params;
+  }, [userRole]);
+
   const { 
     data: activityFeed, 
     isLoading: isActivityLoading,
     refetch: refetchActivity 
-  } = useGetActivityFeedQuery({ limit: 10 }, {
+  } = useGetActivityFeedQuery(activityParams, {
     pollingInterval: criticalPolling, // Frequent - shows recent actions
     skip: !isVisible,
   });
@@ -387,7 +399,14 @@ const Dashboard = () => {
         {activityFeed && activityFeed.length > 0 && (
           <div className="mt-8">
             <div className="flex-between items-center mb-4">
-              <h2 className="text-heading-3">Recent Activity</h2>
+              <h2 className="text-heading-3">
+                Recent Activity
+                {[USER_ROLES.COMPLIANCE_USER, USER_ROLES.PRODUCT_USER].includes(userRole) && (
+                  <span className="ml-2 text-sm font-normal text-gray-500">
+                    (Your assigned tasks only)
+                  </span>
+                )}
+              </h2>
               <button 
                 className="btn btn-ghost btn-sm text-blue-600"
                 onClick={refetchActivity}
