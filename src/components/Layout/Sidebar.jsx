@@ -58,6 +58,8 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
     error: countsError 
   } = useGetCountsQuery(undefined, {
     pollingInterval: 30000, // Update every 30 seconds
+    refetchOnFocus: true,    // Refetch when window gains focus
+    refetchOnReconnect: true, 
     refetchOnMountOrArgChange: true,
   });
 

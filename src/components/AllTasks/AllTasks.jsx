@@ -124,7 +124,11 @@ export default function AllTasksPage() {
         refetch,
         isFetching
     } = useGetTasksQuery(filters, { 
-        skip: activeView !== 'all' || advancedSearch.enabled 
+        skip: activeView !== 'all' || advancedSearch.enabled,
+        pollingInterval: 30000, // Poll every 30 seconds
+        refetchOnFocus: true,    // Refetch when window gains focus
+        refetchOnReconnect: true, // Refetch on network reconnect
+        refetchOnMountOrArgChange: true 
     });
 
     const {

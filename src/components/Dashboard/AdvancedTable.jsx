@@ -75,7 +75,12 @@ export default function AdvancedTable() {
         isError,
         error,
         refetch
-    } = useGetTasksQuery(filters, { skip: activeView !== 'all' });
+    } = useGetTasksQuery(filters, {
+        skip: activeView !== 'all',
+        refetchOnFocus: true,    
+        refetchOnReconnect: true, 
+        refetchOnMountOrArgChange: true
+     });
 
     const {
         data: approvedNotPublishedData,
