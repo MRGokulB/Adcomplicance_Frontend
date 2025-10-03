@@ -1,4 +1,4 @@
-// src/components/Tasks/ExchangeApproval/ExchangeApproval.jsx - Updated for backend changes
+// src/components/Tasks/ExchangeApproval/ExchangeApproval.jsx - With integrated file upload
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUserRole, selectCurrentUser } from '../../../redux/slices/authSlice';
@@ -19,13 +19,37 @@ const ExchangeApproval = ({ task, onRefresh }) => {
   const [showModal, setShowModal] = useState(false);
   const [selectedExchange, setSelectedExchange] = useState('');
   const [editingApproval, setEditingApproval] = useState(null);
-  const [fileUploads, setFileUploads] = useState({});
+  
+  // NEW: Local editing state for each approval
+  const [editingData, setEditingData] = useState({});
+  
+  // NEW: Pending files state (stores File objects before upload)
+  const [pendingFiles, setPendingFiles] = useState({});
 
   // API mutations
   const [addExchangeApproval, { isLoading: isAdding }] = useAddExchangeApprovalMutation();
   const [updateExchangeApproval, { isLoading: isUpdating }] = useUpdateExchangeApprovalMutation();
   const [deleteExchangeApproval, { isLoading: isDeleting }] = useDeleteExchangeApprovalMutation();
   const [uploadFile, { isLoading: isUploading }] = useUploadFileMutation();
+
+  // Get existing approvals from task data
+  const approvals = task?.exchangeApprovals || [];
+
+  // Initialize editing data when approvals change
+  useEffect(() => {
+    const initialData = {};
+    approvals.forEach(approval => {
+      initialData[approval.id] = {
+        approvalStatus: approval.approvalStatus || 'NOT_SENT',
+        approvalDate: approval.approvalDate || '',
+        expiryDate: approval.expiryDate || '',
+        referenceNumber: approval.referenceNumber || '',
+        approvalEmailUrl: approval.approvalEmailUrl || '',
+        emailFileName: approval.emailFileName || ''
+      };
+    });
+    setEditingData(initialData);
+  }, [approvals]);
 
   // Check if user can manage exchange approvals on this specific task
   const canUserManageThisTask = () => {
@@ -57,9 +81,6 @@ const ExchangeApproval = ({ task, onRefresh }) => {
     { value: 'REJECTED', label: 'Rejected', color: 'red' }
   ];
 
-  // Get existing approvals from task data
-  const approvals = task?.exchangeApprovals || [];
-
   const getAvailableExchanges = () => {
     const usedExchanges = approvals.map(approval => approval.exchangeName);
     return exchangeOptions.filter(option => !usedExchanges.includes(option.value));
@@ -80,7 +101,6 @@ const ExchangeApproval = ({ task, onRefresh }) => {
       await addExchangeApproval({
         id: task.id,
         exchangeName: selectedExchange
-        // Note: Removed typeOfContent as per backend update
       }).unwrap();
 
       setSelectedExchange('');
@@ -93,79 +113,106 @@ const ExchangeApproval = ({ task, onRefresh }) => {
     }
   };
 
-  const handleStatusChange = async (approvalId, newStatus) => {
-    if (!canUserManageThisTask()) {
-      alert('You do not have permission to update exchange approvals.');
-      return;
-    }
-
-    try {
-      await updateExchangeApproval({
-        taskId: task.id,
-        approvalId: approvalId,
-        approvalStatus: newStatus
-      }).unwrap();
-
-      onRefresh();
-
-    } catch (error) {
-      console.error('Failed to update status:', error);
-      alert(error?.data?.message || 'Failed to update status. Please try again.');
-    }
-  };
-
-  const handleFieldUpdate = async (approvalId, field, value) => {
-    if (!canUserManageThisTask()) {
-      alert('You do not have permission to update exchange approvals.');
-      return;
-    }
-
-    try {
-      await updateExchangeApproval({
-        taskId: task.id,
-        approvalId: approvalId,
+  // Update local state only
+  const handleLocalFieldChange = (approvalId, field, value) => {
+    setEditingData(prev => ({
+      ...prev,
+      [approvalId]: {
+        ...prev[approvalId],
         [field]: value
-      }).unwrap();
-
-      onRefresh();
-
-    } catch (error) {
-      console.error('Failed to update field:', error);
-      alert(error?.data?.message || 'Failed to update. Please try again.');
-    }
+      }
+    }));
   };
 
-  const handleFileUpload = async (approvalId, file) => {
+  // NEW: Store file locally without uploading (following VersionControl pattern)
+  const handleFileSelect = (approvalId, file) => {
     if (!file) return;
-
+    
     if (!canUserManageThisTask()) {
       alert('You do not have permission to upload files.');
       return;
     }
 
+    // Store the file object
+    setPendingFiles(prev => ({
+      ...prev,
+      [approvalId]: file
+    }));
+    
+    // Update local state with file name
+    handleLocalFieldChange(approvalId, 'emailFileName', file.name);
+  };
+
+  // NEW: Submit approval with file upload (following VersionControl pattern)
+  const handleSubmitApproval = async (approvalId) => {
+    if (!canUserManageThisTask()) {
+      alert('You do not have permission to update exchange approvals.');
+      return;
+    }
+
+    const data = editingData[approvalId];
+    
+    // Validation for APPROVED status
+    if (data.approvalStatus === 'APPROVED') {
+      if (!data.approvalDate || !data.expiryDate || !data.referenceNumber) {
+        alert('Approval date, expiry date, and reference number are required when status is Approved');
+        return;
+      }
+
+      if (new Date(data.expiryDate) <= new Date(data.approvalDate)) {
+        alert('Expiry date must be after approval date');
+        return;
+      }
+    }
+
     try {
-      setFileUploads(prev => ({ ...prev, [approvalId]: true }));
+      let fileUrl = data.approvalEmailUrl;
+      let fileName = data.emailFileName;
+      
+      // Step 1: Upload file first if there's a pending one (following VersionControl pattern)
+      if (pendingFiles[approvalId]) {
+        console.log('Uploading file to S3...', pendingFiles[approvalId].name);
+        
+        const formData = new FormData();
+        formData.append('file', pendingFiles[approvalId]);
+        
+        const uploadResult = await uploadFile(formData).unwrap();
+        console.log('Upload result:', uploadResult);
+        
+        fileUrl = uploadResult.file?.url || uploadResult.url;
+        fileName = pendingFiles[approvalId].name;
+        
+        console.log('File uploaded successfully:', fileUrl);
+      }
 
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const uploadResult = await uploadFile(formData).unwrap();
-      const fileUrl = uploadResult.file?.url || uploadResult.url;
+      // Step 2: Update approval with all data including file URL
+      console.log('Submitting approval with data:', {
+        ...data,
+        approvalEmailUrl: fileUrl,
+        emailFileName: fileName
+      });
 
       await updateExchangeApproval({
         taskId: task.id,
         approvalId: approvalId,
-        approvalEmailUrl: fileUrl, // Updated field name from backend
-        emailFileName: file.name
+        ...data,
+        approvalEmailUrl: fileUrl || data.approvalEmailUrl,
+        emailFileName: fileName || data.emailFileName
       }).unwrap();
 
+      // Step 3: Clear pending file
+      setPendingFiles(prev => {
+        const newState = { ...prev };
+        delete newState[approvalId];
+        return newState;
+      });
+
+      alert('Exchange approval submitted successfully!');
       onRefresh();
 
     } catch (error) {
-      console.error('Failed to upload file:', error);
-      alert(error?.data?.message || 'Failed to upload file. Please try again.');
-    } finally {
-      setFileUploads(prev => ({ ...prev, [approvalId]: false }));
+      console.error('Failed to submit approval:', error);
+      alert(error?.data?.message || 'Failed to submit. Please try again.');
     }
   };
 
@@ -195,7 +242,8 @@ const ExchangeApproval = ({ task, onRefresh }) => {
 
   const formatDateForInput = (dateString) => {
     if (!dateString) return '';
-    return new Date(dateString).toISOString().split('T')[0];
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
   };
 
   const formatDisplayDate = (dateString) => {
@@ -219,6 +267,24 @@ const ExchangeApproval = ({ task, onRefresh }) => {
 
   const getStatusLabel = (status) => {
     return statusOptions.find(opt => opt.value === status)?.label || status;
+  };
+
+  // Check if approval has unsaved changes
+  const hasUnsavedChanges = (approvalId) => {
+    const approval = approvals.find(a => a.id === approvalId);
+    const edited = editingData[approvalId];
+    
+    if (!approval || !edited) return false;
+
+    // Check if there's a pending file
+    if (pendingFiles[approvalId]) return true;
+
+    return (
+      edited.approvalStatus !== (approval.approvalStatus || 'NOT_SENT') ||
+      edited.approvalDate !== (approval.approvalDate || '') ||
+      edited.expiryDate !== (approval.expiryDate || '') ||
+      edited.referenceNumber !== (approval.referenceNumber || '')
+    );
   };
 
   // Check if all approvals are approved (for task approval workflow)
@@ -285,155 +351,180 @@ const ExchangeApproval = ({ task, onRefresh }) => {
                 </tr>
               </thead>
               <tbody className="exchange-table-body">
-                {approvals.map((approval) => (
-                  <tr key={approval.id}>
-                    <td className="font-medium text-gray-900">{approval.exchangeName}</td>
-                    <td>
-                      {canManage ? (
-                        <select 
-                          className="exchange-status-dropdown"
-                          value={approval.approvalStatus || 'NOT_SENT'}
-                          onChange={(e) => handleStatusChange(approval.id, e.target.value)}
-                          disabled={isUpdating}
-                        >
-                          {statusOptions.map(status => (
-                            <option key={status.value} value={status.value}>
-                              {status.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(approval.approvalStatus)}`}>
-                          {getStatusLabel(approval.approvalStatus)}
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      {canManage ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="date"
-                            className="exchange-date-input"
-                            value={formatDateForInput(approval.approvalDate)}
-                            onChange={(e) => handleFieldUpdate(approval.id, 'approvalDate', e.target.value)}
-                            disabled={isUpdating}
-                          />
-                          <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-600">
-                          {formatDisplayDate(approval.approvalDate) || '—'}
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      {canManage ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="date"
-                            className="exchange-date-input"
-                            value={formatDateForInput(approval.expiryDate)}
-                            onChange={(e) => handleFieldUpdate(approval.id, 'expiryDate', e.target.value)}
-                            disabled={isUpdating}
-                          />
-                          <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-600">
-                          {formatDisplayDate(approval.expiryDate) || '—'}
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      {canManage ? (
-                        <input
-                          type="text"
-                          className="exchange-ref-input"
-                          value={approval.referenceNumber || ''}
-                          onChange={(e) => handleFieldUpdate(approval.id, 'referenceNumber', e.target.value)}
-                          placeholder="Enter ref number"
-                          disabled={isUpdating}
-                        />
-                      ) : (
-                        <span className="text-sm text-gray-600">
-                          {approval.referenceNumber || '—'}
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="space-y-2">
-                        {approval.approvalEmailUrl && approval.emailFileName && (
-                          <div>
-                            <a 
-                              href={approval.approvalEmailUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="exchange-file-link flex items-center gap-1"
-                            >
-                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-                              </svg>
-                              {approval.emailFileName}
-                            </a>
-                          </div>
-                        )}
-                        {canManage && (
-                          <div className="flex items-center gap-2">
-                            <label className="exchange-file-upload cursor-pointer">
-                              Choose File
-                              <input
-                                type="file"
-                                className="hidden"
-                                onChange={(e) => handleFileUpload(approval.id, e.target.files[0])}
-                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.eml,.msg"
-                                disabled={isUploading || fileUploads[approval.id]}
-                              />
-                            </label>
-                            <span className="text-sm text-gray-500">
-                              {fileUploads[approval.id] ? 'Uploading...' : 'PDF, DOC, Image, Email'}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="text-sm text-gray-600">
-                      {approval.updatedBy?.fullName || 
-                       approval.submittedBy?.fullName || 
-                       approval.submittedBy || 
-                       currentUser?.fullName || 
-                       '—'}
-                    </td>
-                    {canManage && (
-                      <td>
-                        <div className="flex gap-2">
-                          {approval.approvalStatus !== 'PENDING' && (
-                            <button 
-                              className="exchange-submit-btn"
-                              onClick={() => handleStatusChange(approval.id, 'PENDING')}
-                              disabled={isUpdating}
-                            >
-                              Submit
-                            </button>
-                          )}
-                          {permissions.canDelete && (
-                            <button 
-                              className="text-red-600 hover:text-red-800 text-sm"
-                              onClick={() => handleDeleteApproval(approval.id)}
-                              disabled={isDeleting}
-                            >
-                              Delete
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
+  {approvals.map((approval) => {
+    const localData = editingData[approval.id] || {};
+    const hasChanges = hasUnsavedChanges(approval.id);
+    const hasPendingFile = !!pendingFiles[approval.id];
+    
+    return (
+      <tr key={approval.id} className={hasChanges ? 'bg-yellow-50' : ''}>
+        <td className="font-medium text-gray-900">{approval.exchangeName}</td>
+        <td>
+          {canManage ? (
+            <select 
+              className="exchange-status-dropdown"
+              value={localData.approvalStatus || 'NOT_SENT'}
+              onChange={(e) => handleLocalFieldChange(approval.id, 'approvalStatus', e.target.value)}
+              disabled={isUpdating || isUploading}
+            >
+              {statusOptions.map(status => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(approval.approvalStatus)}`}>
+              {getStatusLabel(approval.approvalStatus)}
+            </span>
+          )}
+        </td>
+        <td>
+          {canManage ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                className="exchange-date-input"
+                value={formatDateForInput(localData.approvalDate)}
+                onChange={(e) => handleLocalFieldChange(approval.id, 'approvalDate', e.target.value)}
+                disabled={isUpdating || isUploading}
+              />
+              <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+              </svg>
+            </div>
+          ) : (
+            <span className="text-sm text-gray-600">
+              {formatDisplayDate(approval.approvalDate) || '—'}
+            </span>
+          )}
+        </td>
+        <td>
+          {canManage ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                className="exchange-date-input"
+                value={formatDateForInput(localData.expiryDate)}
+                onChange={(e) => handleLocalFieldChange(approval.id, 'expiryDate', e.target.value)}
+                disabled={isUpdating || isUploading}
+              />
+              <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+              </svg>
+            </div>
+          ) : (
+            <span className="text-sm text-gray-600">
+              {formatDisplayDate(approval.expiryDate) || '—'}
+            </span>
+          )}
+        </td>
+        <td>
+          {canManage ? (
+            <input
+              type="text"
+              className="exchange-ref-input"
+              value={localData.referenceNumber || ''}
+              onChange={(e) => handleLocalFieldChange(approval.id, 'referenceNumber', e.target.value)}
+              placeholder="Enter ref number"
+              disabled={isUpdating || isUploading}
+            />
+          ) : (
+            <span className="text-sm text-gray-600">
+              {approval.referenceNumber || '—'}
+            </span>
+          )}
+        </td>
+        <td>
+          <div className="space-y-2">
+            {/* UPDATED: Show file for everyone, not just when canManage */}
+            {approval.approvalEmailUrl && (
+              <div>
+                <a 
+                  href={approval.approvalEmailUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="exchange-file-link flex items-center gap-1 text-blue-600 hover:text-blue-800"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                  {approval.emailFileName || 'Download File'}
+                </a>
+              </div>
+            )}
+            
+            {/* Show "No file uploaded" message for non-managers if no file exists */}
+            {!approval.approvalEmailUrl && !canManage && (
+              <span className="text-sm text-gray-500 italic">No file uploaded</span>
+            )}
+            
+            {/* Pending file indicator - only for managers */}
+            {canManage && hasPendingFile && (
+              <div className="flex items-center gap-2 text-sm text-orange-600">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+                </svg>
+                <span className="truncate">{pendingFiles[approval.id].name}</span>
+                <span className="text-xs">(not saved yet)</span>
+              </div>
+            )}
+            
+            {/* File upload input - only for managers */}
+            {canManage && (
+              <div className="flex items-center gap-2">
+                <label className="exchange-file-upload cursor-pointer">
+                  {hasPendingFile ? 'Change File' : (approval.approvalEmailUrl ? 'Replace File' : 'Choose File')}
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => handleFileSelect(approval.id, e.target.files[0])}
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.eml,.msg"
+                    disabled={isUpdating || isUploading}
+                  />
+                </label>
+                <span className="text-sm text-gray-500">
+                  PDF, DOC, Image, Email
+                </span>
+              </div>
+            )}
+          </div>
+        </td>
+        <td className="text-sm text-gray-600">
+          {approval.updatedBy?.fullName || 
+           approval.submittedBy?.fullName || 
+           approval.submittedBy || 
+           currentUser?.fullName || 
+           '—'}
+        </td>
+        {canManage && (
+          <td>
+            <div className="flex gap-2 items-center">
+              {hasChanges && (
+                <button 
+                  className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm font-medium"
+                  onClick={() => handleSubmitApproval(approval.id)}
+                  disabled={isUpdating || isUploading}
+                >
+                  {isUploading ? 'Uploading...' : isUpdating ? 'Submitting...' : 'Submit'}
+                </button>
+              )}
+              {permissions.canDelete && !hasChanges && (
+                <button 
+                  className="text-red-600 hover:text-red-800 text-sm"
+                  onClick={() => handleDeleteApproval(approval.id)}
+                  disabled={isDeleting}
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+          </td>
+        )}
+      </tr>
+    );
+  })}
+</tbody>
             </table>
           ) : (
             <div className="text-center py-12">
@@ -491,10 +582,8 @@ const ExchangeApproval = ({ task, onRefresh }) => {
                 </select>
               </div>
               
-              {/* Note: Removed Type of Content field as per backend update */}
-              
               <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded">
-                <strong>Note:</strong> After adding the exchange entry, you can update the approval status, dates, and reference number in the table above.
+                <strong>Note:</strong> After adding the exchange entry, you can fill in all the details and click Submit to save all changes together.
               </div>
             </div>
             <div className="exchange-modal-footer">
@@ -521,12 +610,13 @@ const ExchangeApproval = ({ task, onRefresh }) => {
         <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
           <h4 className="text-sm font-medium text-blue-900 mb-2">Exchange Approval Workflow:</h4>
           <ul className="text-sm text-blue-800 space-y-1">
-            <li>• Set status to "Pending" when submitted to exchange</li>
-            <li>• Update to "Approved" only after receiving official approval</li>
-            <li>• Enter reference numbers for approved submissions</li>
+            <li>• Fill in all fields (status, dates, reference number, and upload file if needed)</li>
+            <li>• Yellow highlight indicates unsaved changes</li>
+            <li>• Orange "📎 not saved yet" indicates file selected but not uploaded</li>
+            <li>• Click "Submit" button to upload file (if any) and save all changes together</li>
+            <li>• Set status to "Approved" and Submit when officially approved</li>
             <li>• Upload approval emails/documents for audit trail</li>
             <li>• All exchanges must be "Approved" before task can be approved</li>
-            <li>• Set expiry dates to track when approvals expire</li>
           </ul>
           
           {!canManage && (

@@ -158,69 +158,93 @@ export const usersApi = createApi({
     }),
 
     // OPTIMIZED: Update user with optimistic update
-    updateUser: builder.mutation({
-      query: ({ id, ...userData }) => ({
-        url: id,
-        method: 'PUT',
-        body: userData
-      }),
-      invalidatesTags: (result, error, { id }) => [
-        { type: 'User', id },
-        { type: 'User', id: 'LIST' },
-        { type: 'Promotion', id: 'ELIGIBLE' }
-      ],
-      transformResponse: (response) => ({
-        user: response.user,
-        changes: response.changes || null
-      }),
-      async onQueryStarted({ id, ...patch }, { dispatch, queryFulfilled }) {
-        // Optimistic update
-        const patchResult = dispatch(
-          usersApi.util.updateQueryData('getUserById', id, (draft) => {
-            Object.assign(draft, patch);
-          })
-        );
+    // FIXED: Update user with optimistic update for BOTH detail and list
+updateUser: builder.mutation({
+  query: ({ id, ...userData }) => ({
+    url: id,
+    method: 'PUT',
+    body: userData
+  }),
+  invalidatesTags: (result, error, { id }) => [
+    { type: 'User', id },
+    { type: 'User', id: 'LIST' },
+    { type: 'Promotion', id: 'ELIGIBLE' }
+  ],
+  transformResponse: (response) => ({
+    user: response.user,
+    changes: response.changes || null
+  }),
+  async onQueryStarted({ id, ...patch }, { dispatch, queryFulfilled }) {
+    // Optimistic update for getUserById
+    const patchDetail = dispatch(
+      usersApi.util.updateQueryData('getUserById', id, (draft) => {
+        Object.assign(draft, patch);
+      })
+    );
 
-        try {
-          await queryFulfilled;
-        } catch {
-          patchResult.undo();
+    // FIXED: Optimistic update for getUsers list
+    const patchList = dispatch(
+      usersApi.util.updateQueryData('getUsers', undefined, (draft) => {
+        const userIndex = draft.users?.findIndex(u => u.id === id);
+        if (userIndex !== -1 && draft.users) {
+          Object.assign(draft.users[userIndex], patch);
         }
-      }
-    }),
+      })
+    );
 
-    // OPTIMIZED: Promote user with optimistic update
-    promoteUser: builder.mutation({
-      query: ({ id, newRole, reason }) => ({
-        url: `${id}/promote`,
-        method: 'POST',
-        body: { newRole, reason }
-      }),
-      invalidatesTags: (result, error, { id }) => [
-        { type: 'User', id },
-        { type: 'User', id: 'LIST' },
-        { type: 'Promotion', id: 'ELIGIBLE' }
-      ],
-      transformResponse: (response) => ({
-        user: response.user,
-        changes: response.changes
-      }),
-      async onQueryStarted({ id, newRole }, { dispatch, queryFulfilled }) {
-        // Optimistic update
-        const patchResult = dispatch(
-          usersApi.util.updateQueryData('getUserById', id, (draft) => {
-            draft.role = newRole;
-            draft.updatedAt = new Date().toISOString();
-          })
-        );
+    try {
+      await queryFulfilled;
+    } catch {
+      patchDetail.undo();
+      patchList.undo();
+    }
+  }
+}),
 
-        try {
-          await queryFulfilled;
-        } catch {
-          patchResult.undo();
+// FIXED: Promote user with optimistic update for BOTH detail and list
+promoteUser: builder.mutation({
+  query: ({ id, newRole, reason }) => ({
+    url: `${id}/promote`,
+    method: 'POST',
+    body: { newRole, reason }
+  }),
+  invalidatesTags: (result, error, { id }) => [
+    { type: 'User', id },
+    { type: 'User', id: 'LIST' },
+    { type: 'Promotion', id: 'ELIGIBLE' }
+  ],
+  transformResponse: (response) => ({
+    user: response.user,
+    changes: response.changes
+  }),
+  async onQueryStarted({ id, newRole }, { dispatch, queryFulfilled }) {
+    // Optimistic update for getUserById
+    const patchDetail = dispatch(
+      usersApi.util.updateQueryData('getUserById', id, (draft) => {
+        draft.role = newRole;
+        draft.updatedAt = new Date().toISOString();
+      })
+    );
+
+    // FIXED: Optimistic update for getUsers list
+    const patchList = dispatch(
+      usersApi.util.updateQueryData('getUsers', undefined, (draft) => {
+        const userIndex = draft.users?.findIndex(u => u.id === id);
+        if (userIndex !== -1 && draft.users) {
+          draft.users[userIndex].role = newRole;
+          draft.users[userIndex].updatedAt = new Date().toISOString();
         }
-      }
-    }),
+      })
+    );
+
+    try {
+      await queryFulfilled;
+    } catch {
+      patchDetail.undo();
+      patchList.undo();
+    }
+  }
+}),
 
     // Reset user password - no optimistic update needed
     resetUserPassword: builder.mutation({

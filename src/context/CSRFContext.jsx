@@ -55,7 +55,7 @@ export const CSRFProvider = ({ children }) => {
   const value = {
     csrfToken,
     isLoading,
-    fetchCSRFToken,
+    // fetchCSRFToken,
     clearCSRFToken,
   };
 

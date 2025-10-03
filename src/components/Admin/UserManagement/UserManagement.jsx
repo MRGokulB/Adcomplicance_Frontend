@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+// src/components/Admin/UserManagement/UserManagement.jsx - OPTIMIZED VERSION
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import CreateUserModal from './CreateUserModal';
 import UserDetailModal from '../../common/modals/UserDetailModal';
@@ -10,12 +11,11 @@ import {
   useCreateUserMutation,
   useUpdateUserMutation,
   useResetUserPasswordMutation,
-  usePromoteUserMutation, // NEW
+  usePromoteUserMutation,
 } from '../../../redux/api/usersApi';
 import { hasPermission, PERMISSIONS, USER_ROLES } from '../../../utils/roles';
 
 const UserManagement = () => {
-  // State management
   const [filters, setFilters] = useState({
     search: '',
     role: '',
@@ -37,47 +37,71 @@ const UserManagement = () => {
 
   const currentUserRole = useSelector(selectUserRole);
 
-  // API hooks - Updated to use new backend structure
+  // OPTIMIZED: Page visibility detection for conditional polling
+  const [isPageVisible, setIsPageVisible] = useState(!document.hidden);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsPageVisible(!document.hidden);
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  // OPTIMIZED: Conditional polling instead of setInterval
   const { 
     data: usersResponse, 
     isLoading, 
     isError, 
     error,
     refetch 
-  } = useGetUsersQuery(filters);
+  } = useGetUsersQuery(filters, {
+    pollingInterval: isPageVisible ? 30000 : 0, // Only poll when tab is visible
+    refetchOnMountOrArgChange: 300, // 5 minutes
+  });
 
   const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
   const [updateUser, { isLoading: isUpdating }] = useUpdateUserMutation();
   const [resetPassword, { isLoading: isResetting }] = useResetUserPasswordMutation();
-  const [promoteUser, { isLoading: isPromoting }] = usePromoteUserMutation(); // NEW
+  const [promoteUser, { isLoading: isPromoting }] = usePromoteUserMutation();
 
-  // Permission checks
-  const canCreateUsers = hasPermission(currentUserRole, PERMISSIONS.USER_CREATE_ANY) ||
-                        hasPermission(currentUserRole, PERMISSIONS.USER_CREATE_PRODUCT) ||
-                        hasPermission(currentUserRole, PERMISSIONS.USER_CREATE_COMPLIANCE);
+  // OPTIMIZED: Memoize permission checks
+  const canCreateUsers = useMemo(() => 
+    hasPermission(currentUserRole, PERMISSIONS.USER_CREATE_ANY) ||
+    hasPermission(currentUserRole, PERMISSIONS.USER_CREATE_PRODUCT) ||
+    hasPermission(currentUserRole, PERMISSIONS.USER_CREATE_COMPLIANCE),
+    [currentUserRole]
+  );
   
-  const canUpdateUsers = hasPermission(currentUserRole, PERMISSIONS.USER_UPDATE_ANY) ||
-                        hasPermission(currentUserRole, PERMISSIONS.USER_UPDATE_TEAM);
+  const canUpdateUsers = useMemo(() =>
+    hasPermission(currentUserRole, PERMISSIONS.USER_UPDATE_ANY) ||
+    hasPermission(currentUserRole, PERMISSIONS.USER_UPDATE_TEAM),
+    [currentUserRole]
+  );
   
-  const canResetPasswords = hasPermission(currentUserRole, PERMISSIONS.USER_RESET_PASSWORD);
-  const canPromoteUsers = hasPermission(currentUserRole, PERMISSIONS.USER_PROMOTE); // NEW
-  const canViewAllUsers = hasPermission(currentUserRole, PERMISSIONS.USER_READ_ALL);
+  const canResetPasswords = useMemo(() =>
+    hasPermission(currentUserRole, PERMISSIONS.USER_RESET_PASSWORD),
+    [currentUserRole]
+  );
 
-  // Extract data from response
-  const users = usersResponse?.users || [];
-  const pagination = usersResponse?.pagination || {};
+  const canPromoteUsers = useMemo(() =>
+    hasPermission(currentUserRole, PERMISSIONS.USER_PROMOTE),
+    [currentUserRole]
+  );
 
-  // Auto-refresh data periodically
-  useEffect(() => {
-    const interval = setInterval(() => {
-      refetch();
-    }, 30000); // Refresh every 30 seconds
+  const canViewAllUsers = useMemo(() =>
+    hasPermission(currentUserRole, PERMISSIONS.USER_READ_ALL),
+    [currentUserRole]
+  );
 
-    return () => clearInterval(interval);
-  }, [refetch]);
+  // OPTIMIZED: Memoize derived data
+  const users = useMemo(() => usersResponse?.users || [], [usersResponse?.users]);
+  const pagination = useMemo(() => usersResponse?.pagination || {}, [usersResponse?.pagination]);
 
-  // Utility functions
-  const getRoleBadgeClass = (role) => {
+  // OPTIMIZED: Memoize utility functions
+  const getRoleBadgeClass = useCallback((role) => {
     switch (role) {
       case USER_ROLES.PRODUCT_USER:
         return 'badge-primary';
@@ -94,34 +118,34 @@ const UserManagement = () => {
       default:
         return 'badge-ghost';
     }
-  };
+  }, []);
 
-  const getStatusBadgeClass = (isActive) => {
+  const getStatusBadgeClass = useCallback((isActive) => {
     return isActive ? 'badge-success' : 'badge-error';
-  };
+  }, []);
 
-  const formatDate = (dateString) => {
+  const formatDate = useCallback((dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
     });
-  };
+  }, []);
 
-  // Filter handlers
-  const handleFilterChange = (key, value) => {
+  // OPTIMIZED: Memoize filter handlers
+  const handleFilterChange = useCallback((key, value) => {
     setFilters(prev => ({
       ...prev,
       [key]: value,
-      page: 1 // Reset to first page when filtering
+      page: 1
     }));
-  };
+  }, []);
 
-  const handleSearch = (searchTerm) => {
+  const handleSearch = useCallback((searchTerm) => {
     handleFilterChange('search', searchTerm);
-  };
+  }, [handleFilterChange]);
 
-  const handleClearFilters = () => {
+  const handleClearFilters = useCallback(() => {
     setFilters({
       search: '',
       role: '',
@@ -130,12 +154,11 @@ const UserManagement = () => {
       page: 1,
       limit: 20
     });
-  };
+  }, []);
 
-  // CRUD operations - Updated to match new backend
-  const handleCreateUser = async (userData) => {
+  // OPTIMIZED: Memoize CRUD handlers
+  const handleCreateUser = useCallback(async (userData) => {
     try {
-      // Role-based user creation restrictions
       const allowedRoles = [];
       if (hasPermission(currentUserRole, PERMISSIONS.USER_CREATE_ANY)) {
         allowedRoles.push(...Object.values(USER_ROLES));
@@ -152,7 +175,7 @@ const UserManagement = () => {
         throw new Error(`You don't have permission to create users with role: ${userData.role}`);
       }
 
-      const result = await createUser({
+      await createUser({
         username: userData.username,
         email: userData.email,
         password: userData.password,
@@ -162,14 +185,14 @@ const UserManagement = () => {
       }).unwrap();
 
       setModals(prev => ({ ...prev, createUser: false }));
-      refetch();
+      // Optimistic update handles cache refresh
     } catch (error) {
       console.error('Failed to create user:', error);
-      throw error; // Re-throw to let modal handle error display
+      throw error;
     }
-  };
+  }, [currentUserRole, createUser]);
 
-  const handleEditUser = async (userData) => {
+  const handleEditUser = useCallback(async (userData) => {
     try {
       const result = await updateUser({ 
         id: selectedUser.id, 
@@ -178,9 +201,7 @@ const UserManagement = () => {
 
       setModals(prev => ({ ...prev, editUser: false }));
       setSelectedUser(null);
-      refetch();
 
-      // Show promotion change notification if role changed
       if (result.changes?.roleChanged) {
         console.log(`User promoted from ${result.changes.previousRole} to ${result.changes.newRole}`);
       }
@@ -188,27 +209,28 @@ const UserManagement = () => {
       console.error('Failed to update user:', error);
       throw error;
     }
-  };
+  }, [selectedUser, updateUser]);
 
-  const handlePromoteUser = async (promotionData) => {
-    try {
-      const result = await promoteUser({
-        id: selectedUser.id,
-        newRole: promotionData.newRole,
-        reason: promotionData.reason
-      }).unwrap();
+const handlePromoteUser = useCallback(async (promotionData) => {
+  try {
+    const result = await promoteUser({
+      id: selectedUser.id,
+      newRole: promotionData.newRole,
+      reason: promotionData.reason
+    }).unwrap();
 
-      setSelectedUser(null);
-      refetch();
+    // FIXED: Close the modal after promotion
+    setModals(prev => ({ ...prev, userDetail: false }));
+    setSelectedUser(null);
+    
+    console.log(`User promoted from ${result.changes.previousRole} to ${result.changes.newRole}`);
+  } catch (error) {
+    console.error('Failed to promote user:', error);
+    throw error;
+  }
+}, [selectedUser, promoteUser]);
 
-      console.log(`User promoted from ${result.changes.previousRole} to ${result.changes.newRole}`);
-    } catch (error) {
-      console.error('Failed to promote user:', error);
-      throw error;
-    }
-  };
-
-  const handleResetPassword = async (passwordData) => {
+  const handleResetPassword = useCallback(async (passwordData) => {
     try {
       await resetPassword({ 
         id: selectedUser.id, 
@@ -221,22 +243,10 @@ const UserManagement = () => {
       console.error('Failed to reset password:', error);
       throw error;
     }
-  };
+  }, [selectedUser, resetPassword]);
 
-  // Export functionality - Updated for new response structure
-  const handleExport = async () => {
-    setIsExporting(true);
-    try {
-      const csvContent = convertToCSV(users);
-      downloadCSV(csvContent, `users_export_${new Date().toISOString().split('T')[0]}.csv`);
-    } catch (error) {
-      console.error('Export failed:', error);
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const convertToCSV = (data) => {
+  // OPTIMIZED: Memoize export functions
+  const convertToCSV = useCallback((data) => {
     if (!data.length) return '';
     
     const headers = ['Name', 'Email', 'Username', 'Role', 'Status', 'Team', 'Created At'];
@@ -256,9 +266,9 @@ const UserManagement = () => {
     });
     
     return csvRows.join('\n');
-  };
+  }, [formatDate]);
 
-  const downloadCSV = (content, filename) => {
+  const downloadCSV = useCallback((content, filename) => {
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -268,25 +278,54 @@ const UserManagement = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
+  }, []);
 
-  // Modal handlers
-  const openModal = (modalName, user = null) => {
+  const handleExport = useCallback(async () => {
+    setIsExporting(true);
+    try {
+      const csvContent = convertToCSV(users);
+      downloadCSV(csvContent, `users_export_${new Date().toISOString().split('T')[0]}.csv`);
+    } catch (error) {
+      console.error('Export failed:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  }, [users, convertToCSV, downloadCSV]);
+
+  // OPTIMIZED: Memoize modal handlers
+  const openModal = useCallback((modalName, user = null) => {
     setSelectedUser(user);
     setModals(prev => ({ ...prev, [modalName]: true }));
-  };
+  }, []);
 
-  const closeModal = (modalName) => {
+  const closeModal = useCallback((modalName) => {
     setModals(prev => ({ ...prev, [modalName]: false }));
     setSelectedUser(null);
-  };
+  }, []);
 
-  // Pagination handlers
-  const handlePageChange = (newPage) => {
+  // OPTIMIZED: Memoize pagination handler
+  const handlePageChange = useCallback((newPage) => {
     setFilters(prev => ({ ...prev, page: newPage }));
-  };
+  }, []);
 
-  // Loading state
+  // OPTIMIZED: Memoize pagination display text
+  const paginationText = useMemo(() => {
+    if (pagination.totalCount > 0) {
+      const start = ((pagination.page - 1) * pagination.limit) + 1;
+      const end = Math.min(pagination.page * pagination.limit, pagination.totalCount);
+      return `Showing ${start} to ${end} of ${pagination.totalCount} users`;
+    }
+    return '';
+  }, [pagination]);
+
+  // OPTIMIZED: Memoize empty state message
+  const emptyStateMessage = useMemo(() => {
+    if (filters.search || filters.role || filters.team || filters.isActive) {
+      return 'No users match your current filters. Try adjusting your search criteria.';
+    }
+    return 'No users have been created yet. Click "Create User" to add the first user.';
+  }, [filters]);
+
   if (isLoading && !users.length) {
     return (
       <div className="container-lg section-md">
@@ -302,7 +341,6 @@ const UserManagement = () => {
     );
   }
 
-  // Error state
   if (isError) {
     return (
       <div className="container-lg section-md">
@@ -329,7 +367,6 @@ const UserManagement = () => {
   return (
     <div className="container-lg section-md">
       <div className="card">
-        {/* Header */}
         <div className="card-header">
           <div className="flex-between">
             <div>
@@ -353,10 +390,8 @@ const UserManagement = () => {
           </div>
         </div>
 
-        {/* Filters */}
         <div className="card-body border-b border-gray-100">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            {/* Search */}
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
@@ -372,7 +407,6 @@ const UserManagement = () => {
               />
             </div>
 
-            {/* Role Filter */}
             <select
               className="input"
               value={filters.role}
@@ -387,7 +421,6 @@ const UserManagement = () => {
               <option value={USER_ROLES.ADMIN}>Administrator</option>
             </select>
 
-            {/* Status Filter - Updated to match backend boolean format */}
             <select
               className="input"
               value={filters.isActive}
@@ -398,7 +431,6 @@ const UserManagement = () => {
               <option value="false">Inactive</option>
             </select>
 
-            {/* Team Filter */}
             <input
               type="text"
               className="input"
@@ -408,16 +440,9 @@ const UserManagement = () => {
             />
           </div>
 
-          {/* Filter Actions */}
           <div className="flex-between">
             <div className="text-sm text-gray-600">
-              {pagination.totalCount > 0 && (
-                <>
-                  Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
-                  {Math.min(pagination.page * pagination.limit, pagination.totalCount)} of{' '}
-                  {pagination.totalCount} users
-                </>
-              )}
+              {paginationText}
             </div>
             <div className="flex gap-2">
               <button
@@ -452,7 +477,6 @@ const UserManagement = () => {
           </div>
         </div>
 
-        {/* User Table */}
         <div className="table-container">
           <table className="table table-modern">
             <thead className="table-header">
@@ -554,12 +578,7 @@ const UserManagement = () => {
                         <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
                       </svg>
                       <h3 className="table-empty-title">No Users Found</h3>
-                      <p className="table-empty-description">
-                        {filters.search || filters.role || filters.team || filters.isActive ? 
-                          'No users match your current filters. Try adjusting your search criteria.' :
-                          'No users have been created yet. Click "Create User" to add the first user.'
-                        }
-                      </p>
+                      <p className="table-empty-description">{emptyStateMessage}</p>
                     </div>
                   </td>
                 </tr>
@@ -568,7 +587,6 @@ const UserManagement = () => {
           </table>
         </div>
 
-        {/* Pagination */}
         {pagination.totalPages > 1 && (
           <div className="card-body border-t border-gray-100">
             <div className="flex-between">
@@ -610,7 +628,6 @@ const UserManagement = () => {
         )}
       </div>
 
-      {/* Modals */}
       <CreateUserModal
         isOpen={modals.createUser}
         onClose={() => closeModal('createUser')}

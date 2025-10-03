@@ -1,17 +1,19 @@
-import React, { useState } from 'react';
+// src/components/Admin/UserManagement/UserManagementMain.jsx - OPTIMIZED VERSION
+import React, { useState, useMemo, useCallback } from 'react';
 import UserManagement from './UserManagement';
 import AbsenceTracker from './AbsenceTracker';
 
 const UserManagementMain = () => {
   const [activeTab, setActiveTab] = useState('user-management');
 
-  const tabs = [
+  // OPTIMIZED: Memoize tabs array
+  const tabs = useMemo(() => [
     {
       id: 'user-management',
       label: 'User Management',
       icon: (
         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-          <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
         </svg>
       )
     },
@@ -24,9 +26,15 @@ const UserManagementMain = () => {
         </svg>
       )
     }
-  ];
+  ], []);
 
-  const renderContent = () => {
+  // OPTIMIZED: Memoize tab change handler
+  const handleTabChange = useCallback((tabId) => {
+    setActiveTab(tabId);
+  }, []);
+
+  // OPTIMIZED: Memoize rendered content
+  const renderContent = useMemo(() => {
     switch (activeTab) {
       case 'user-management':
         return <UserManagement />;
@@ -35,11 +43,10 @@ const UserManagementMain = () => {
       default:
         return <UserManagement />;
     }
-  };
+  }, [activeTab]);
 
   return (
     <div className="container-lg section-md">
-      {/* Tabs Navigation */}
       <div className="tabs mb-6">
         {tabs.map((tab) => (
           <div
@@ -47,7 +54,7 @@ const UserManagementMain = () => {
             className={`tab flex items-center gap-2 cursor-pointer ${
               activeTab === tab.id ? 'tab-active' : 'tab-inactive'
             }`}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => handleTabChange(tab.id)}
           >
             {tab.icon}
             <span>{tab.label}</span>
@@ -55,9 +62,8 @@ const UserManagementMain = () => {
         ))}
       </div>
 
-      {/* Tab Content */}
       <div className="fade-in">
-        {renderContent()}
+        {renderContent}
       </div>
     </div>
   );

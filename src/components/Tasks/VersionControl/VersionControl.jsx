@@ -654,6 +654,110 @@ const VersionControl = ({ task, onRefresh }) => {
                   </div>
                 </div>
               )}
+
+              {/* NEW: Exchange Approvals Section - Only for Exchange Type Tasks */}
+        {task?.taskType === 'EXCHANGE' && selectedVersion.exchangeApprovals && selectedVersion.exchangeApprovals.length > 0 && (
+          <div className="mt-6 pt-4 border-t border-purple-200">
+            <div className="flex items-center gap-2 mb-3">
+              <svg className="w-5 h-5 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              <span className="text-base font-semibold text-purple-900">
+                Exchange Approvals ({selectedVersion.exchangeApprovals.length})
+              </span>
+              {selectedVersion.exchangeApprovals.every(a => a.approvalStatus === 'APPROVED') && (
+                <span className="badge badge-success ml-auto">All Approved</span>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              {selectedVersion.exchangeApprovals.map((approval, index) => (
+                <div key={approval.id || index} className="bg-white rounded-lg border border-purple-200 p-3">
+                  {/* Exchange Header */}
+                  <div className="flex-between items-start mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900">{approval.exchangeName}</span>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        approval.approvalStatus === 'APPROVED' ? 'bg-green-100 text-green-800' :
+                        approval.approvalStatus === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                        approval.approvalStatus === 'REJECTED' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {approval.approvalStatus === 'NOT_SENT' ? 'Not Sent' :
+                         approval.approvalStatus === 'PENDING' ? 'Pending' :
+                         approval.approvalStatus === 'APPROVED' ? 'Approved' :
+                         approval.approvalStatus === 'REJECTED' ? 'Rejected' :
+                         approval.approvalStatus}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Exchange Details */}
+                  <div className="space-y-1 text-sm">
+                    {approval.approvalDate && (
+                      <div className="flex gap-2">
+                        <span className="text-gray-600 min-w-[100px]">Approval Date:</span>
+                        <span className="text-gray-900">
+                          {new Date(approval.approvalDate).toLocaleDateString('en-US', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {approval.expiryDate && (
+                      <div className="flex gap-2">
+                        <span className="text-gray-600 min-w-[100px]">Expiry Date:</span>
+                        <span className="text-gray-900">
+                          {new Date(approval.expiryDate).toLocaleDateString('en-US', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {approval.referenceNumber && (
+                      <div className="flex gap-2">
+                        <span className="text-gray-600 min-w-[100px]">Reference No:</span>
+                        <span className="text-gray-900 font-medium">{approval.referenceNumber}</span>
+                      </div>
+                    )}
+
+                    {approval.approvalEmailUrl && (
+                      <div className="flex gap-2">
+                        <span className="text-gray-600 min-w-[100px]">Approval Doc:</span>
+                        <a 
+                          href={approval.approvalEmailUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-blue-600 hover:text-blue-800"
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                          {approval.emailFileName || 'Download'}
+                        </a>
+                      </div>
+                    )}
+
+                    {approval.updatedBy && (
+                      <div className="flex gap-2">
+                        <span className="text-gray-600 min-w-[100px]">Updated By:</span>
+                        <span className="text-gray-900 text-xs">{approval.updatedBy.fullName}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+         
               
               {/* Version Statistics */}
               <div className="mt-4 p-3 bg-white rounded border">
