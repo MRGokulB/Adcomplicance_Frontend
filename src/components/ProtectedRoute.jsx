@@ -25,12 +25,13 @@ const ProtectedRoute = ({
   const userRole = useSelector(selectUserRole)
 
   // Verify session with server on mount
+  // IMPORTANT: Don't skip this check - we need to verify session even if Redux state is cleared
   const { 
     data: currentUserData, 
     isLoading: isCheckingSession,
     error: sessionError 
   } = useGetCurrentUserQuery(undefined, {
-    skip: !isAuthenticated, // Only check if we think we're authenticated
+    skip: false, // Always check session on mount (handles page refresh)
   })
 
   // Initialize auth on component mount
@@ -46,7 +47,7 @@ const ProtectedRoute = ({
   }, [sessionError, dispatch])
 
   // Show loading while checking authentication or session
-  if (isLoading || isCheckingSession) {
+  if (isCheckingSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -57,8 +58,8 @@ const ProtectedRoute = ({
     )
   }
 
-  // Redirect to login if not authenticated or session invalid
-  if (!isAuthenticated || sessionError) {
+  // Redirect to login if session check failed or user not authenticated
+  if (sessionError || (!isAuthenticated && !currentUserData)) {
     return <Navigate to={fallbackPath} state={{ from: location }} replace />
   }
 

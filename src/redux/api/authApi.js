@@ -1,6 +1,7 @@
 // src/redux/api/authApi.js
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 import { logout, setCredentials } from '../slices/authSlice'
+import { getCsrfTokenFromCookie } from '../../utils/csrf'
 
 const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/`
 console.log('Auth API Base URL:', apiUrl)
@@ -9,14 +10,14 @@ const baseQuery = fetchBaseQuery({
   baseUrl: apiUrl,
   credentials: 'include', // Important for session cookies
   prepareHeaders: (headers, { getState }) => {
-    // Get token from auth state
+    // Get token from auth state (for JWT-based auth if needed)
     const token = getState().auth.token;
     if (token) {
       headers.set('authorization', `Bearer ${token}`);
     }
     
-    // Add CSRF token for non-GET requests
-    const csrfToken = window.csrfToken;
+    // Add CSRF token from Redux state or cookie
+    const csrfToken = getState().csrf.token || getCsrfTokenFromCookie();
     if (csrfToken) {
       headers.set('X-CSRF-Token', csrfToken);
     }
@@ -46,8 +47,16 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
       
       if (csrfResponse.ok) {
         const data = await csrfResponse.json();
-        window.csrfToken = data.csrfToken;
-        console.log('✅ New CSRF token fetched, retrying request...');
+        // Token is now in cookie, update Redux state
+        const { setCsrfToken } = await import('../slices/csrfSlice');
+        const tokenFromCookie = getCsrfTokenFromCookie();
+        if (tokenFromCookie) {
+          api.dispatch(setCsrfToken(tokenFromCookie));
+          console.log('✅ New CSRF token fetched from cookie, retrying request...');
+        } else {
+          api.dispatch(setCsrfToken(data.csrfToken));
+          console.log('✅ New CSRF token fetched from response, retrying request...');
+        }
         
         // Retry the original request with new token
         result = await baseQuery(args, api, extraOptions);

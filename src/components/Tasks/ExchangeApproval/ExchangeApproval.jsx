@@ -316,11 +316,7 @@ const ExchangeApproval = ({ task, onRefresh }) => {
           <p className="text-sm text-gray-600 mt-1">
             Manage approvals for different exchanges (NSE, BSE, MCX, NCDEX)
           </p>
-          {allApprovalsApproved && approvals.length > 0 && (
-            <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-800">
-              ✅ All exchange approvals completed - Task can be approved by compliance
-            </div>
-          )}
+          {allApprovalsApproved && approvals.length > 0 }
         </div>
         {canManage && getAvailableExchanges().length > 0 && (
           <button 
@@ -617,13 +613,7 @@ const ExchangeApproval = ({ task, onRefresh }) => {
             <li>• Set status to "Approved" and Submit when officially approved</li>
             <li>• Upload approval emails/documents for audit trail</li>
             <li>• All exchanges must be "Approved" before task can be approved</li>
-          </ul>
-          
-          {!canManage && (
-            <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
-              <strong>Note:</strong> You can view exchange approvals but cannot modify them. Only assigned compliance users can make changes.
-            </div>
-          )}
+          </ul> 
         </div>
       )}
     </div>

@@ -1,5 +1,8 @@
 // src/context/CSRFContext.jsx
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { setCsrfToken, clearCsrfToken, setCsrfLoading, setCsrfError } from '../redux/slices/csrfSlice';
+import { fetchCsrfToken, getCsrfTokenFromCookie } from '../utils/csrf';
 
 const CSRFContext = createContext();
 
@@ -12,51 +15,77 @@ export const useCSRF = () => {
 };
 
 export const CSRFProvider = ({ children }) => {
-  const [csrfToken, setCsrfToken] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const dispatch = useDispatch();
+  const csrfToken = useSelector((state) => state.csrf.token);
+  const isLoading = useSelector((state) => state.csrf.isLoading);
+  const error = useSelector((state) => state.csrf.error);
 
-  const fetchCSRFToken = async () => {
-    setIsLoading(true);
+  const fetchToken = async () => {
+    dispatch(setCsrfLoading(true));
+    
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/csrf-token`,
-        {
-          credentials: 'include', // Important for cookies
-        }
-      );
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const result = await fetchCsrfToken(apiUrl);
       
-      if (response.ok) {
-        const data = await response.json();
-        setCsrfToken(data.csrfToken);
-        // Set global variable for RTK Query access
-        window.csrfToken = data.csrfToken;
-        console.log('✅ CSRF token fetched and set globally');
+      if (result.success) {
+        // Token is now in cookie, read it from there
+        const tokenFromCookie = getCsrfTokenFromCookie();
+        if (tokenFromCookie) {
+          dispatch(setCsrfToken(tokenFromCookie));
+          console.log('✅ CSRF token fetched and stored in Redux from cookie');
+        } else {
+          // Fallback to token from response
+          dispatch(setCsrfToken(result.token));
+          console.log('✅ CSRF token fetched and stored in Redux from response');
+        }
       } else {
-        console.error('❌ Failed to fetch CSRF token:', response.status);
+        dispatch(setCsrfError(result.error));
+        console.error('❌ Failed to fetch CSRF token:', result.error);
       }
     } catch (error) {
+      dispatch(setCsrfError(error.message));
       console.error('❌ Error fetching CSRF token:', error);
     } finally {
-      setIsLoading(false);
+      dispatch(setCsrfLoading(false));
     }
   };
 
-  const clearCSRFToken = () => {
-    setCsrfToken(null);
-    window.csrfToken = null;
-    console.log('🧹 CSRF token cleared');
+  const clearToken = () => {
+    dispatch(clearCsrfToken());
+    console.log('🧹 CSRF token cleared from Redux');
+  };
+
+  const refreshToken = async () => {
+    // Check if token exists in cookie first
+    const tokenFromCookie = getCsrfTokenFromCookie();
+    if (tokenFromCookie) {
+      dispatch(setCsrfToken(tokenFromCookie));
+      console.log('✅ CSRF token refreshed from cookie');
+    } else {
+      // If not in cookie, fetch from server
+      await fetchToken();
+    }
   };
 
   useEffect(() => {
-    // Fetch CSRF token on mount
-    fetchCSRFToken();
+    // On mount, try to get token from cookie first
+    const tokenFromCookie = getCsrfTokenFromCookie();
+    if (tokenFromCookie) {
+      dispatch(setCsrfToken(tokenFromCookie));
+      console.log('✅ CSRF token loaded from cookie on mount');
+    } else {
+      // If no token in cookie, fetch from server
+      fetchToken();
+    }
   }, []);
 
   const value = {
     csrfToken,
     isLoading,
-    // fetchCSRFToken,
-    clearCSRFToken,
+    error,
+    fetchToken,
+    clearToken,
+    refreshToken,
   };
 
   return (

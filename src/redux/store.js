@@ -1,6 +1,7 @@
 import { configureStore } from '@reduxjs/toolkit'
 import { setupListeners } from '@reduxjs/toolkit/query'
 import authReducer from './slices/authSlice'
+import csrfReducer from './slices/csrfSlice'
 import { authApi } from './api/authApi'
 import { usersApi } from './api/usersApi'
 import { tasksApi } from './api/tasksApi'
@@ -28,6 +29,7 @@ const apiReducers = {
 // Combine all feature reducers
 const featureReducers = {
   auth: authReducer,
+  csrf: csrfReducer,
 }
 
 export const store = configureStore({
