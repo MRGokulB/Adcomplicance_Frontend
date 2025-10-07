@@ -475,7 +475,7 @@ const ExchangeApproval = ({ task, onRefresh }) => {
                     type="file"
                     className="hidden"
                     onChange={(e) => handleFileSelect(approval.id, e.target.files[0])}
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.eml,.msg"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.eml,.msg,.excel,.csv,.xls,.xlsx,.txt"
                     disabled={isUpdating || isUploading}
                   />
                 </label>

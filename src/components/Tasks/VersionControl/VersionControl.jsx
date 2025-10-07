@@ -86,7 +86,7 @@ const VersionControl = ({ task, onRefresh }) => {
         };
       case 'PRODUCT_REVIEW':
         return {
-          message: 'Upload revised version addressing compliance feedback, then manually update status to Compliance Review',
+          message: 'now manually update status to Compliance Review',
           type: 'info'
         };
       case 'COMPLIANCE_REVIEW':
@@ -815,7 +815,7 @@ const VersionControl = ({ task, onRefresh }) => {
                   ref={fileInputRef}
                   multiple
                   onChange={handleFileChange}
-                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.mp4,.avi,.mov"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.mp4,.avi,.mov,.excel,.csv,.txt"
                 />
                 
                 {/* File Preview */}
@@ -975,7 +975,7 @@ const VersionControl = ({ task, onRefresh }) => {
                 <div className="mt-3 text-xs text-gray-500">
                   <p className="mb-1">• Supported formats: PDF, DOC, DOCX, JPG, PNG, GIF, MP4, AVI, MOV</p>
                   <p className="mb-1">• Maximum 5 files per version</p>
-                  <p className="mb-1">• Maximum file size: 50MB per file</p> 
+                  <p className="mb-1">• Maximum file size: 200MB per file</p> 
                 </div>
               </>
             ) : (

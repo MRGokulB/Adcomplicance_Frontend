@@ -21,6 +21,10 @@ import {
   getClosureActions
 } from '../../../utils/roles';
 import TaskReassignmentModal from '../../AllTasks/TaskReassignmentModal';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 
 const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
   const userRole = useSelector(selectUserRole);
@@ -663,15 +667,40 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
             </div>
 
             {task.description && (
-              <div className="mb-4">
-                <label className="exchange-form-label">Description</label>
-                <div className="bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                    {task.description}
-                  </p>
-                </div>
-              </div>
-            )}
+  <div className="mb-4">
+    <label className="exchange-form-label">Description</label>
+    <div className="bg-gray-50 rounded-lg p-3"> 
+      <div className="prose prose-sm max-w-none">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          rehypePlugins={[rehypeRaw, rehypeSanitize]}
+          components={{
+            a: ({ node, ...props }) => (
+              <a
+                {...props}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 underline"
+              />
+            ),
+            p: ({ node, ...props }) => (
+              <p {...props} className="mb-2 last:mb-0 text-sm text-gray-700" />
+            ),
+            ul: ({ node, ...props }) => (
+              <ul {...props} className="list-disc list-inside mb-2 text-sm" />
+            ),
+            ol: ({ node, ...props }) => (
+              <ol {...props} className="list-decimal list-inside mb-2 text-sm" />
+            ),
+          }}
+        >
+          {task.description}
+        </ReactMarkdown>
+      </div>
+    </div>
+  </div>
+)}
+
 
             {/* Assignments */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">

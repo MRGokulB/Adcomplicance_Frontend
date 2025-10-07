@@ -1,4 +1,3 @@
-// src/components/Tasks/NewTask.jsx - OPTIMIZED VERSION
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { selectCurrentUser, selectUserRole } from '../../redux/slices/authSlice';
@@ -6,6 +5,10 @@ import { useCreateTaskMutation } from '../../redux/api/tasksApi';
 import { useGetUsersQuery } from '../../redux/api/usersApi';
 import { useUploadFilesMutation } from '../../redux/api/uploadApi';
 import { hasPermission, PERMISSIONS, USER_ROLES } from '../../utils/roles';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 
 // OPTIMIZED: Validation function memoized outside component
 const validateFormField = (field, value, allValues) => {
@@ -410,18 +413,55 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
                 </div>
               </div>
 
-              {/* Description */}
+              {/* Description with Markdown Support */}
               <div>
-                <label className="exchange-form-label">Description *</label>
+                <label className="exchange-form-label">
+                  Description * 
+                </label>
                 <textarea
-                  className={`input resize-none ${errors.description ? 'border-red-300 focus:border-red-500' : ''}`}
+                  className={`input resize-none font-mono ${errors.description ? 'border-red-300 focus:border-red-500' : ''}`}
                   rows="4"
-                  placeholder="Describe the task details"
+                  placeholder="Describe the task details."
                   value={formData.description}
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   disabled={isSubmitting}
                   maxLength={1000}
                 />
+                
+                {/* Markdown Preview */}
+                {formData.description && (
+                  <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="text-xs font-medium text-gray-600 mb-2">Preview:</div>
+                    <div className="prose prose-sm max-w-none">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                        components={{
+                          a: ({ node, ...props }) => (
+                            <a
+                              {...props}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 underline"
+                            />
+                          ),
+                          p: ({ node, ...props }) => (
+                            <p {...props} className="mb-2 last:mb-0" />
+                          ),
+                          ul: ({ node, ...props }) => (
+                            <ul {...props} className="list-disc list-inside mb-2" />
+                          ),
+                          ol: ({ node, ...props }) => (
+                            <ol {...props} className="list-decimal list-inside mb-2" />
+                          ),
+                        }}
+                      >
+                        {formData.description}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="flex justify-between items-center mt-1">
                   {errors.description && (
                     <p className="text-sm text-red-600">{errors.description}</p>
@@ -579,7 +619,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
                 <input
                   type="file"
                   multiple
-                  accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx"
+                  accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.text"
                   onChange={handleFileChange}
                   className={`input ${errors.selectedFiles ? 'border-red-300 focus:border-red-500' : ''}`}
                   style={{ padding: '8px' }}

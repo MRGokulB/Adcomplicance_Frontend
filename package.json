@@ -15,9 +15,13 @@
     "prop-types": "^15.8.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-markdown": "^10.1.0",
     "react-redux": "^9.0.4",
     "react-router-dom": "^7.7.1",
     "redux-logger": "^3.0.6",
+    "rehype-raw": "^7.0.0",
+    "rehype-sanitize": "^6.0.0",
+    "remark-gfm": "^4.0.1",
     "socket.io-client": "^4.7.5"
   },
   "devDependencies": {

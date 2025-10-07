@@ -5,6 +5,10 @@ import { useSelector } from 'react-redux';
 import { selectUserRole } from '../../redux/slices/authSlice';
 import { useGetTaskByIdQuery } from '../../redux/api/tasksApi';
 import { hasPermission, PERMISSIONS } from '../../utils/roles';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 
 const TaskDetailPanel = ({ taskId, onClose }) => {
     const navigate = useNavigate();
@@ -135,11 +139,38 @@ const TaskDetailPanel = ({ taskId, onClose }) => {
                             </div>
                         )}
                         {task.description && (
-                            <div className="info-row">
-                                <span className="info-label">Description:</span>
-                                <span className="info-value">{task.description}</span>
+                            <div className="info-row flex-col items-start">
+                                <span className="info-label mb-2">Description:</span>
+                                <div className="info-value w-full bg-gray-50 rounded-lg p-3">
+                                    <div className="prose prose-sm max-w-none">
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm]}
+                                            rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                                            components={{
+                                                a: ({ node, ...props }) => (
+                                                    <a
+                                                        {...props}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-600 hover:text-blue-800 underline"
+                                                    />
+                                                ),
+                                                p: ({ node, ...props }) => (
+                                                    <p {...props} className="mb-2 last:mb-0 text-sm text-gray-700" />
+                                                ),
+                                                ul: ({ node, ...props }) => (
+                                                    <ul {...props} className="list-disc list-inside mb-2 text-sm" />
+                                                ),
+                                                ol: ({ node, ...props }) => (
+                                                    <ol {...props} className="list-decimal list-inside mb-2 text-sm" />
+                                                ),
+                                            }}
+                                        >
+                                            {task.description}
+                                        </ReactMarkdown>
+                                    </div>
+                                </div>
                             </div>
-                            
                         )}
                         <div className="info-row">
                             <span className="info-label">Created:</span>
