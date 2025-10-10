@@ -1,5 +1,6 @@
 // src/redux/api/uploadApi.js - Updated with Redux CSRF
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { refreshCsrfToken } from './csrfRefreshHandler';
 
 const baseQuery = fetchBaseQuery({
   baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/upload/`,
@@ -9,52 +10,34 @@ const baseQuery = fetchBaseQuery({
     if (token) {
       headers.set('authorization', `Bearer ${token}`);
     }
-    
+
     // FIXED: Read CSRF token from Redux state instead of window
     const csrfToken = getState().csrf?.token;
     if (csrfToken) {
       headers.set('X-CSRF-Token', csrfToken);
     }
-    
+
     return headers;
   },
 });
 
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
-   
+
   if (result?.error?.status === 401) {
     api.dispatch({ type: 'auth/logout' });
   }
-  
-  // Handle 403 CSRF token errors - refresh token and retry
-  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) { 
-    try {
-      const csrfResponse = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/csrf-token`,
-        { credentials: 'include' }
-      );
-      
-      if (csrfResponse.ok) {
-        const data = await csrfResponse.json();
-        
-        // FIXED: Update Redux state instead of window variable
-        const { setCsrfToken } = await import('../slices/csrfSlice');
-        const { getCsrfTokenFromCookie } = await import('../../utils/csrf');
-        
-        const tokenFromCookie = getCsrfTokenFromCookie();
-        api.dispatch(setCsrfToken(tokenFromCookie || data.csrfToken));
-        
-        console.log('✅ CSRF token refreshed in uploadApi');
-        
-        // Retry the original request with new token
-        result = await baseQuery(args, api, extraOptions);
-      }
-    } catch (error) {
-      console.error('❌ Failed to refresh CSRF token:', error);
+
+  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
+    console.log('🔄 CSRF token invalid in tasksApi, refreshing...');
+
+    const success = await refreshCsrfToken(api);
+
+    if (success) {
+      result = await baseQuery(args, api, extraOptions);
     }
   }
-  
+
   return result;
 };
 
@@ -99,7 +82,7 @@ export const uploadApi = createApi({
     }),
 
     getSignedUrl: builder.query({
-      query: ({ s3Key, expires = 3600 }) => 
+      query: ({ s3Key, expires = 3600 }) =>
         `signed-url/${encodeURIComponent(s3Key)}?expires=${expires}`,
       transformResponse: (response) => response,
       keepUnusedDataFor: 300,
@@ -118,7 +101,7 @@ export const uploadApi = createApi({
     }),
 
     listFiles: builder.query({
-      query: ({ prefix, limit = 10 }) => 
+      query: ({ prefix, limit = 10 }) =>
         `list/${encodeURIComponent(prefix)}?limit=${limit}`,
       providesTags: ['Upload'],
       transformResponse: (response) => response,

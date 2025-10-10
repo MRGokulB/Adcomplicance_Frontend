@@ -1,5 +1,6 @@
 // src/redux/api/systemApi.js - Session-based (public endpoints)
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { refreshCsrfToken } from './csrfRefreshHandler';
 
 const baseQuery = fetchBaseQuery({
   baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/`,
@@ -10,53 +11,34 @@ const baseQuery = fetchBaseQuery({
     if (token) {
       headers.set('authorization', `Bearer ${token}`);
     }
-    
+
     // FIXED: Read CSRF token from Redux state
     const csrfToken = getState().csrf?.token;
     if (csrfToken) {
       headers.set('X-CSRF-Token', csrfToken);
     }
-    
+
     return headers;
   }
 });
 
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
-  
-  // Handle 401 unauthorized responses
+
   if (result?.error?.status === 401) {
     api.dispatch({ type: 'auth/logout' });
   }
-  
-  // Handle 403 CSRF token errors - refresh token and retry
-  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {    
-    try {
-      const csrfResponse = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/csrf-token`,
-        { credentials: 'include' }
-      );
-      
-      if (csrfResponse.ok) {
-        const data = await csrfResponse.json();
-        
-        // FIXED: Update Redux state instead of window variable
-        const { setCsrfToken } = await import('../slices/csrfSlice');
-        const { getCsrfTokenFromCookie } = await import('../../utils/csrf');
-        
-        const tokenFromCookie = getCsrfTokenFromCookie();
-        api.dispatch(setCsrfToken(tokenFromCookie || data.csrfToken));
-        
-        console.log('✅ CSRF token refreshed in systemApi');
-        
-        // Retry the original request with new token
-        result = await baseQuery(args, api, extraOptions);
-      }
-    } catch (error) {
-      console.error('❌ Failed to refresh CSRF token:', error);
+
+  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
+    console.log('🔄 CSRF token invalid in tasksApi, refreshing...');
+
+    const success = await refreshCsrfToken(api);
+
+    if (success) {
+      result = await baseQuery(args, api, extraOptions);
     }
   }
-  
+
   return result;
 };
 

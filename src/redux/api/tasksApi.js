@@ -1,5 +1,6 @@
 // redux/api/tasksApi.js - Session-based with CSRF  
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { refreshCsrfToken } from './csrfRefreshHandler';
 
 const baseQuery = fetchBaseQuery({
   baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/tasks/`,
@@ -22,39 +23,21 @@ const baseQuery = fetchBaseQuery({
 
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
-
+  
   if (result?.error?.status === 401) {
     api.dispatch({ type: 'auth/logout' });
   }
-
-  // Handle 403 CSRF token errors - refresh token and retry
-  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
-    try {
-      const csrfResponse = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/csrf-token`,
-        { credentials: 'include' }
-      );
-
-      if (csrfResponse.ok) {
-        const data = await csrfResponse.json();
-
-        // FIXED: Update Redux state instead of window variable
-        const { setCsrfToken } = await import('../slices/csrfSlice');
-        const { getCsrfTokenFromCookie } = await import('../../utils/csrf');
-
-        const tokenFromCookie = getCsrfTokenFromCookie();
-        api.dispatch(setCsrfToken(tokenFromCookie || data.csrfToken));
-
-        console.log('✅ CSRF token refreshed in tasksApi');
-
-        // Retry the original request with new token
-        result = await baseQuery(args, api, extraOptions);
-      }
-    } catch (error) {
-      console.error('Failed to refresh CSRF token:', error);
+  
+  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {    
+    console.log('🔄 CSRF token invalid in tasksApi, refreshing...');
+    
+    const success = await refreshCsrfToken(api);
+    
+    if (success) {
+      result = await baseQuery(args, api, extraOptions);
     }
   }
-
+  
   return result;
 };
 

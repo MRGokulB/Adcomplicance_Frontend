@@ -2,6 +2,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 import { logout, setCredentials } from '../slices/authSlice'
 import { getCsrfTokenFromCookie } from '../../utils/csrf'
+import { refreshCsrfToken } from './csrfRefreshHandler'
 
 const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/`
 
@@ -27,37 +28,18 @@ const baseQuery = fetchBaseQuery({
 
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
-   
-  // Handle 401 unauthorized responses
+  
   if (result?.error?.status === 401) {
-    api.dispatch(logout());
+    api.dispatch({ type: 'auth/logout' });
   }
   
-  // Handle 403 CSRF token errors - refresh token and retry
   if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {    
-    // Fetch new CSRF token
-    try {
-      const csrfResponse = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/csrf-token`,
-        { credentials: 'include' }
-      );
-      
-      if (csrfResponse.ok) {
-        const data = await csrfResponse.json();
-        // Token is now in cookie, update Redux state
-        const { setCsrfToken } = await import('../slices/csrfSlice');
-        const tokenFromCookie = getCsrfTokenFromCookie();
-        if (tokenFromCookie) {
-          api.dispatch(setCsrfToken(tokenFromCookie));
-         } else {
-          api.dispatch(setCsrfToken(data.csrfToken));
-         }
-        
-        // Retry the original request with new token
-        result = await baseQuery(args, api, extraOptions);
-      }
-    } catch (error) {
-      console.error('❌ Failed to refresh CSRF token:', error);
+    console.log('🔄 CSRF token invalid in tasksApi, refreshing...');
+    
+    const success = await refreshCsrfToken(api);
+    
+    if (success) {
+      result = await baseQuery(args, api, extraOptions);
     }
   }
   

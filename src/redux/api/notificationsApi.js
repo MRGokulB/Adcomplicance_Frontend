@@ -1,5 +1,6 @@
 // src/redux/api/notificationsApi.js - Updated with Redux CSRF
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { refreshCsrfToken } from './csrfRefreshHandler';
 
 const baseQuery = fetchBaseQuery({
   baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/notifications/`,
@@ -9,52 +10,34 @@ const baseQuery = fetchBaseQuery({
     if (token) {
       headers.set('authorization', `Bearer ${token}`);
     }
-    
+
     // FIXED: Read CSRF token from Redux state instead of window
     const csrfToken = getState().csrf?.token;
     if (csrfToken) {
       headers.set('X-CSRF-Token', csrfToken);
     }
-    
+
     return headers;
   }
 });
 
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
-  
+
   if (result?.error?.status === 401) {
     api.dispatch({ type: 'auth/logout' });
   }
-  
-  // Handle 403 CSRF token errors - refresh token and retry
+
   if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
-    try {
-      const csrfResponse = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/csrf-token`,
-        { credentials: 'include' }
-      );
-      
-      if (csrfResponse.ok) {
-        const data = await csrfResponse.json();
-        
-        // FIXED: Update Redux state instead of window variable
-        const { setCsrfToken } = await import('../slices/csrfSlice');
-        const { getCsrfTokenFromCookie } = await import('../../utils/csrf');
-        
-        const tokenFromCookie = getCsrfTokenFromCookie();
-        api.dispatch(setCsrfToken(tokenFromCookie || data.csrfToken));
-        
-        console.log('✅ CSRF token refreshed in notificationsApi');
-        
-        // Retry the original request with new token
-        result = await baseQuery(args, api, extraOptions);
-      }
-    } catch (error) {
-      console.error('❌ Failed to refresh CSRF token:', error);
+    console.log('🔄 CSRF token invalid in tasksApi, refreshing...');
+
+    const success = await refreshCsrfToken(api);
+
+    if (success) {
+      result = await baseQuery(args, api, extraOptions);
     }
   }
-  
+
   return result;
 };
 
@@ -64,7 +47,7 @@ export const notificationsApi = createApi({
   tagTypes: ['Notification', 'NotificationCount'],
   keepUnusedDataFor: 180,
   refetchOnMountOrArgChange: 180,
-  
+
   endpoints: (builder) => ({
     getNotifications: builder.query({
       query: (params = {}) => {
@@ -77,9 +60,9 @@ export const notificationsApi = createApi({
       providesTags: (result) =>
         result?.notifications
           ? [
-              ...result.notifications.map(({ id }) => ({ type: 'Notification', id })),
-              { type: 'Notification', id: 'LIST' }
-            ]
+            ...result.notifications.map(({ id }) => ({ type: 'Notification', id })),
+            { type: 'Notification', id: 'LIST' }
+          ]
           : [{ type: 'Notification', id: 'LIST' }],
       transformResponse: (response) => response,
       keepUnusedDataFor: 120,

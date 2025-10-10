@@ -24,7 +24,8 @@ import AbsenceTracker from './components/Admin/UserManagement/AbsenceTracker'
 
 function App() {
   const isAuthenticated = useSelector(selectIsAuthenticated)
-  
+  const { csrfToken } = useCSRF();
+
   return (
     <Router>
       <Routes>

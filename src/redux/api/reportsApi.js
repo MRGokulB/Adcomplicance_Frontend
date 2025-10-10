@@ -1,5 +1,6 @@
 // src/redux/api/reportsApi.js - Updated with Redux CSRF
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { refreshCsrfToken } from './csrfRefreshHandler';
 
 const baseQuery = fetchBaseQuery({
   baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports/`,
@@ -9,52 +10,34 @@ const baseQuery = fetchBaseQuery({
     if (token) {
       headers.set('authorization', `Bearer ${token}`);
     }
-    
+
     // FIXED: Read CSRF token from Redux state instead of window
     const csrfToken = getState().csrf?.token;
     if (csrfToken) {
       headers.set('X-CSRF-Token', csrfToken);
     }
-    
+
     return headers;
   }
 });
 
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
-  
+
   if (result?.error?.status === 401) {
     api.dispatch({ type: 'auth/logout' });
   }
-  
-  // Handle 403 CSRF token errors - refresh token and retry
+
   if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
-    try {
-      const csrfResponse = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/csrf-token`,
-        { credentials: 'include' }
-      );
-      
-      if (csrfResponse.ok) {
-        const data = await csrfResponse.json();
-        
-        // FIXED: Update Redux state instead of window variable
-        const { setCsrfToken } = await import('../slices/csrfSlice');
-        const { getCsrfTokenFromCookie } = await import('../../utils/csrf');
-        
-        const tokenFromCookie = getCsrfTokenFromCookie();
-        api.dispatch(setCsrfToken(tokenFromCookie || data.csrfToken));
-        
-        console.log('✅ CSRF token refreshed in reportsApi');
-        
-        // Retry the original request with new token
-        result = await baseQuery(args, api, extraOptions);
-      }
-    } catch (error) {
-      console.error('❌ Failed to refresh CSRF token:', error);
+    console.log('🔄 CSRF token invalid in tasksApi, refreshing...');
+
+    const success = await refreshCsrfToken(api);
+
+    if (success) {
+      result = await baseQuery(args, api, extraOptions);
     }
   }
-  
+
   return result;
 };
 
@@ -74,7 +57,7 @@ export const reportsApi = createApi({
         if (params.assignedTo) searchParams.append('assignedTo', params.assignedTo);
         if (params.page) searchParams.append('page', params.page);
         if (params.limit) searchParams.append('limit', params.limit);
-        
+
         return `internal-tasks?${searchParams.toString()}`;
       },
       providesTags: [{ type: 'Report', id: 'INTERNAL_TASKS' }],
@@ -94,7 +77,7 @@ export const reportsApi = createApi({
         if (params.assignedTo) searchParams.append('assignedTo', params.assignedTo);
         if (params.page) searchParams.append('page', params.page);
         if (params.limit) searchParams.append('limit', params.limit);
-        
+
         return `exchange-tasks?${searchParams.toString()}`;
       },
       providesTags: [{ type: 'Report', id: 'EXCHANGE_TASKS' }],
@@ -108,7 +91,7 @@ export const reportsApi = createApi({
         if (params.dateFrom) searchParams.append('dateFrom', params.dateFrom);
         if (params.dateTo) searchParams.append('dateTo', params.dateTo);
         if (params.userId) searchParams.append('userId', params.userId);
-        
+
         return `compliance-users?${searchParams.toString()}`;
       },
       providesTags: [{ type: 'Report', id: 'COMPLIANCE_USERS' }],
@@ -122,7 +105,7 @@ export const reportsApi = createApi({
         if (params.dateFrom) searchParams.append('dateFrom', params.dateFrom);
         if (params.dateTo) searchParams.append('dateTo', params.dateTo);
         if (params.userId) searchParams.append('userId', params.userId);
-        
+
         return `product-users?${searchParams.toString()}`;
       },
       providesTags: [{ type: 'Report', id: 'PRODUCT_USERS' }],
@@ -134,7 +117,7 @@ export const reportsApi = createApi({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
         if (params.days) searchParams.append('days', params.days.toString());
-        
+
         return `expiring-soon?${searchParams.toString()}`;
       },
       providesTags: [{ type: 'Report', id: 'EXPIRING_SOON' }],
@@ -146,7 +129,7 @@ export const reportsApi = createApi({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
         if (params.date) searchParams.append('date', params.date);
-        
+
         return `daily-movement?${searchParams.toString()}`;
       },
       providesTags: [{ type: 'Report', id: 'DAILY_MOVEMENT' }],
@@ -160,7 +143,7 @@ export const reportsApi = createApi({
         if (params.dateFrom) searchParams.append('dateFrom', params.dateFrom);
         if (params.dateTo) searchParams.append('dateTo', params.dateTo);
         if (params.closureType) searchParams.append('closureType', params.closureType);
-        
+
         return `rejected-tasks?${searchParams.toString()}`;
       },
       providesTags: [{ type: 'Report', id: 'REJECTED_TASKS' }],
@@ -176,7 +159,7 @@ export const reportsApi = createApi({
             searchParams.append(key, value);
           }
         });
-        
+
         return {
           url: `${reportType}/export?format=${format}&${searchParams.toString()}`,
           method: 'GET',
@@ -190,7 +173,7 @@ export const reportsApi = createApi({
         const searchParams = new URLSearchParams();
         if (params.dateFrom) searchParams.append('dateFrom', params.dateFrom);
         if (params.dateTo) searchParams.append('dateTo', params.dateTo);
-        
+
         return `summary?${searchParams.toString()}`;
       },
       providesTags: [{ type: 'Report', id: 'SUMMARY' }],
