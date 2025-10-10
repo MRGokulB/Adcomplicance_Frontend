@@ -4,7 +4,7 @@
 export const USER_ROLES = {
   ADMIN: 'ADMIN',
   SENIOR_MANAGER: 'SENIOR_MANAGER',
-  COMPLIANCE_ADMIN: 'COMPLIANCE_ADMIN', 
+  COMPLIANCE_ADMIN: 'COMPLIANCE_ADMIN',
   COMPLIANCE_USER: 'COMPLIANCE_USER',
   PRODUCT_ADMIN: 'PRODUCT_ADMIN',
   PRODUCT_USER: 'PRODUCT_USER'
@@ -35,14 +35,14 @@ export const PERMISSIONS = {
   TASK_UPDATE_OWN: 'task:update:own',
   TASK_UPDATE_STATUS: 'task:update:status',
   TASK_ASSIGN: 'task:assign',
-  TASK_REASSIGN: 'task:reassign', 
+  TASK_REASSIGN: 'task:reassign',
   TASK_APPROVE: 'task:approve',
   TASK_REJECT: 'task:reject',
   TASK_PUBLISH: 'task:publish',
   TASK_CLASSIFY: 'task:classify',
   TASK_CLOSE: 'task:close',
   TASK_FOLLOW_UP: 'task:follow_up',
-  TASK_VALIDATE_FILES: 'task:validate_files', 
+  TASK_VALIDATE_FILES: 'task:validate_files',
 
   // Task Buckets - From backend
   TASK_VIEW_BUCKETS: 'task:view_buckets',
@@ -187,6 +187,7 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.TASK_FOLLOW_UP,
     PERMISSIONS.TASK_CLOSE,
     PERMISSIONS.TASK_VIEW_BUCKETS,
+    PERMISSIONS.AUDIT_EXPORT,
     PERMISSIONS.TASK_VIEW_APPROVED_NOT_PUBLISHED,
     PERMISSIONS.TASK_VIEW_EXPIRING_SOON,
     PERMISSIONS.TASK_VIEW_USER_WORKLOAD, // NEW
@@ -295,6 +296,7 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.USER_READ_ALL, // ENHANCED: Product Admin can read all users
     PERMISSIONS.USER_UPDATE_TEAM,
     PERMISSIONS.USER_PROMOTE,
+    PERMISSIONS.AUDIT_EXPORT,
     PERMISSIONS.TASK_CREATE,
     PERMISSIONS.TASK_READ_TEAM,
     PERMISSIONS.TASK_UPDATE_OWN,
@@ -336,7 +338,7 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.COMMENT_READ_TASK,
     PERMISSIONS.VERSION_UPLOAD,
     PERMISSIONS.REPORT_INTERNAL_TASKS,
-    PERMISSIONS.REPORT_EXCHANGE_TASKS, 
+    PERMISSIONS.REPORT_EXCHANGE_TASKS,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.UPLOAD_FILES,
     PERMISSIONS.DASHBOARD_VIEW_OWN,
@@ -442,7 +444,7 @@ export const canAccessReports = (userRole, reportType = null) => {
       PERMISSIONS.REPORT_REJECTED_TASKS
     ])
   }
-  
+
   const reportPermissions = {
     'internal-tasks': PERMISSIONS.REPORT_INTERNAL_TASKS,
     'exchange-tasks': PERMISSIONS.REPORT_EXCHANGE_TASKS,
@@ -452,7 +454,7 @@ export const canAccessReports = (userRole, reportType = null) => {
     'daily-movement': PERMISSIONS.REPORT_DAILY_MOVEMENT,
     'rejected-tasks': PERMISSIONS.REPORT_REJECTED_TASKS
   }
-  
+
   return hasPermission(userRole, reportPermissions[reportType])
 }
 
@@ -470,7 +472,7 @@ export const canPromoteUser = (userRole) => {
 
 export const canViewAudit = (userRole) => {
   return hasPermission(userRole, PERMISSIONS.AUDIT_READ_ALL) ||
-         hasPermission(userRole, PERMISSIONS.AUDIT_READ_LIMITED)
+    hasPermission(userRole, PERMISSIONS.AUDIT_READ_LIMITED)
 }
 
 export const canPerformBulkOperations = (userRole) => {
@@ -485,27 +487,27 @@ export const canClassifyOrReclassifyTask = (userRole, task = null, currentUserId
   if (!hasPermission(userRole, PERMISSIONS.TASK_CLASSIFY)) {
     return false
   }
-  
+
   // If task is provided and already classified, check if user can reclassify
   if (task && task.taskType) {
     // FIXED: COMPLIANCE_ADMIN and ADMIN can reclassify ANY task (no assignment check)
     if ([USER_ROLES.COMPLIANCE_ADMIN, USER_ROLES.ADMIN].includes(userRole)) {
       return true
     }
-    
+
     // COMPLIANCE_USER can only reclassify tasks assigned to them
     if (userRole === USER_ROLES.COMPLIANCE_USER && currentUserId) {
       return task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
     }
-    
+
     return false
   }
-  
+
   // For new classification, check assignment only for COMPLIANCE_USER
   if (userRole === USER_ROLES.COMPLIANCE_USER && task && currentUserId) {
     return task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
   }
-  
+
   // COMPLIANCE_ADMIN and ADMIN can classify any task
   return [USER_ROLES.COMPLIANCE_ADMIN, USER_ROLES.ADMIN].includes(userRole)
 }
@@ -514,17 +516,17 @@ export const canCloseSpecificTask = (userRole, task = null, currentUserId = null
   if (!hasPermission(userRole, PERMISSIONS.TASK_CLOSE)) {
     return false
   }
-  
+
   // ADMIN, SENIOR_MANAGER, COMPLIANCE_ADMIN can close any task
   if ([USER_ROLES.ADMIN, USER_ROLES.SENIOR_MANAGER, USER_ROLES.COMPLIANCE_ADMIN].includes(userRole)) {
     return true
   }
-  
+
   // MODIFIED: Assigned COMPLIANCE_USER can close tasks assigned to them (replacing PRODUCT_ADMIN logic)
   if (userRole === USER_ROLES.COMPLIANCE_USER && task && currentUserId) {
     return task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
   }
-  
+
   return false
 }
 
@@ -533,12 +535,12 @@ export const canReclassifyTask = (userRole, task = null, currentUserId = null) =
   if ([USER_ROLES.COMPLIANCE_ADMIN, USER_ROLES.ADMIN].includes(userRole)) {
     return true
   }
-  
+
   // COMPLIANCE_USER can only reclassify assigned tasks
   if (userRole === USER_ROLES.COMPLIANCE_USER && task && currentUserId) {
     return task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
   }
-  
+
   return false
 }
 
@@ -546,7 +548,7 @@ export const getClassificationActions = (userRole, task = null, currentUserId = 
   if (!hasPermission(userRole, PERMISSIONS.TASK_CLASSIFY)) {
     return { canClassify: false, canReclassify: false }
   }
-  
+
   // FIXED: For COMPLIANCE_USER only, check if assigned to task
   if (userRole === USER_ROLES.COMPLIANCE_USER && task && currentUserId) {
     const isAssigned = task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
@@ -554,9 +556,9 @@ export const getClassificationActions = (userRole, task = null, currentUserId = 
       return { canClassify: false, canReclassify: false }
     }
   }
-  
+
   const canClassify = !task || !task.taskType // Can classify if task has no type
-  
+
   // FIXED: COMPLIANCE_ADMIN and ADMIN can reclassify ANY task
   let canReclassify = false
   if (task && task.taskType) {
@@ -566,7 +568,7 @@ export const getClassificationActions = (userRole, task = null, currentUserId = 
       canReclassify = task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
     }
   }
-  
+
   return { canClassify, canReclassify }
 }
 
@@ -575,27 +577,27 @@ export const getClosureActions = (userRole, task = null, currentUserId = null) =
   if (!hasPermission(userRole, PERMISSIONS.TASK_CLOSE)) {
     return { canClose: false, reason: 'No close permission' }
   }
-  
+
   // Full admin access
   if ([USER_ROLES.ADMIN, USER_ROLES.SENIOR_MANAGER, USER_ROLES.COMPLIANCE_ADMIN].includes(userRole)) {
     return { canClose: true, reason: 'Admin access' }
   }
-  
+
   // MODIFIED: Assigned COMPLIANCE_USER can close tasks assigned to them (replacing PRODUCT_ADMIN logic)
   if (userRole === USER_ROLES.COMPLIANCE_USER) {
     if (!task || !currentUserId) {
       return { canClose: false, reason: 'Task or user information missing' }
     }
-    
+
     const isAssigned = task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
-    
+
     if (isAssigned) {
       return { canClose: true, reason: 'Assigned compliance user' }
     }
-    
+
     return { canClose: false, reason: 'Not assigned to this task' }
   }
-  
+
   return { canClose: false, reason: 'Insufficient permissions' }
 }
 

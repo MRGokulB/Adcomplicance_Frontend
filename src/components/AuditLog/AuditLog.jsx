@@ -9,25 +9,10 @@ import {
 } from '../../redux/api/auditApi';
 import { useGetUsersQuery } from '../../redux/api/usersApi';
 
-// Debounce hook
-const useDebounce = (value, delay = 800) => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-    return () => clearTimeout(handler);
-  }, [value, delay]);
-
-  return debouncedValue;
-};
-
 const AuditLog = () => {
   const userRole = useSelector(selectUserRole);
   const isAuthenticated = useSelector(selectIsAuthenticated);
-  console.log('Is authenticated:', isAuthenticated);
-  
+    
   // Separate UI state from API query state
   const [uiFilters, setUiFilters] = useState({
     page: 1,
@@ -50,19 +35,8 @@ const AuditLog = () => {
     taskId: '',
   });
 
-  // Debounce taskId to prevent API calls on every keystroke
-  const debouncedTaskId = useDebounce(uiFilters.taskId, 800);
-
-  // Auto-apply debounced taskId
-  useEffect(() => {
-    if (debouncedTaskId !== appliedFilters.taskId) {
-      setAppliedFilters(prev => ({
-        ...prev,
-        taskId: debouncedTaskId,
-        page: 1
-      }));
-    }
-  }, [debouncedTaskId]);
+  // REMOVED: Debounce hook and auto-apply for taskId
+  // Now taskId only applies when user clicks "Apply Filters"
 
   // FIXED: Check permissions using correct backend-aligned roles
   const canViewFullAudit = hasPermission(userRole, PERMISSIONS.AUDIT_READ_ALL);
@@ -110,14 +84,14 @@ const AuditLog = () => {
   const { data: usersData } = useGetUsersQuery({ limit: 100 });
   const [exportAuditData] = useLazyExportAuditDataQuery();
 
-  // Handle UI filter changes (doesn't trigger API immediately except for taskId via debounce)
+  // Handle UI filter changes (doesn't trigger API immediately)
   const handleFilterChange = (field, value) => {
     setUiFilters(prev => ({
       ...prev,
       [field]: value,
     }));
 
-    // Auto-apply for non-text fields (dropdowns, dates, pagination)
+    // FIXED: Auto-apply ONLY for dropdowns, dates, and pagination (NOT taskId)
     if (field !== 'taskId') {
       setAppliedFilters(prev => ({
         ...prev,
@@ -166,12 +140,10 @@ const AuditLog = () => {
         dateTo: appliedFilters.dateTo,
         performedBy: appliedFilters.performedBy,
         action: appliedFilters.action,
-        // Note: taskId not supported in export endpoint per backend spec
       };
       
       const result = await exportAuditData(exportParams).unwrap();
       
-      // Backend returns { message, count, data } - use the data array
       const exportData = result.data || [];
       let fileContent;
       let mimeType;
@@ -294,6 +266,9 @@ const AuditLog = () => {
   // Non-blocking error display
   const showError = auditError && !isAuditLoading;
 
+  // ADDED: Check if filters are different from applied
+  const hasUnappliedChanges = JSON.stringify(uiFilters) !== JSON.stringify(appliedFilters);
+
   return (
     <div className="container-lg section-md">
       {/* Header */}
@@ -358,7 +333,7 @@ const AuditLog = () => {
         </div>
       )}
 
-      {/* Statistics Cards - CORRECTED backend response structure */}
+      {/* Statistics Cards */}
       {statsData && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="card">
@@ -461,18 +436,21 @@ const AuditLog = () => {
 
             <div>
               <label className="exchange-form-label">
-                Task ID
-                {uiFilters.taskId && uiFilters.taskId !== appliedFilters.taskId && (
-                  <span className="ml-1 text-xs text-gray-500">(typing...)</span>
+                Task UIN
+                {uiFilters.taskId && hasUnappliedChanges && (
+                  <span className="ml-1 text-xs text-orange-600">(not applied)</span>
                 )}
               </label>
               <input
                 type="text"
                 className="input"
-                placeholder="Filter by task ID..."
+                placeholder="e.g., AOL-20251009 or full UIN"
                 value={uiFilters.taskId}
                 onChange={(e) => handleFilterChange('taskId', e.target.value)}
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Supports partial search (e.g., "AOL-20251009")
+              </p>
             </div>
           </div>
 
@@ -501,7 +479,7 @@ const AuditLog = () => {
               <button 
                 className="btn btn-primary"
                 onClick={applyFilters}
-                disabled={JSON.stringify(uiFilters) === JSON.stringify(appliedFilters)}
+                disabled={!hasUnappliedChanges}
               >
                 <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
@@ -598,7 +576,9 @@ const AuditLog = () => {
                 </svg>
                 <h3 className="table-empty-title">No Audit Logs Found</h3>
                 <p className="table-empty-description">
-                  No audit logs match the current filters. Try adjusting your search criteria.
+                  {appliedFilters.taskId 
+                    ? `No audit logs found for Task UIN containing "${appliedFilters.taskId}". Try a different search term.`
+                    : 'No audit logs match the current filters. Try adjusting your search criteria.'}
                 </p>
                 {hasActiveFilters() && (
                   <button onClick={resetFilters} className="mt-4 btn btn-secondary">
@@ -638,12 +618,12 @@ const AuditLog = () => {
         </div>
       )}
 
-      {/* Export Rights Notice - UPDATED to show correct export permissions */}
+      {/* Export Rights Notice */}
       {!canExportAudit && canViewFullAudit && (
         <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <div className="flex items-center gap-2">
             <svg className="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
             <span className="text-sm text-yellow-800">
               Export functionality requires COMPLIANCE_ADMIN or ADMIN role.

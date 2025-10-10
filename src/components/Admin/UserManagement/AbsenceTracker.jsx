@@ -40,7 +40,7 @@ const AbsenceTracker = () => {
     refetch
   } = useGetAbsencesQuery(absenceParams, {
     pollingInterval: isPageVisible ? 60000 : 0, // Poll every minute when visible
-    refetchOnMountOrArgChange: 300, // 5 minutes
+    refetchOnMountOrArgChange: 60, // 5 minutes
     skip: !hasPermission(currentUserRole, PERMISSIONS.ABSENCE_READ_ALL) && 
           !hasPermission(currentUserRole, PERMISSIONS.ABSENCE_MANAGE),
   });
