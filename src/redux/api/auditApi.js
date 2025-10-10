@@ -1,17 +1,17 @@
-// src/redux/api/auditApi.js - Session-based with CSRF
+// src/redux/api/auditApi.js - Updated with Redux CSRF
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 const baseQuery = fetchBaseQuery({
   baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api`,
-  credentials: 'include', // Send session cookies
+  credentials: 'include',
   prepareHeaders: (headers, { getState }) => {
-    const token = getState().auth.token;
+    const token = getState().auth?.token;
     if (token) {
       headers.set('authorization', `Bearer ${token}`);
     }
     
-    // Add CSRF token for non-GET requests
-    const csrfToken = window.csrfToken;
+    // FIXED: Read CSRF token from Redux state instead of window
+    const csrfToken = getState().csrf?.token;
     if (csrfToken) {
       headers.set('X-CSRF-Token', csrfToken);
     }
@@ -24,14 +24,11 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
   
   if (result?.error?.status === 401) {
-    console.log('Token expired, redirecting to login...');
     api.dispatch({ type: 'auth/logout' });
   }
   
   // Handle 403 CSRF token errors - refresh token and retry
   if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
-    console.log('CSRF token invalid, fetching new token...');
-    
     try {
       const csrfResponse = await fetch(
         `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/csrf-token`,
@@ -40,14 +37,21 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
       
       if (csrfResponse.ok) {
         const data = await csrfResponse.json();
-        window.csrfToken = data.csrfToken;
-        console.log('New CSRF token fetched, retrying request...');
+        
+        // FIXED: Update Redux state instead of window variable
+        const { setCsrfToken } = await import('../slices/csrfSlice');
+        const { getCsrfTokenFromCookie } = await import('../../utils/csrf');
+        
+        const tokenFromCookie = getCsrfTokenFromCookie();
+        api.dispatch(setCsrfToken(tokenFromCookie || data.csrfToken));
+        
+        console.log('✅ CSRF token refreshed in auditApi');
         
         // Retry the original request with new token
         result = await baseQuery(args, api, extraOptions);
       }
     } catch (error) {
-      console.error('Failed to refresh CSRF token:', error);
+      console.error('❌ Failed to refresh CSRF token:', error);
     }
   }
   
@@ -58,9 +62,8 @@ export const auditApi = createApi({
   reducerPath: 'auditApi',
   baseQuery: baseQueryWithReauth,
   tagTypes: ['Audit', 'AuditStats'],
-  keepUnusedDataFor: 300, // 5 minutes cache for audit logs
+  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
-    // Get audit logs with comprehensive filtering
     getAuditLogs: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -87,7 +90,6 @@ export const auditApi = createApi({
       keepUnusedDataFor: 300,
     }),
 
-    // Get audit logs for specific task
     getTaskAuditLogs: builder.query({
       query: ({ taskId, ...params }) => {
         const searchParams = new URLSearchParams();
@@ -104,7 +106,6 @@ export const auditApi = createApi({
       keepUnusedDataFor: 300,
     }),
 
-    // Get audit logs for specific user  
     getUserAuditLogs: builder.query({
       query: ({ userId, ...params }) => {
         const searchParams = new URLSearchParams();
@@ -123,7 +124,6 @@ export const auditApi = createApi({
       keepUnusedDataFor: 300,
     }),
 
-    // Get audit statistics
     getAuditStats: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -136,10 +136,9 @@ export const auditApi = createApi({
       },
       providesTags: [{ type: 'AuditStats', id: 'STATS' }],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 600, // 10 minutes for stats
+      keepUnusedDataFor: 600,
     }),
 
-    // Get recent activity
     getRecentActivity: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -151,10 +150,9 @@ export const auditApi = createApi({
       },
       providesTags: [{ type: 'Audit', id: 'RECENT' }],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 60, // 1 minute for recent activity
+      keepUnusedDataFor: 60,
     }),
 
-    // Export audit data
     exportAuditData: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -162,7 +160,7 @@ export const auditApi = createApi({
         if (params.dateTo) searchParams.append('dateTo', params.dateTo);
         if (params.action) searchParams.append('action', params.action);
         if (params.performedBy) searchParams.append('performedBy', params.performedBy);
-        if (params.format) searchParams.append('format', params.format); // csv, json, xlsx
+        if (params.format) searchParams.append('format', params.format);
         
         const queryString = searchParams.toString();
         return `/audit/export${queryString ? `?${queryString}` : ''}`;
@@ -170,11 +168,10 @@ export const auditApi = createApi({
       transformResponse: (response) => response,
     }),
 
-    // Get action types (for filtering)
     getActionTypes: builder.query({
       query: () => '/audit/action-types',
       transformResponse: (response) => response,
-      keepUnusedDataFor: 3600, // 1 hour - action types rarely change
+      keepUnusedDataFor: 3600,
     }),
   })
 });

@@ -3,42 +3,50 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 const baseQuery = fetchBaseQuery({
   baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/users/`,
-  credentials: 'include',  
+  credentials: 'include',
   prepareHeaders: (headers, { getState }) => {
     const token = getState().auth.token;
     if (token) {
       headers.set('authorization', `Bearer ${token}`);
     }
-    
-    // Add CSRF token for non-GET requests
-    const csrfToken = window.csrfToken;
+
+    // FIXED: Read CSRF token from Redux state instead of window
+    const csrfToken = getState().csrf?.token;
     if (csrfToken) {
       headers.set('X-CSRF-Token', csrfToken);
     }
-    
+
     return headers;
   }
 });
 
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
-  
+
   if (result?.error?.status === 401) {
     api.dispatch({ type: 'auth/logout' });
   }
-  
+
   // Handle 403 CSRF token errors - refresh token and retry
-  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {    
+  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
     try {
       const csrfResponse = await fetch(
         `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/csrf-token`,
         { credentials: 'include' }
       );
-      
+
       if (csrfResponse.ok) {
         const data = await csrfResponse.json();
-        window.csrfToken = data.csrfToken;
-         
+
+        // FIXED: Update Redux state instead of window variable
+        const { setCsrfToken } = await import('../slices/csrfSlice');
+        const { getCsrfTokenFromCookie } = await import('../../utils/csrf');
+
+        const tokenFromCookie = getCsrfTokenFromCookie();
+        api.dispatch(setCsrfToken(tokenFromCookie || data.csrfToken));
+
+        console.log('✅ CSRF token refreshed in usersApi');
+
         // Retry the original request with new token
         result = await baseQuery(args, api, extraOptions);
       }
@@ -46,19 +54,19 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
       console.error('❌ Failed to refresh CSRF token:', error);
     }
   }
-  
+
   return result;
 };
- 
+
 export const usersApi = createApi({
   reducerPath: 'usersApi',
   baseQuery: baseQueryWithReauth,
   tagTypes: ['User', 'Absence', 'Profile', 'Promotion'],
-  
+
   //  Default cache retention
   keepUnusedDataFor: 300, // 5 minutes default
   refetchOnMountOrArgChange: 300,
-  
+
   endpoints: (builder) => ({
     //  Current user profile with longer cache
     getCurrentUserProfile: builder.query({
@@ -76,7 +84,7 @@ export const usersApi = createApi({
         body: userData
       }),
       invalidatesTags: [
-        { type: 'Profile', id: 'CURRENT' }, 
+        { type: 'Profile', id: 'CURRENT' },
         { type: 'User', id: 'LIST' }
       ],
       transformResponse: (response) => response.user,
@@ -91,9 +99,9 @@ export const usersApi = createApi({
         try {
           const { data: updatedUser } = await queryFulfilled;
           // Update auth slice with new user data
-          dispatch({ 
-            type: 'auth/updateUser', 
-            payload: updatedUser 
+          dispatch({
+            type: 'auth/updateUser',
+            payload: updatedUser
           });
         } catch {
           patchResult.undo();
@@ -111,16 +119,16 @@ export const usersApi = createApi({
         if (params.role && params.role.trim()) searchParams.append('role', params.role.trim());
         if (params.isActive !== undefined && params.isActive !== '') searchParams.append('isActive', params.isActive);
         if (params.team && params.team.trim()) searchParams.append('team', params.team.trim());
-        
+
         return `?${searchParams.toString()}`;
       },
       //  Provide specific tags for each user
-      providesTags: (result) => 
+      providesTags: (result) =>
         result?.users
           ? [
-              ...result.users.map(({ id }) => ({ type: 'User', id })),
-              { type: 'User', id: 'LIST' }
-            ]
+            ...result.users.map(({ id }) => ({ type: 'User', id })),
+            { type: 'User', id: 'LIST' }
+          ]
           : [{ type: 'User', id: 'LIST' }],
       transformResponse: (response) => ({
         users: response.users || [],
@@ -155,92 +163,92 @@ export const usersApi = createApi({
 
     //  Update user with optimistic update
     // FIXED: Update user with optimistic update for BOTH detail and list
-updateUser: builder.mutation({
-  query: ({ id, ...userData }) => ({
-    url: id,
-    method: 'PUT',
-    body: userData
-  }),
-  invalidatesTags: (result, error, { id }) => [
-    { type: 'User', id },
-    { type: 'User', id: 'LIST' },
-    { type: 'Promotion', id: 'ELIGIBLE' }
-  ],
-  transformResponse: (response) => ({
-    user: response.user,
-    changes: response.changes || null
-  }),
-  async onQueryStarted({ id, ...patch }, { dispatch, queryFulfilled }) {
-    // Optimistic update for getUserById
-    const patchDetail = dispatch(
-      usersApi.util.updateQueryData('getUserById', id, (draft) => {
-        Object.assign(draft, patch);
-      })
-    );
+    updateUser: builder.mutation({
+      query: ({ id, ...userData }) => ({
+        url: id,
+        method: 'PUT',
+        body: userData
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: 'User', id },
+        { type: 'User', id: 'LIST' },
+        { type: 'Promotion', id: 'ELIGIBLE' }
+      ],
+      transformResponse: (response) => ({
+        user: response.user,
+        changes: response.changes || null
+      }),
+      async onQueryStarted({ id, ...patch }, { dispatch, queryFulfilled }) {
+        // Optimistic update for getUserById
+        const patchDetail = dispatch(
+          usersApi.util.updateQueryData('getUserById', id, (draft) => {
+            Object.assign(draft, patch);
+          })
+        );
 
-    // FIXED: Optimistic update for getUsers list
-    const patchList = dispatch(
-      usersApi.util.updateQueryData('getUsers', undefined, (draft) => {
-        const userIndex = draft.users?.findIndex(u => u.id === id);
-        if (userIndex !== -1 && draft.users) {
-          Object.assign(draft.users[userIndex], patch);
+        // FIXED: Optimistic update for getUsers list
+        const patchList = dispatch(
+          usersApi.util.updateQueryData('getUsers', undefined, (draft) => {
+            const userIndex = draft.users?.findIndex(u => u.id === id);
+            if (userIndex !== -1 && draft.users) {
+              Object.assign(draft.users[userIndex], patch);
+            }
+          })
+        );
+
+        try {
+          await queryFulfilled;
+        } catch {
+          patchDetail.undo();
+          patchList.undo();
         }
-      })
-    );
+      }
+    }),
 
-    try {
-      await queryFulfilled;
-    } catch {
-      patchDetail.undo();
-      patchList.undo();
-    }
-  }
-}),
+    // FIXED: Promote user with optimistic update for BOTH detail and list
+    promoteUser: builder.mutation({
+      query: ({ id, newRole, reason }) => ({
+        url: `${id}/promote`,
+        method: 'POST',
+        body: { newRole, reason }
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: 'User', id },
+        { type: 'User', id: 'LIST' },
+        { type: 'Promotion', id: 'ELIGIBLE' }
+      ],
+      transformResponse: (response) => ({
+        user: response.user,
+        changes: response.changes
+      }),
+      async onQueryStarted({ id, newRole }, { dispatch, queryFulfilled }) {
+        // Optimistic update for getUserById
+        const patchDetail = dispatch(
+          usersApi.util.updateQueryData('getUserById', id, (draft) => {
+            draft.role = newRole;
+            draft.updatedAt = new Date().toISOString();
+          })
+        );
 
-// FIXED: Promote user with optimistic update for BOTH detail and list
-promoteUser: builder.mutation({
-  query: ({ id, newRole, reason }) => ({
-    url: `${id}/promote`,
-    method: 'POST',
-    body: { newRole, reason }
-  }),
-  invalidatesTags: (result, error, { id }) => [
-    { type: 'User', id },
-    { type: 'User', id: 'LIST' },
-    { type: 'Promotion', id: 'ELIGIBLE' }
-  ],
-  transformResponse: (response) => ({
-    user: response.user,
-    changes: response.changes
-  }),
-  async onQueryStarted({ id, newRole }, { dispatch, queryFulfilled }) {
-    // Optimistic update for getUserById
-    const patchDetail = dispatch(
-      usersApi.util.updateQueryData('getUserById', id, (draft) => {
-        draft.role = newRole;
-        draft.updatedAt = new Date().toISOString();
-      })
-    );
+        // FIXED: Optimistic update for getUsers list
+        const patchList = dispatch(
+          usersApi.util.updateQueryData('getUsers', undefined, (draft) => {
+            const userIndex = draft.users?.findIndex(u => u.id === id);
+            if (userIndex !== -1 && draft.users) {
+              draft.users[userIndex].role = newRole;
+              draft.users[userIndex].updatedAt = new Date().toISOString();
+            }
+          })
+        );
 
-    // FIXED: Optimistic update for getUsers list
-    const patchList = dispatch(
-      usersApi.util.updateQueryData('getUsers', undefined, (draft) => {
-        const userIndex = draft.users?.findIndex(u => u.id === id);
-        if (userIndex !== -1 && draft.users) {
-          draft.users[userIndex].role = newRole;
-          draft.users[userIndex].updatedAt = new Date().toISOString();
+        try {
+          await queryFulfilled;
+        } catch {
+          patchDetail.undo();
+          patchList.undo();
         }
-      })
-    );
-
-    try {
-      await queryFulfilled;
-    } catch {
-      patchDetail.undo();
-      patchList.undo();
-    }
-  }
-}),
+      }
+    }),
 
     // Reset user password - no optimistic update needed
     resetUserPassword: builder.mutation({
@@ -273,16 +281,16 @@ promoteUser: builder.mutation({
         if (params.userId) searchParams.append('userId', params.userId);
         if (params.dateFrom) searchParams.append('dateFrom', params.dateFrom);
         if (params.dateTo) searchParams.append('dateTo', params.dateTo);
-        
+
         return `absences?${searchParams.toString()}`;
       },
       //  Provide specific tags for each absence
       providesTags: (result) =>
         result && Array.isArray(result)
           ? [
-              ...result.map(({ id }) => ({ type: 'Absence', id })),
-              { type: 'Absence', id: 'LIST' }
-            ]
+            ...result.map(({ id }) => ({ type: 'Absence', id })),
+            { type: 'Absence', id: 'LIST' }
+          ]
           : [{ type: 'Absence', id: 'LIST' }],
       transformResponse: (response) => response,
       keepUnusedDataFor: 300, // 5 minutes

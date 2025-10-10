@@ -3,42 +3,50 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 const baseQuery = fetchBaseQuery({
   baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/tasks/`,
-  credentials: 'include', // Send session cookies
+  credentials: 'include',
   prepareHeaders: (headers, { getState }) => {
     const token = getState().auth.token;
     if (token) {
       headers.set('authorization', `Bearer ${token}`);
     }
-    
-    // Add CSRF token for non-GET requests
-    const csrfToken = window.csrfToken;
+
+    // FIXED: Read CSRF token from Redux state instead of window
+    const csrfToken = getState().csrf?.token;
     if (csrfToken) {
       headers.set('X-CSRF-Token', csrfToken);
     }
-    
+
     return headers;
   }
 });
 
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
-  
+
   if (result?.error?.status === 401) {
     api.dispatch({ type: 'auth/logout' });
   }
-  
+
   // Handle 403 CSRF token errors - refresh token and retry
-  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {    
+  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
     try {
       const csrfResponse = await fetch(
         `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/csrf-token`,
         { credentials: 'include' }
       );
-      
+
       if (csrfResponse.ok) {
         const data = await csrfResponse.json();
-        window.csrfToken = data.csrfToken; 
-        
+
+        // FIXED: Update Redux state instead of window variable
+        const { setCsrfToken } = await import('../slices/csrfSlice');
+        const { getCsrfTokenFromCookie } = await import('../../utils/csrf');
+
+        const tokenFromCookie = getCsrfTokenFromCookie();
+        api.dispatch(setCsrfToken(tokenFromCookie || data.csrfToken));
+
+        console.log('✅ CSRF token refreshed in tasksApi');
+
         // Retry the original request with new token
         result = await baseQuery(args, api, extraOptions);
       }
@@ -46,7 +54,7 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
       console.error('Failed to refresh CSRF token:', error);
     }
   }
-  
+
   return result;
 };
 
@@ -62,7 +70,7 @@ export const tasksApi = createApi({
     getTasks: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
-        
+
         // Add all possible filter parameters
         if (params.page) searchParams.append('page', params.page);
         if (params.limit) searchParams.append('limit', params.limit);

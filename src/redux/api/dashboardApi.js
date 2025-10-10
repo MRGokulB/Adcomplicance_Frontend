@@ -1,56 +1,60 @@
-// src/redux/api/dashboardApi.js - Session-based with CSRF
+// src/redux/api/dashboardApi.js - Updated with Redux CSRF
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 const baseQuery = fetchBaseQuery({
   baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/dashboard/`,
-  credentials: 'include', // Send session cookies
+  credentials: 'include',
   prepareHeaders: (headers, { getState }) => {
-    const token = getState().auth.token;
+    const token = getState().auth?.token;
     if (token) {
       headers.set('authorization', `Bearer ${token}`);
     }
-    
-    // Add CSRF token for non-GET requests
-    const csrfToken = window.csrfToken;
+
+    // FIXED: Read CSRF token from Redux state instead of window
+    const csrfToken = getState().csrf?.token;
     if (csrfToken) {
       headers.set('X-CSRF-Token', csrfToken);
     }
-    
+
     return headers;
   }
 });
 
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
-  
+
   if (result?.error?.status === 401) {
-    console.log('Token expired, redirecting to login...');
     api.dispatch({ type: 'auth/logout' });
   }
-  
+
   // Handle 403 CSRF token errors - refresh token and retry
   if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
-    console.log('CSRF token invalid, fetching new token...');
-    
     try {
       const csrfResponse = await fetch(
         `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/csrf-token`,
         { credentials: 'include' }
       );
-      
+
       if (csrfResponse.ok) {
         const data = await csrfResponse.json();
-        window.csrfToken = data.csrfToken;
-        console.log('New CSRF token fetched, retrying request...');
-        
+
+        // FIXED: Update Redux state instead of window variable
+        const { setCsrfToken } = await import('../slices/csrfSlice');
+        const { getCsrfTokenFromCookie } = await import('../../utils/csrf');
+
+        const tokenFromCookie = getCsrfTokenFromCookie();
+        api.dispatch(setCsrfToken(tokenFromCookie || data.csrfToken));
+
+        console.log('✅ CSRF token refreshed in dashboardApi');
+
         // Retry the original request with new token
         result = await baseQuery(args, api, extraOptions);
       }
     } catch (error) {
-      console.error('Failed to refresh CSRF token:', error);
+      console.error('❌ Failed to refresh CSRF token:', error);
     }
   }
-  
+
   return result;
 };
 
@@ -58,12 +62,10 @@ export const dashboardApi = createApi({
   reducerPath: 'dashboardApi',
   baseQuery: baseQueryWithReauth,
   tagTypes: ['Dashboard', 'DashboardStats', 'DashboardNotification', 'UserWorkload', 'TeamOverview'],
-  
-  keepUnusedDataFor: 300, // 5 minutes
+  keepUnusedDataFor: 300,
   refetchOnMountOrArgChange: 300,
-  
+
   endpoints: (builder) => ({
-    // Main dashboard data
     getDashboard: builder.query({
       query: () => '',
       providesTags: ['Dashboard'],
@@ -71,7 +73,6 @@ export const dashboardApi = createApi({
       keepUnusedDataFor: 300,
     }),
 
-    // Quick stats
     getQuickStats: builder.query({
       query: () => 'quick-stats',
       providesTags: ['DashboardStats'],
@@ -79,7 +80,6 @@ export const dashboardApi = createApi({
       keepUnusedDataFor: 180,
     }),
 
-    // Task buckets
     getTaskBuckets: builder.query({
       query: () => 'task-buckets',
       providesTags: ['Dashboard'],
@@ -87,7 +87,6 @@ export const dashboardApi = createApi({
       keepUnusedDataFor: 600,
     }),
 
-    // Workload chart
     getWorkloadChart: builder.query({
       query: () => 'workload-chart',
       providesTags: ['Dashboard'],
@@ -95,7 +94,6 @@ export const dashboardApi = createApi({
       keepUnusedDataFor: 600,
     }),
 
-    // Completion trends
     getCompletionTrends: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -107,7 +105,6 @@ export const dashboardApi = createApi({
       keepUnusedDataFor: 900,
     }),
 
-    // Activity feed
     getActivityFeed: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -120,7 +117,6 @@ export const dashboardApi = createApi({
       keepUnusedDataFor: 120,
     }),
 
-    // Performance metrics
     getPerformanceMetrics: builder.query({
       query: (params = {}) => {
         const period = params?.period || '30d';
@@ -131,7 +127,6 @@ export const dashboardApi = createApi({
       keepUnusedDataFor: 600,
     }),
 
-    // Dashboard stats
     getDashboardStats: builder.query({
       query: () => 'dashboard-stats',
       providesTags: ['DashboardStats'],
@@ -139,7 +134,6 @@ export const dashboardApi = createApi({
       keepUnusedDataFor: 180,
     }),
 
-    // User workload
     getUserWorkload: builder.query({
       query: (userId) => `user-workload/${userId}`,
       providesTags: (result, error, userId) => [{ type: 'UserWorkload', id: userId }],
@@ -147,7 +141,6 @@ export const dashboardApi = createApi({
       keepUnusedDataFor: 300,
     }),
 
-    // Team overview
     getTeamOverview: builder.query({
       query: () => 'team-overview',
       providesTags: ['TeamOverview'],
@@ -155,7 +148,6 @@ export const dashboardApi = createApi({
       keepUnusedDataFor: 600,
     }),
 
-    // Mark notification as read
     markDashboardNotificationRead: builder.mutation({
       query: (id) => ({
         url: `notifications/${id}/read`,
@@ -168,7 +160,6 @@ export const dashboardApi = createApi({
       transformResponse: (response) => response
     }),
 
-    // Mark all notifications as read
     markAllDashboardNotificationsRead: builder.mutation({
       query: () => ({
         url: 'notifications/read-all',

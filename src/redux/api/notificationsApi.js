@@ -1,17 +1,17 @@
-// src/redux/api/notificationsApi.js - Session-based with CSRF
+// src/redux/api/notificationsApi.js - Updated with Redux CSRF
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 const baseQuery = fetchBaseQuery({
   baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/notifications/`,
-  credentials: 'include', // Send session cookies
+  credentials: 'include',
   prepareHeaders: (headers, { getState }) => {
-    const token = getState().auth.token;
+    const token = getState().auth?.token;
     if (token) {
       headers.set('authorization', `Bearer ${token}`);
     }
     
-    // Add CSRF token for non-GET requests
-    const csrfToken = window.csrfToken;
+    // FIXED: Read CSRF token from Redux state instead of window
+    const csrfToken = getState().csrf?.token;
     if (csrfToken) {
       headers.set('X-CSRF-Token', csrfToken);
     }
@@ -29,8 +29,6 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
   
   // Handle 403 CSRF token errors - refresh token and retry
   if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
-    console.log('CSRF token invalid, fetching new token...');
-    
     try {
       const csrfResponse = await fetch(
         `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/csrf-token`,
@@ -39,14 +37,21 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
       
       if (csrfResponse.ok) {
         const data = await csrfResponse.json();
-        window.csrfToken = data.csrfToken;
-        console.log('New CSRF token fetched, retrying request...');
+        
+        // FIXED: Update Redux state instead of window variable
+        const { setCsrfToken } = await import('../slices/csrfSlice');
+        const { getCsrfTokenFromCookie } = await import('../../utils/csrf');
+        
+        const tokenFromCookie = getCsrfTokenFromCookie();
+        api.dispatch(setCsrfToken(tokenFromCookie || data.csrfToken));
+        
+        console.log('✅ CSRF token refreshed in notificationsApi');
         
         // Retry the original request with new token
         result = await baseQuery(args, api, extraOptions);
       }
     } catch (error) {
-      console.error('Failed to refresh CSRF token:', error);
+      console.error('❌ Failed to refresh CSRF token:', error);
     }
   }
   
@@ -57,13 +62,10 @@ export const notificationsApi = createApi({
   reducerPath: 'notificationsApi',
   baseQuery: baseQueryWithReauth,
   tagTypes: ['Notification', 'NotificationCount'],
-  
-  // OPTIMIZED: Default cache retention
-  keepUnusedDataFor: 180, // 3 minutes default
+  keepUnusedDataFor: 180,
   refetchOnMountOrArgChange: 180,
   
   endpoints: (builder) => ({
-    // OPTIMIZED: Get notifications with specific tag invalidation
     getNotifications: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
