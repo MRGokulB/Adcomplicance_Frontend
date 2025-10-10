@@ -1,4 +1,4 @@
-// redux/api/tasksApi.js - Session-based with CSRF
+// redux/api/tasksApi.js - Session-based with CSRF  
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 const baseQuery = fetchBaseQuery({
@@ -24,14 +24,11 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
   
   if (result?.error?.status === 401) {
-    console.log('Token expired, redirecting to login...');
     api.dispatch({ type: 'auth/logout' });
   }
   
   // Handle 403 CSRF token errors - refresh token and retry
-  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
-    console.log('CSRF token invalid, fetching new token...');
-    
+  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {    
     try {
       const csrfResponse = await fetch(
         `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/csrf-token`,
@@ -40,8 +37,7 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
       
       if (csrfResponse.ok) {
         const data = await csrfResponse.json();
-        window.csrfToken = data.csrfToken;
-        console.log('New CSRF token fetched, retrying request...');
+        window.csrfToken = data.csrfToken; 
         
         // Retry the original request with new token
         result = await baseQuery(args, api, extraOptions);
@@ -66,6 +62,8 @@ export const tasksApi = createApi({
     getTasks: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
+        
+        // Add all possible filter parameters
         if (params.page) searchParams.append('page', params.page);
         if (params.limit) searchParams.append('limit', params.limit);
         if (params.status) searchParams.append('status', params.status);
@@ -77,6 +75,8 @@ export const tasksApi = createApi({
         if (params.exchange) searchParams.append('exchange', params.exchange);
         if (params.dateFrom) searchParams.append('dateFrom', params.dateFrom);
         if (params.dateTo) searchParams.append('dateTo', params.dateTo);
+        if (params.refNo) searchParams.append('refNo', params.refNo);
+        if (params.searchQuery) searchParams.append('searchQuery', params.searchQuery);
 
         return `?${searchParams.toString()}`;
       },
@@ -88,6 +88,26 @@ export const tasksApi = createApi({
           ]
           : [{ type: 'Task', id: 'LIST' }],
       transformResponse: (response) => response,
+      //  Force new cache entry for each unique filter + page combination
+      serializeQueryArgs: ({ endpointName, queryArgs }) => {
+        // Create unique cache key based on filters (excluding page/limit)
+        const { page, limit, ...filters } = queryArgs;
+        const filterKey = Object.keys(filters)
+          .sort()
+          .map(key => `${key}:${filters[key]}`)
+          .join('|');
+        return `${endpointName}-${filterKey}`;
+      },
+      //  Merge results for different pages of same filter
+      merge: (currentCache, newItems) => {
+        // Replace cache entirely (no merging needed for pagination)
+        return newItems;
+      },
+      //  Force refetch when page changes
+      forceRefetch({ currentArg, previousArg }) {
+        // Refetch if any parameter changed
+        return JSON.stringify(currentArg) !== JSON.stringify(previousArg);
+      },
     }),
 
     createTask: builder.mutation({

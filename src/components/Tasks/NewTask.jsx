@@ -10,7 +10,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 
-// OPTIMIZED: Validation function memoized outside component
+//  Validation function memoized outside component
 const validateFormField = (field, value, allValues) => {
   switch (field) {
     case 'title':
@@ -62,7 +62,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
   const [createTask] = useCreateTaskMutation();
   const [uploadFiles, { isLoading: isUploading }] = useUploadFilesMutation();
   
-  // OPTIMIZED: Memoized user query parameters
+  //  Memoized user query parameters
   const userQueryParams = useMemo(() => ({
     isActive: true,
     limit: 100
@@ -73,7 +73,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
   // Permission check
   const canCreateTasks = hasPermission(currentUserRole, PERMISSIONS.TASK_CREATE);
 
-  // OPTIMIZED: Memoized product users filter
+  //  Memoized product users filter
   const productUsers = useMemo(() => {
     if (!allUsersData?.users) return [];
     return allUsersData.users.filter(user => 
@@ -81,7 +81,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     );
   }, [allUsersData]);
 
-  // OPTIMIZED: Auto-assign current user only once on mount
+  //  Auto-assign current user only once on mount
   useEffect(() => {
     if (currentUser && 
         (currentUser.role === USER_ROLES.PRODUCT_USER || currentUser.role === USER_ROLES.PRODUCT_ADMIN) &&
@@ -99,7 +99,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     }
   }, [canCreateTasks, onClose]);
 
-  // OPTIMIZED: Validate all fields at once
+  //  Validate all fields at once
   const validateForm = useCallback(() => {
     const newErrors = {};
     
@@ -112,7 +112,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     return newErrors;
   }, [formData]);
 
-  // OPTIMIZED: Debounced field validation
+  //  Debounced field validation
   const handleInputChange = useCallback((field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     
@@ -126,7 +126,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     }
   }, [errors]);
 
-  // OPTIMIZED: Memoized handlers
+  //  Memoized handlers
   const handleUserSelect = useCallback((userId) => {
     setFormData(prev => {
       if (prev.assignedProductIds.includes(userId)) {
@@ -155,18 +155,29 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     }));
   }, []);
 
-  // OPTIMIZED: File validation with better error handling
+  //  File validation with better error handling
   const handleFileChange = useCallback((e) => {
     const files = Array.from(e.target.files);
     
-    const validTypes = ['image/', 'video/', 'application/pdf', 'application/msword', 
-                       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                       'application/vnd.ms-powerpoint', 
-                       'application/vnd.openxmlformats-officedocument.presentationml.presentation'];
+    const validTypes = [
+  'image/',
+  'video/',
+  'video/mp4',
+  'audio/mpeg',
+  'audio/mp3',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/csv'
+];
     
     const validFiles = files.filter(file => {
       const isValidType = validTypes.some(type => file.type.startsWith(type));
-      const isValidSize = file.size <= 50 * 1024 * 1024; // 50MB
+      const isValidSize = file.size <= 200 * 1024 * 1024; // 200MB
       return isValidType && isValidSize;
     });
 
@@ -202,7 +213,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     onClose();
   }, [onClose]);
 
-  // OPTIMIZED: Streamlined task creation
+  //  Streamlined task creation
   const handleCreateTask = useCallback(async () => {
     const validationErrors = validateForm();
     if (Object.keys(validationErrors).length > 0) {
@@ -296,7 +307,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     }
   }, [formData, validateForm, uploadFiles, createTask, onSuccess, onClose]);
 
-  // OPTIMIZED: Memoized user lookup
+  //  Memoized user lookup
   const getUserName = useCallback((userId) => {
     const user = productUsers.find(u => u.id === userId);
     return user ? user.fullName : 'Unknown User';
@@ -306,7 +317,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     return productUsers.find(u => u.id === userId) || null;
   }, [productUsers]);
 
-  // OPTIMIZED: Memoized available users for dropdown
+  //  Memoized available users for dropdown
   const availableUsers = useMemo(() => {
     return productUsers.filter(user => !formData.assignedProductIds.includes(user.id));
   }, [productUsers, formData.assignedProductIds]);

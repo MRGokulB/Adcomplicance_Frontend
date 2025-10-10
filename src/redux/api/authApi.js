@@ -4,7 +4,6 @@ import { logout, setCredentials } from '../slices/authSlice'
 import { getCsrfTokenFromCookie } from '../../utils/csrf'
 
 const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/`
-console.log('Auth API Base URL:', apiUrl)
 
 const baseQuery = fetchBaseQuery({
   baseUrl: apiUrl,
@@ -35,9 +34,7 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
   }
   
   // Handle 403 CSRF token errors - refresh token and retry
-  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
-    console.log('🔄 CSRF token invalid, fetching new token...');
-    
+  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {    
     // Fetch new CSRF token
     try {
       const csrfResponse = await fetch(
@@ -52,11 +49,9 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
         const tokenFromCookie = getCsrfTokenFromCookie();
         if (tokenFromCookie) {
           api.dispatch(setCsrfToken(tokenFromCookie));
-          console.log('✅ New CSRF token fetched from cookie, retrying request...');
-        } else {
+         } else {
           api.dispatch(setCsrfToken(data.csrfToken));
-          console.log('✅ New CSRF token fetched from response, retrying request...');
-        }
+         }
         
         // Retry the original request with new token
         result = await baseQuery(args, api, extraOptions);

@@ -30,9 +30,7 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
   }
   
   // Handle 403 CSRF token errors - refresh token and retry
-  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
-    console.log('🔄 CSRF token invalid, fetching new token...');
-    
+  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) { 
     // Fetch new CSRF token
     try {
       const csrfResponse = await fetch(
@@ -42,8 +40,7 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
       
       if (csrfResponse.ok) {
         const data = await csrfResponse.json();
-        window.csrfToken = data.csrfToken;
-        console.log('✅ New CSRF token fetched, retrying request...');
+        window.csrfToken = data.csrfToken; 
         
         // Retry the original request with new token
         result = await baseQuery(args, api, extraOptions);

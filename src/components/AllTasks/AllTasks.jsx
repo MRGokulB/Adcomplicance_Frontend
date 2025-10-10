@@ -1,5 +1,5 @@
-// src/components/AllTasks/AllTasks.jsx - OPTIMIZED VERSION
-import React, { useState, useEffect, useCallback } from 'react';
+// src/components/AllTasks/AllTasks.jsx - FIXED PAGINATION & FILTERS (NO PRIORITY)
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { selectUserRole } from '../../redux/slices/authSlice';
@@ -25,7 +25,7 @@ import FileValidationModal from './FlieValidationModal';
 import TaskReassignmentModal from './TaskReassignmentModal';
 import BulkOperationsModal from './BulkOperationsModal';
 
-// OPTIMIZED: Debounce hook
+// Debounce hook
 const useDebounce = (value, delay = 500) => {
     const [debouncedValue, setDebouncedValue] = useState(value);
 
@@ -43,12 +43,13 @@ export default function AllTasksPage() {
     const navigate = useNavigate();
     const currentUserRole = useSelector(selectUserRole);
     const permissions = usePermissions();
+    const tableRef = useRef(null); // ✅ For scroll positioning
 
-    // OPTIMIZED: Single unified filters state - all server-side
+    // ✅ FIX: Unified filters state - all server-side (REMOVED priority)
     const [filters, setFilters] = useState({
         taskType: '',
         status: '',
-        priority: '',
+        // priority: '', // ❌ REMOVED - not in schema
         createdBy: '',
         assignedTo: '',
         dateFrom: '',
@@ -58,12 +59,12 @@ export default function AllTasksPage() {
         limit: 10
     });
 
-    // OPTIMIZED: Separate state for immediate UI update
+    // Separate state for immediate UI update
     const [searchInput, setSearchInput] = useState('');
     const [createdByInput, setCreatedByInput] = useState('');
     const [assignedToInput, setAssignedToInput] = useState('');
 
-    // OPTIMIZED: Debounced values
+    // Debounced values
     const debouncedSearch = useDebounce(searchInput, 500);
     const debouncedCreatedBy = useDebounce(createdByInput, 500);
     const debouncedAssignedTo = useDebounce(assignedToInput, 500);
@@ -115,7 +116,24 @@ export default function AllTasksPage() {
     const canViewHealthCheck = permissions.canViewHealthCheck;
     const canAdvancedSearch = permissions.canAdvancedSearch;
 
-    // OPTIMIZED: API queries - conditional based on view
+    // ✅ FIX: Build clean query params
+    const buildQueryParams = (filterObj) => {
+    const params = {};
+    Object.keys(filterObj).forEach(key => {
+        // Exclude priority - it will be applied client-side
+        if (key !== 'priority' && filterObj[key] !== '' && filterObj[key] != null) {
+            params[key] = filterObj[key];
+        }
+    });
+    return params;
+};
+
+const applyPriorityFilter = useCallback((taskList) => {
+    if (!filters.priority) return taskList;
+    return taskList.filter(task => task.priority === filters.priority);
+}, [filters.priority]);
+
+    // ✅ FIX: API queries with clean params
     const {
         data: tasksData,
         isLoading,
@@ -123,11 +141,11 @@ export default function AllTasksPage() {
         error,
         refetch,
         isFetching
-    } = useGetTasksQuery(filters, { 
+    } = useGetTasksQuery(buildQueryParams(filters), { 
         skip: activeView !== 'all' || advancedSearch.enabled,
-        pollingInterval: 30000, // Poll every 30 seconds
-        refetchOnFocus: true,    // Refetch when window gains focus
-        refetchOnReconnect: true, // Refetch on network reconnect
+        pollingInterval: 30000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
         refetchOnMountOrArgChange: true 
     });
 
@@ -172,47 +190,72 @@ export default function AllTasksPage() {
         pollingInterval: 300000
     });
 
-    // OPTIMIZED: Get current data - no client-side filtering
-    const getCurrentData = useCallback(() => {
-        if (advancedSearch.enabled && advancedSearchData) {
+    // Get current data - server-side + client-side priority
+const getCurrentData = useCallback(() => {
+    if (advancedSearch.enabled && advancedSearchData) {
+        const results = advancedSearchData?.results || [];
+        const priorityFiltered = applyPriorityFilter(results);
+        return {
+            tasks: priorityFiltered,
+            pagination: advancedSearchData?.pagination || null,
+            totalCount: advancedSearchData?.pagination?.totalCount || 0,
+            isLoading: isAdvancedSearchLoading,
+            isError: false,
+            error: null
+        };
+    }
+
+    switch (activeView) {
+        case 'approved-not-published':
+            const approvedTasks = approvedNotPublishedData?.tasks || approvedNotPublishedData || [];
+            const approvedFiltered = applyPriorityFilter(approvedTasks);
             return {
-                tasks: advancedSearchData?.results || [],
-                pagination: advancedSearchData?.pagination || null,
-                totalCount: advancedSearchData?.pagination?.totalCount || 0,
-                isLoading: isAdvancedSearchLoading
+                tasks: approvedFiltered,
+                pagination: { 
+                    page: 1, 
+                    totalCount: approvedFiltered.length,
+                    totalPages: 1,
+                    hasNext: false,
+                    hasPrev: false
+                },
+                totalCount: approvedFiltered.length,
+                isLoading: isLoadingApproved,
+                isError: false,
+                error: null
             };
-        }
-
-        switch (activeView) {
-            case 'approved-not-published':
-                const approvedTasks = approvedNotPublishedData?.tasks || approvedNotPublishedData || [];
-                return {
-                    tasks: approvedTasks,
-                    pagination: null,
-                    totalCount: approvedNotPublishedData?.count || approvedTasks.length,
-                    isLoading: isLoadingApproved
-                };
-                
-            case 'expiring-soon':
-                const expiringTasks = expiringSoonData?.tasks || expiringSoonData?.data || [];
-                return {
-                    tasks: expiringTasks,
-                    pagination: null,
-                    totalCount: expiringSoonData?.summary?.totalExpiring || expiringTasks.length,
-                    isLoading: isLoadingExpiring
-                };
-                
-            default:
-                return {
-                    tasks: tasksData?.tasks || [],
-                    pagination: tasksData?.pagination || null,
-                    totalCount: tasksData?.pagination?.totalCount || 0,
-                    isLoading: isLoading
-                };
-        }
-    }, [advancedSearch, advancedSearchData, activeView, tasksData, approvedNotPublishedData, expiringSoonData, isLoading, isLoadingApproved, isLoadingExpiring, isAdvancedSearchLoading]);
-
-    const { tasks, pagination, totalCount, isLoading: currentLoading } = getCurrentData();
+            
+        case 'expiring-soon':
+            const expiringTasks = expiringSoonData?.tasks || expiringSoonData?.data || [];
+            const expiringFiltered = applyPriorityFilter(expiringTasks);
+            return {
+                tasks: expiringFiltered,
+                pagination: { 
+                    page: 1, 
+                    totalCount: expiringFiltered.length,
+                    totalPages: 1,
+                    hasNext: false,
+                    hasPrev: false
+                },
+                totalCount: expiringFiltered.length,
+                isLoading: isLoadingExpiring,
+                isError: false,
+                error: null
+            };
+            
+        default:
+            const allTasks = tasksData?.tasks || [];
+            const priorityFiltered = applyPriorityFilter(allTasks);
+            return {
+                tasks: priorityFiltered,
+                pagination: tasksData?.pagination || null,
+                totalCount: tasksData?.pagination?.totalCount || 0,
+                isLoading: isLoading || isFetching,
+                isError: isError,
+                error: error
+            };
+    }
+}, [advancedSearch, advancedSearchData, activeView, tasksData, approvedNotPublishedData, expiringSoonData, isLoading, isLoadingApproved, isLoadingExpiring, isAdvancedSearchLoading, isError, error, isFetching, applyPriorityFilter]);
+    const { tasks, pagination, totalCount, isLoading: currentLoading, isError: currentError, error: currentErrorData } = getCurrentData();
 
     // Tab visibility handler
     useEffect(() => {
@@ -235,18 +278,29 @@ export default function AllTasksPage() {
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [activeView, refetch, refetchApproved, refetchExpiring]);
 
-    // OPTIMIZED: Server-side pagination
+    // Server-side pagination
     const totalPages = pagination 
         ? Math.ceil(pagination.totalCount / filters.limit)
         : Math.ceil(totalCount / filters.limit);
 
-    // OPTIMIZED: Simplified handlers
+    // ✅ FIX: Simplified filter handler
     const handleFilterChange = useCallback((field, value) => {
         setFilters(prev => ({ 
             ...prev, 
             [field]: value,
-            page: 1
+            // Reset to page 1 when filter changes (except page/limit)
+            ...(field !== 'page' && field !== 'limit' ? { page: 1 } : {})
         }));
+    }, []);
+
+    // ✅ FIX: Page change with scroll
+    const handlePageChange = useCallback((newPage) => {
+        setFilters(prev => ({ ...prev, page: newPage }));
+        
+        // Scroll to table container
+        if (tableRef.current) {
+            tableRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     }, []);
 
     const handleAdvancedSearch = useCallback(() => {
@@ -306,11 +360,12 @@ export default function AllTasksPage() {
         setSelectedRows([]);
     }, []);
 
+    // ✅ FIX: Reset handler (REMOVED priority)
     const handleReset = useCallback(() => {
         setFilters({
             taskType: '',
             status: '',
-            priority: '',
+            // priority: '', // ❌ REMOVED
             createdBy: '',
             assignedTo: '',
             dateFrom: '',
@@ -425,30 +480,12 @@ export default function AllTasksPage() {
     };
 
     // Loading state
-    if (currentLoading && !tasks.length) {
+    if (currentLoading && !tasks.length && !currentError) {
         return (
             <div className="container-lg section-md">
                 <div className="flex items-center justify-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                     <span className="ml-2 text-gray-600">Loading tasks...</span>
-                </div>
-            </div>
-        );
-    }
-
-    // Error state
-    if (isError) {
-        return (
-            <div className="container-lg section-md">
-                <div className="text-center py-12">
-                    <div className="text-red-600 mb-4">
-                        <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to load tasks</h3>
-                    <p className="text-gray-600 mb-4">{error?.data?.message || 'An error occurred while fetching tasks'}</p>
-                    <button onClick={refetch} className="btn btn-primary">Try Again</button>
                 </div>
             </div>
         );
@@ -467,12 +504,44 @@ export default function AllTasksPage() {
                         {advancedSearch.enabled && (
                             <span className="ml-2 text-green-600">• Advanced search active</span>
                         )}
+                        {currentLoading && (
+                            <span className="ml-2 text-blue-600">• Loading...</span>
+                        )}
                     </p>
                 </div>
                 <div className="flex gap-2">
                     <button className="btn btn-outline" onClick={handleExportCSV}>Export CSV</button>
                 </div>
             </div>
+
+            {/* ✅ FIX: Non-blocking error alert */}
+            {currentError && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-start">
+                        <svg className="w-5 h-5 text-red-600 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="flex-1">
+                            <h3 className="text-sm font-semibold text-red-800">Error loading tasks</h3>
+                            <p className="text-sm text-red-700 mt-1">
+                                {currentErrorData?.data?.message || currentErrorData?.message || 'An error occurred while fetching tasks'}
+                            </p>
+                            <button 
+                                onClick={() => refetch()} 
+                                className="mt-2 text-sm text-red-800 underline hover:no-underline"
+                            >
+                                Try again
+                            </button>
+                        </div>
+                        <button 
+                            onClick={handleReset}
+                            className="ml-4 text-sm text-red-600 hover:text-red-800"
+                        >
+                            Reset filters
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {canViewTaskBuckets && (
                 <div className="mb-6">
@@ -493,11 +562,10 @@ export default function AllTasksPage() {
                 </div>
             )}
 
-            {/* Filter Panel - OPTIMIZED with debouncing */}
+            {/* Filter Panel - with debouncing */}
             <div className="filter-panel">
                 <div className="card-header">
                     <h3 className="card-title">Filters</h3>
-                    {isFetching && <span className="text-xs text-blue-600">Updating...</span>}
                 </div>
                 <div className="card-body">
                     <div className="filter-grid">
@@ -507,6 +575,7 @@ export default function AllTasksPage() {
                                 className="select"
                                 value={filters.taskType}
                                 onChange={(e) => handleFilterChange('taskType', e.target.value)}
+                                disabled={currentLoading}
                             >
                                 <option value="">All Task Types</option>
                                 <option value="INTERNAL">Internal</option>
@@ -520,6 +589,7 @@ export default function AllTasksPage() {
                                 className="select"
                                 value={filters.status}
                                 onChange={(e) => handleFilterChange('status', e.target.value)}
+                                disabled={currentLoading}
                             >
                                 <option value="">All Status</option>
                                 <option value="OPEN">Open</option>
@@ -530,28 +600,31 @@ export default function AllTasksPage() {
                             </select>
                         </div>
 
+                        {/* ❌ REMOVED Priority Filter */}
                         <div>
-                            <label className="info-label">Priority</label>
-                            <select
-                                className="select"
-                                value={filters.priority}
-                                onChange={(e) => handleFilterChange('priority', e.target.value)}
-                            >
-                                <option value="">All Priorities</option>
-                                <option value="HIGH">High</option>
-                                <option value="MEDIUM">Medium</option>
-                                <option value="LOW">Low</option>
-                            </select>
-                        </div>
+    <label className="info-label">Priority  </label>
+    <select
+        className="select"
+        value={filters.priority}
+        onChange={(e) => handleFilterChange('priority', e.target.value)}
+        disabled={currentLoading}
+    >
+        <option value="">All Priorities</option>
+        <option value="HIGH">High</option>
+        <option value="MEDIUM">Medium</option>
+        <option value="LOW">Low</option>
+    </select>
+</div>
 
                         <div>
                             <label className="info-label">Created By</label>
                             <input
                                 type="text"
                                 className="input"
-                                placeholder="Search by creator"
+                                placeholder="Search by creator name"
                                 value={createdByInput}
                                 onChange={(e) => setCreatedByInput(e.target.value)}
+                                disabled={currentLoading}
                             />
                         </div>
 
@@ -560,9 +633,10 @@ export default function AllTasksPage() {
                             <input
                                 type="text"
                                 className="input"
-                                placeholder="Search assignee"
+                                placeholder="Search by assignee name"
                                 value={assignedToInput}
                                 onChange={(e) => setAssignedToInput(e.target.value)}
+                                disabled={currentLoading}
                             />
                         </div>
 
@@ -573,6 +647,7 @@ export default function AllTasksPage() {
                                 className="input"
                                 value={filters.dateFrom}
                                 onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+                                disabled={currentLoading}
                             />
                         </div>
 
@@ -583,6 +658,7 @@ export default function AllTasksPage() {
                                 className="input"
                                 value={filters.dateTo}
                                 onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+                                disabled={currentLoading}
                             />
                         </div>
 
@@ -594,25 +670,27 @@ export default function AllTasksPage() {
                                 placeholder="Search everything..."
                                 value={searchInput}
                                 onChange={(e) => setSearchInput(e.target.value)}
+                                disabled={currentLoading}
                             />
                         </div>
                     </div>
 
-                    <div className="filter-actions">
-                        <div className="filter-summary">
-                            Showing {tasks.length} of {totalCount} tasks
-                            {activeView !== 'all' && ` (${activeView.replace('-', ' ')})`}
-                            {advancedSearch.enabled && ` • Advanced search: "${advancedSearch.query}"`}
-                        </div>
+                    <div className="filter-actions"> 
                         <div className="filter-buttons">
-                            <button className="btn btn-secondary" onClick={handleReset}>Reset</button>
+                            <button 
+                                className="btn btn-secondary" 
+                                onClick={handleReset}
+                                disabled={currentLoading}
+                            >
+                                Reset
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Table with server-side pagination */}
-            <div className="table-container">
+            {/* ✅ FIX: Table with ref for scroll */}
+            <div className="table-container" ref={tableRef}>
                 <div className="table-toolbar">
                     <div className="table-toolbar-left">
                         <h3 className="text-heading-4">Task Management</h3>
@@ -776,12 +854,22 @@ export default function AllTasksPage() {
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                         </svg>
                                         <h3 className="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
-                                        <p className="text-gray-500">
-                                            {activeView === 'all' ?
-                                                'No tasks match your current filters.' :
+                                        <p className="text-gray-500 mb-4">
+                                            {currentError ? 
+                                                'Unable to load tasks. Please check your filters or try again.' :
+                                                activeView === 'all' ?
+                                                'No tasks match your current filters. Try adjusting your search criteria.' :
                                                 `No ${activeView.replace('-', ' ')} tasks found.`
                                             }
                                         </p>
+                                        {!currentError && (
+                                            <button 
+                                                onClick={handleReset}
+                                                className="btn btn-secondary"
+                                            >
+                                                Reset Filters
+                                            </button>
+                                        )}
                                     </div>
                                 </td>
                             </tr>
@@ -789,7 +877,7 @@ export default function AllTasksPage() {
                     </tbody>
                 </table>
 
-                {/* Server-side pagination */}
+                {/* ✅ FIX: Server-side pagination with proper handlers */}
                 <div className="card-footer">
                     <div className="flex-between">
                         <div className="text-sm text-gray-600">
@@ -802,6 +890,7 @@ export default function AllTasksPage() {
                                     value={filters.limit}
                                     onChange={(e) => handleFilterChange('limit', Number(e.target.value))}
                                     className="select"
+                                    disabled={currentLoading}
                                 >
                                     <option value={5}>5</option>
                                     <option value={10}>10</option>
@@ -816,28 +905,28 @@ export default function AllTasksPage() {
                                 <button
                                     className="btn btn-secondary btn-sm"
                                     disabled={filters.page === 1 || currentLoading}
-                                    onClick={() => handleFilterChange('page', 1)}
+                                    onClick={() => handlePageChange(1)}
                                 >
                                     ⟨⟨
                                 </button>
                                 <button
                                     className="btn btn-secondary btn-sm"
                                     disabled={filters.page === 1 || currentLoading}
-                                    onClick={() => handleFilterChange('page', filters.page - 1)}
+                                    onClick={() => handlePageChange(filters.page - 1)}
                                 >
                                     ⟨
                                 </button>
                                 <button
                                     className="btn btn-secondary btn-sm"
-                                    disabled={filters.page === totalPages || currentLoading}
-                                    onClick={() => handleFilterChange('page', filters.page + 1)}
+                                    disabled={filters.page >= totalPages || currentLoading}
+                                    onClick={() => handlePageChange(filters.page + 1)}
                                 >
                                     ⟩
                                 </button>
                                 <button
                                     className="btn btn-secondary btn-sm"
-                                    disabled={filters.page === totalPages || currentLoading}
-                                    onClick={() => handleFilterChange('page', totalPages)}
+                                    disabled={filters.page >= totalPages || currentLoading}
+                                    onClick={() => handlePageChange(totalPages)}
                                 >
                                     ⟩⟩
                                 </button>

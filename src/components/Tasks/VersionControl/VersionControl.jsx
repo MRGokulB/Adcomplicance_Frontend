@@ -150,24 +150,18 @@ const VersionControl = ({ task, onRefresh }) => {
     }));
   };
 
-  // UPDATED: Auto-validation with optional files parameter
+  //  Auto-validation with optional files parameter
   const handleValidateFiles = async (filesToValidate = null) => {
     const files = filesToValidate || uploadData.files;
     
-    try {
-      console.log('Starting file validation...', files.length, 'files');
-      
+    try {      
       // Step 1: Prepare FormData for upload
       const formData = new FormData();
       files.forEach((file) => {
         formData.append("files", file);
       });
 
-      // Step 2: Upload to S3
-      console.log('Uploading files to S3...');
-      const uploadRes = await uploadFiles(formData).unwrap();
-      console.log('Upload response:', uploadRes);
-      
+      // Step 2: Upload to S3      const uploadRes = await uploadFiles(formData).unwrap();      
       if (!uploadRes.files || uploadRes.files.length === 0) {
         throw new Error('No files were uploaded successfully');
       }
@@ -211,7 +205,7 @@ const VersionControl = ({ task, onRefresh }) => {
     }
   };
 
-  // UPDATED: Create version with auto-validation if needed
+  //  Create version with auto-validation if needed
   const handleFileUpload = async () => {
   console.log("Starting version upload...");  
     
@@ -238,8 +232,6 @@ const VersionControl = ({ task, onRefresh }) => {
       }
     }
 
-    console.log('Creating version with S3 URLs:', uploadData.s3Urls);
-
     // Prepare payload for version creation
     const versionPayload = {
       id: task.id,
@@ -247,12 +239,8 @@ const VersionControl = ({ task, onRefresh }) => {
       remarks: uploadData.remarks?.trim() || `New version with ${uploadData.s3Urls.length} file(s)`
     };
 
-    console.log('Version payload:', versionPayload);
-
     // Create version - FIXED: Just await the result, API success means no error was thrown
     const result = await uploadVersionTrigger(versionPayload).unwrap();
-    console.log('Version upload result:', result);
-
     // If we get here, the upload was successful (no error thrown)
     // Show success message with guidance
     const guidance = getUploadGuidance();
@@ -993,7 +981,7 @@ const VersionControl = ({ task, onRefresh }) => {
         </div>
       </div>
 
-      {/* Version History - UPDATED: Use olderVersions from API response */}
+      {/* Version History -  Use olderVersions from API response */}
       {task?.olderVersions && task.olderVersions.length > 0 && (
         <div className="info-section">
           <div className="info-card">

@@ -1,98 +1,87 @@
-// src/components/Dashboard/AdvancedTable.jsx - Dashboard-specific task table excluding closed and published tasks
-import React, { useState, useMemo, useEffect } from 'react';
+// src/components/Dashboard/AdvancedTable.jsx - Hybrid filtering (server-side + client-side priority)
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { selectUserRole } from '../../redux/slices/authSlice';
 import {
     useGetTasksQuery,
     useGetApprovedNotPublishedQuery,
     useGetExpiringSoonQuery,
     useAdvancedTaskSearchQuery,
-    useBulkTaskOperationsMutation,
-    useValidateFilesMutation,
-    useGetTaskHealthCheckQuery,
-    useUpdateTaskStatusMutation,
 } from '../../redux/api/tasksApi';
-import { hasPermission, PERMISSIONS } from '../../utils/roles';
-import {
-    usePermissions,
-    CanReassignTask,
-    CanValidateFiles,
-    CanPerformBulkOperations,
-    CanViewHealthCheck,
-    CanViewDashboardStats,
-} from '../PermissionWrapper';
- 
+import { usePermissions } from '../PermissionWrapper';
 
 export default function AdvancedTable() {
     const navigate = useNavigate();
     const currentUserRole = useSelector(selectUserRole);
     const permissions = usePermissions();
-    const dispatch = useDispatch();
+    const tableRef = useRef(null);
 
+    // Consolidated filters state - ALL filters in one place
     const [filters, setFilters] = useState({
         taskType: '',
         status: '',
-        search: '',
-        priority: '',
-        page: 1,
-        limit: 10
-    });
-
-    const [localFilters, setLocalFilters] = useState({
+        priority: '', // This will be applied CLIENT-SIDE only
         createdBy: '',
         assignedTo: '',
         dateFrom: '',
         dateTo: '',
         refNo: '',
-        searchQuery: ''
+        searchQuery: '',
+        page: 1,
+        limit: 10
     });
 
     // Advanced search state
     const [advancedSearch, setAdvancedSearch] = useState({
         enabled: false,
         query: '',
-        type: 'all' // 'title', 'description', 'uin', 'all'
-    }); 
+        type: 'all'
+    });
+    
     const [activeView, setActiveView] = useState('all');
 
-    // Permission checks - Updated with new permissions
-    const canCreateTasks = permissions.canCreateTask;
-    const canViewTaskBuckets = permissions.canViewTaskBuckets;
-    const canPerformBulkOps = permissions.canPerformBulkOperations;
-    const canReassignTasks = permissions.canReassignTask;
-    const canValidateFiles = permissions.canValidateFiles;
-    const canViewHealthCheck = permissions.canViewHealthCheck;
+    // Permission checks
     const canAdvancedSearch = permissions.canAdvancedSearch;
 
-    // EXCLUDED STATUSES - Key modification for AdvancedTable
+    // EXCLUDED STATUSES
     const EXCLUDED_STATUSES = ['CLOSED_INTERNAL', 'CLOSED_EXCHANGE', 'PUBLISHED'];
 
-    // API queries based on active view
+    // Prepare server-side filters (WITHOUT priority)
+    const serverFilters = useMemo(() => {
+        const { priority, ...restFilters } = filters;
+        return restFilters;
+    }, [filters]);
+
+    // API queries based on active view (using serverFilters without priority)
     const {
         data: tasksData,
         isLoading,
         isError,
         error,
         refetch
-    } = useGetTasksQuery(filters, {
+    } = useGetTasksQuery(serverFilters, {
         skip: activeView !== 'all',
-        refetchOnFocus: true,    
-        refetchOnReconnect: true, 
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
         refetchOnMountOrArgChange: true
-     });
+    });
 
     const {
         data: approvedNotPublishedData,
         isLoading: isLoadingApproved,
         refetch: refetchApproved
-    } = useGetApprovedNotPublishedQuery(undefined, { skip: activeView !== 'approved-not-published' });
+    } = useGetApprovedNotPublishedQuery(undefined, { 
+        skip: activeView !== 'approved-not-published' 
+    });
 
     const {
         data: expiringSoonData,
         isLoading: isLoadingExpiring,
         refetch: refetchExpiring
-    } = useGetExpiringSoonQuery({ days: 15 });
+    } = useGetExpiringSoonQuery({ days: 15 }, {
+        skip: activeView !== 'expiring-soon'
+    });
 
     // Advanced search query
     const {
@@ -103,37 +92,35 @@ export default function AdvancedTable() {
         {
             q: advancedSearch.query,
             type: advancedSearch.type,
-            page: filters.page,
-            limit: filters.limit
+            page: serverFilters.page,
+            limit: serverFilters.limit
         },
         {
             skip: !advancedSearch.enabled || !advancedSearch.query || !canAdvancedSearch
         }
     );
 
-    // Health check query for system monitoring
-    const {
-        data: healthCheckData,
-        refetch: refetchHealthCheck
-    } = useGetTaskHealthCheckQuery(undefined, {
-        skip: true,
-        pollingInterval: 300000 // 5 minutes
-    });
-
-    // Function to filter out excluded statuses
+    // Function to filter out excluded statuses (still needed for special views)
     const filterActiveTasks = (taskList) => {
         if (!Array.isArray(taskList)) return [];
         return taskList.filter(task => !EXCLUDED_STATUSES.includes(task.status));
     };
 
-    // Get current data based on active view - Updated with status filtering
+    // Client-side priority filter function
+    const applyPriorityFilter = (taskList) => {
+        if (!filters.priority) return taskList;
+        return taskList.filter(task => task.priority === filters.priority);
+    };
+
+    // Get current data based on active view
     const getCurrentData = () => {
         if (advancedSearch.enabled && advancedSearchData) {
             const filteredResults = filterActiveTasks(advancedSearchData?.results || []);
+            const priorityFiltered = applyPriorityFilter(filteredResults);
             return {
-                tasks: filteredResults,
+                tasks: priorityFiltered,
+                totalBeforeClientFilter: filteredResults.length,
                 pagination: advancedSearchData?.pagination || null,
-                count: filteredResults.length,
                 isLoading: isAdvancedSearchLoading
             };
         }
@@ -141,38 +128,53 @@ export default function AdvancedTable() {
         switch (activeView) {
             case 'approved-not-published':
                 const approvedTasks = filterActiveTasks(approvedNotPublishedData?.tasks || approvedNotPublishedData || []);
+                const approvedFiltered = applyPriorityFilter(approvedTasks);
                 return {
-                    tasks: approvedTasks,
-                    pagination: null,
-                    count: approvedTasks.length,
+                    tasks: approvedFiltered,
+                    totalBeforeClientFilter: approvedTasks.length,
+                    pagination: { 
+                        page: 1, 
+                        totalCount: approvedFiltered.length,
+                        totalPages: 1,
+                        hasNext: false,
+                        hasPrev: false
+                    },
                     isLoading: isLoadingApproved
                 };
             case 'expiring-soon':
                 const expiringTasks = filterActiveTasks(expiringSoonData?.tasks || expiringSoonData?.data || []);
+                const expiringFiltered = applyPriorityFilter(expiringTasks);
                 return {
-                    tasks: expiringTasks,
-                    pagination: null,
-                    count: expiringTasks.length,
+                    tasks: expiringFiltered,
+                    totalBeforeClientFilter: expiringTasks.length,
+                    pagination: { 
+                        page: 1, 
+                        totalCount: expiringFiltered.length,
+                        totalPages: 1,
+                        hasNext: false,
+                        hasPrev: false
+                    },
                     isLoading: isLoadingExpiring
                 };
             default:
-                const allActiveTasks = filterActiveTasks(tasksData?.tasks || []);
+                // Server handles all filtering except priority
+                const allTasks = tasksData?.tasks || [];
+                const priorityFiltered = applyPriorityFilter(allTasks);
                 return {
-                    tasks: allActiveTasks,
+                    tasks: priorityFiltered,
+                    totalBeforeClientFilter: allTasks.length,
                     pagination: tasksData?.pagination || null,
-                    count: allActiveTasks.length,
                     isLoading: isLoading
                 };
         }
     };
 
-    const { tasks, pagination, count, isLoading: currentLoading } = getCurrentData();
+    const { tasks, totalBeforeClientFilter, pagination, isLoading: currentLoading } = getCurrentData();
 
     // Add focus handling to refresh data when tab becomes active
     useEffect(() => {
         const handleFocus = () => {
             if (document.visibilityState === 'visible') {
-                // Refresh current view when tab becomes visible
                 switch (activeView) {
                     case 'approved-not-published':
                         refetchApproved();
@@ -190,113 +192,66 @@ export default function AdvancedTable() {
         return () => document.removeEventListener('visibilitychange', handleFocus);
     }, [activeView, refetch, refetchApproved, refetchExpiring]);
 
-    // Apply local filters to tasks (already filtered for active tasks)
-    // Apply local filters to tasks (already filtered for active tasks)
-const filteredData = useMemo(() => {
-  return tasks.filter(task => {
-    const matchesCreatedBy = !localFilters.createdBy ||
-      task.createdBy?.fullName?.toLowerCase().includes(localFilters.createdBy.toLowerCase()) ||
-      task.createdBy?.toLowerCase().includes(localFilters.createdBy.toLowerCase());
-
-    const matchesAssignedTo = !localFilters.assignedTo ||
-      task.assignedProducts?.some(product =>
-        (typeof product === 'string' ? product : product.fullName)?.toLowerCase().includes(localFilters.assignedTo.toLowerCase())
-      );
-
-    const matchesRefNo = !localFilters.refNo ||
-      (task.uin && task.uin.toLowerCase().includes(localFilters.refNo.toLowerCase()));
-
-    const matchesSearch = !localFilters.searchQuery ||
-      [task.title, task.description, task.uin, task.platform, task.category]
-        .some(value => value && value.toString().toLowerCase().includes(localFilters.searchQuery.toLowerCase()));
-
-    // Date filtering
-    const matchesDateFrom = !localFilters.dateFrom ||
-      (task.createdAt && new Date(task.createdAt) >= new Date(localFilters.dateFrom));
-
-    const matchesDateTo = !localFilters.dateTo ||
-      (task.createdAt && new Date(task.createdAt) <= new Date(localFilters.dateTo + 'T23:59:59'));
-
-    // Priority filtering (from main filters state)
-    const matchesPriority = !filters.priority ||
-      task.priority === filters.priority;
-
-    return matchesCreatedBy && 
-           matchesAssignedTo && 
-           matchesRefNo && 
-           matchesSearch && 
-           matchesDateFrom && 
-           matchesDateTo && 
-           matchesPriority;
-  });
-}, [tasks, localFilters, filters.priority]);
-
-    // Pagination for filtered data
-    const totalPages = Math.ceil(filteredData.length / filters.limit);
-    const startIndex = (filters.page - 1) * filters.limit;
-    const paginatedData = filteredData.slice(startIndex, startIndex + filters.limit);
-
+    // Single filter handler - updates filters and resets to page 1
     const handleFilterChange = (field, value) => {
-        if (['taskType', 'status', 'search', 'priority'].includes(field)) {
-            setFilters(prev => ({ ...prev, [field]: value, page: 1 }));
-        } else {
-            setLocalFilters(prev => ({ ...prev, [field]: value }));
-        }
+        setFilters(prev => ({ 
+            ...prev, 
+            [field]: value, 
+            // Reset to page 1 when any filter changes (except page/limit)
+            ...(field !== 'page' && field !== 'limit' ? { page: 1 } : {})
+        }));
     };
 
     // Handle advanced search
     const handleAdvancedSearch = () => {
         if (advancedSearch.query.trim()) {
             setAdvancedSearch(prev => ({ ...prev, enabled: true }));
-            refetchAdvancedSearch();
+            setFilters(prev => ({ ...prev, page: 1 }));
         }
     };
 
     const clearAdvancedSearch = () => {
         setAdvancedSearch({ enabled: false, query: '', type: 'all' });
-    }; 
+        setFilters(prev => ({ ...prev, page: 1 }));
+    };
 
     const handleReset = () => {
         setFilters({
             taskType: '',
             status: '',
-            search: '',
             priority: '',
-            page: 1,
-            limit: 10
-        });
-        setLocalFilters({
             createdBy: '',
             assignedTo: '',
             dateFrom: '',
             dateTo: '',
             refNo: '',
-            searchQuery: ''
-        }); 
+            searchQuery: '',
+            page: 1,
+            limit: 10
+        });
         clearAdvancedSearch();
-    }; 
+    };
+
+    // Page navigation handlers
+    const handlePageChange = (newPage) => {
+        setFilters(prev => ({ ...prev, page: newPage }));
+        if (tableRef.current) {
+            tableRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
+
     const getStatusBadge = (status) => {
         switch (status) {
             case 'OPEN': return 'table-status-indicator offline';
             case 'PRODUCT_REVIEW': return 'table-status-indicator busy';
             case 'COMPLIANCE_REVIEW': return 'table-status-indicator busy';
             case 'APPROVED': return 'table-status-indicator online';
-            // Removed PUBLISHED, CLOSED_INTERNAL, CLOSED_EXCHANGE as they're filtered out
             default: return 'table-status-indicator offline';
         }
     };
 
     const getTaskTypeLabel = (taskType) => {
         return taskType === 'EXCHANGE' ? 'Exchange' : 'Internal';
-    };
-
-    const formatDate = (dateString) => {
-        if (!dateString) return '-';
-        return new Date(dateString).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
     };
 
     const formatDateTime = (dateString) => {
@@ -344,17 +299,17 @@ const filteredData = useMemo(() => {
 
     return (
         <div className="container-lg section-md">
-            {/* Page Header - Modified for Dashboard context */}
+            {/* Page Header */}
             <div className="flex-between items-center mb-6">
                 <div>
-                    <h1 className="text-heading-2"> Tasks Overview</h1>
-                    <p className="text-caption mt-2"> 
+                    <h1 className="text-heading-2">Tasks Overview</h1>
+                    <p className="text-caption mt-2">
                         {advancedSearch.enabled && (
                             <span className="ml-2 text-green-600">• Advanced search active</span>
-                        )}
+                        )} 
                     </p>
-                </div> 
-            </div> 
+                </div>
+            </div>
 
             {/* Filter Panel */}
             <div className="filter-panel">
@@ -388,12 +343,13 @@ const filteredData = useMemo(() => {
                                 <option value="PRODUCT_REVIEW">Product Review</option>
                                 <option value="COMPLIANCE_REVIEW">Compliance Review</option>
                                 <option value="APPROVED">Approved</option>
-                                {/* Removed PUBLISHED, CLOSED_INTERNAL, CLOSED_EXCHANGE options */}
                             </select>
                         </div>
 
                         <div>
-                            <label className="info-label">Priority</label>
+                            <label className="info-label">
+                                Priority  
+                            </label>
                             <select
                                 className="select"
                                 value={filters.priority}
@@ -412,7 +368,7 @@ const filteredData = useMemo(() => {
                                 type="text"
                                 className="input"
                                 placeholder="Search by creator"
-                                value={localFilters.createdBy}
+                                value={filters.createdBy}
                                 onChange={(e) => handleFilterChange('createdBy', e.target.value)}
                             />
                         </div>
@@ -423,8 +379,19 @@ const filteredData = useMemo(() => {
                                 type="text"
                                 className="input"
                                 placeholder="Search assignee"
-                                value={localFilters.assignedTo}
+                                value={filters.assignedTo}
                                 onChange={(e) => handleFilterChange('assignedTo', e.target.value)}
+                            />
+                        </div>
+
+                        <div>
+                            <label className="info-label">Reference No (UIN)</label>
+                            <input
+                                type="text"
+                                className="input"
+                                placeholder="Search by UIN"
+                                value={filters.refNo}
+                                onChange={(e) => handleFilterChange('refNo', e.target.value)}
                             />
                         </div>
 
@@ -433,7 +400,7 @@ const filteredData = useMemo(() => {
                             <input
                                 type="date"
                                 className="input"
-                                value={localFilters.dateFrom}
+                                value={filters.dateFrom}
                                 onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
                             />
                         </div>
@@ -443,7 +410,7 @@ const filteredData = useMemo(() => {
                             <input
                                 type="date"
                                 className="input"
-                                value={localFilters.dateTo}
+                                value={filters.dateTo}
                                 onChange={(e) => handleFilterChange('dateTo', e.target.value)}
                             />
                         </div>
@@ -454,7 +421,7 @@ const filteredData = useMemo(() => {
                                 type="text"
                                 className="input"
                                 placeholder="Search everything..."
-                                value={localFilters.searchQuery}
+                                value={filters.searchQuery}
                                 onChange={(e) => handleFilterChange('searchQuery', e.target.value)}
                             />
                         </div>
@@ -462,25 +429,26 @@ const filteredData = useMemo(() => {
 
                     <div className="filter-actions">
                         <div className="filter-summary">
-                            Showing {filteredData.length} of {count} active tasks
+                            Showing {tasks.length} of {pagination?.totalCount || 0} active tasks 
                             {activeView !== 'all' && ` (${activeView.replace('-', ' ')})`}
                             {advancedSearch.enabled && ` • Advanced search: "${advancedSearch.query}"`}
                         </div>
                         <div className="filter-buttons">
-                            <button className="btn btn-secondary" onClick={handleReset}>Reset</button>
-                            <button className="btn btn-primary">Apply Filters</button>
+                            <button className="btn btn-secondary" onClick={handleReset}>
+                                Reset All
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Table */}
-            <div className="table-container">
+            <div className="table-container" ref={tableRef}>
                 <div className="table-toolbar">
                     <div className="table-toolbar-left">
                         <h3 className="text-heading-4">Task Management</h3>
                     </div>
-                </div> 
+                </div>
 
                 <table className="table">
                     <thead className="table-header">
@@ -496,11 +464,8 @@ const filteredData = useMemo(() => {
                         </tr>
                     </thead>
                     <tbody className="table-body">
-                        {paginatedData.length > 0 ? paginatedData.map((task) => (
-                            <tr
-                                key={task.id}
-                                className="group"
-                            > 
+                        {tasks.length > 0 ? tasks.map((task) => (
+                            <tr key={task.id} className="group">
                                 <td className="font-medium">{task.uin}</td>
                                 <td className="max-w-xs truncate">{task.title}</td>
                                 <td>
@@ -515,9 +480,10 @@ const filteredData = useMemo(() => {
                                 </td>
                                 <td>
                                     {task.priority && (
-                                        <span className={`badge ${task.priority === 'HIGH' ? 'badge-error' :
-                                                task.priority === 'MEDIUM' ? 'badge-warning' : 'badge-success'
-                                            }`}>
+                                        <span className={`badge ${
+                                            task.priority === 'HIGH' ? 'badge-error' :
+                                            task.priority === 'MEDIUM' ? 'badge-warning' : 'badge-success'
+                                        }`}>
                                             {task.priority}
                                         </span>
                                     )}
@@ -551,7 +517,9 @@ const filteredData = useMemo(() => {
                                         </svg>
                                         <h3 className="text-lg font-medium text-gray-900 mb-2">No active tasks found</h3>
                                         <p className="text-gray-500">
-                                            {activeView === 'all' ?
+                                            {filters.priority ? 
+                                                `No tasks found with priority: ${filters.priority}` :
+                                                activeView === 'all' ?
                                                 'No active tasks match your current filters. Try adjusting your search criteria.' :
                                                 `No active ${activeView.replace('-', ' ')} tasks found.`
                                             }
@@ -567,14 +535,14 @@ const filteredData = useMemo(() => {
                 <div className="card-footer">
                     <div className="flex-between">
                         <div className="text-sm text-gray-600">
-                            Showing {paginatedData.length} of {filteredData.length} tasks
+                            Showing {tasks.length} of {pagination?.totalCount || 0} tasks
                         </div>
                         <div className="flex gap-2 items-center">
                             <div className="flex items-center gap-2 mr-4">
                                 <span className="text-sm text-gray-600">Rows per page:</span>
                                 <select
                                     value={filters.limit}
-                                    onChange={(e) => setFilters(prev => ({ ...prev, limit: Number(e.target.value), page: 1 }))}
+                                    onChange={(e) => handleFilterChange('limit', Number(e.target.value))}
                                     className="select"
                                 >
                                     <option value={5}>5</option>
@@ -585,33 +553,33 @@ const filteredData = useMemo(() => {
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-sm text-gray-600">
-                                    Page {filters.page} of {Math.max(1, totalPages)}
+                                    Page {pagination?.page || 1} of {pagination?.totalPages || 1}
                                 </span>
                                 <button
                                     className="btn btn-secondary btn-sm"
-                                    disabled={filters.page === 1}
-                                    onClick={() => setFilters(prev => ({ ...prev, page: 1 }))}
+                                    disabled={!pagination?.hasPrev}
+                                    onClick={() => handlePageChange(1)}
                                 >
                                     ⟨⟨
                                 </button>
                                 <button
                                     className="btn btn-secondary btn-sm"
-                                    disabled={filters.page === 1}
-                                    onClick={() => setFilters(prev => ({ ...prev, page: prev.page - 1 }))}
+                                    disabled={!pagination?.hasPrev}
+                                    onClick={() => handlePageChange(filters.page - 1)}
                                 >
                                     ⟨
                                 </button>
                                 <button
                                     className="btn btn-secondary btn-sm"
-                                    disabled={filters.page === totalPages}
-                                    onClick={() => setFilters(prev => ({ ...prev, page: prev.page + 1 }))}
+                                    disabled={!pagination?.hasNext}
+                                    onClick={() => handlePageChange(filters.page + 1)}
                                 >
                                     ⟩
                                 </button>
                                 <button
                                     className="btn btn-secondary btn-sm"
-                                    disabled={filters.page === totalPages}
-                                    onClick={() => setFilters(prev => ({ ...prev, page: totalPages }))}
+                                    disabled={!pagination?.hasNext}
+                                    onClick={() => handlePageChange(pagination?.totalPages || 1)}
                                 >
                                     ⟩⟩
                                 </button>
@@ -622,4 +590,4 @@ const filteredData = useMemo(() => {
             </div>
         </div>
     );
-};
+}

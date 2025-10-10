@@ -3,7 +3,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 const baseQuery = fetchBaseQuery({
   baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/users/`,
-  credentials: 'include', // Important for session cookies
+  credentials: 'include',  
   prepareHeaders: (headers, { getState }) => {
     const token = getState().auth.token;
     if (token) {
@@ -24,14 +24,11 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
   
   if (result?.error?.status === 401) {
-    console.log('Token expired, redirecting to login...');
     api.dispatch({ type: 'auth/logout' });
   }
   
   // Handle 403 CSRF token errors - refresh token and retry
-  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
-    console.log('🔄 CSRF token invalid, fetching new token...');
-    
+  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {    
     try {
       const csrfResponse = await fetch(
         `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/csrf-token`,
@@ -41,8 +38,7 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
       if (csrfResponse.ok) {
         const data = await csrfResponse.json();
         window.csrfToken = data.csrfToken;
-        console.log('✅ New CSRF token fetched, retrying request...');
-        
+         
         // Retry the original request with new token
         result = await baseQuery(args, api, extraOptions);
       }
@@ -59,12 +55,12 @@ export const usersApi = createApi({
   baseQuery: baseQueryWithReauth,
   tagTypes: ['User', 'Absence', 'Profile', 'Promotion'],
   
-  // OPTIMIZED: Default cache retention
+  //  Default cache retention
   keepUnusedDataFor: 300, // 5 minutes default
   refetchOnMountOrArgChange: 300,
   
   endpoints: (builder) => ({
-    // OPTIMIZED: Current user profile with longer cache
+    //  Current user profile with longer cache
     getCurrentUserProfile: builder.query({
       query: () => 'profile/me',
       providesTags: [{ type: 'Profile', id: 'CURRENT' }],
@@ -72,7 +68,7 @@ export const usersApi = createApi({
       keepUnusedDataFor: 600, // 10 minutes - rarely changes
     }),
 
-    // OPTIMIZED: Update profile with optimistic update
+    //  Update profile with optimistic update
     updateCurrentUserProfile: builder.mutation({
       query: (userData) => ({
         url: 'profile/me',
@@ -105,7 +101,7 @@ export const usersApi = createApi({
       }
     }),
 
-    // OPTIMIZED: Enhanced user listing with specific tags
+    //  Enhanced user listing with specific tags
     getUsers: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -118,7 +114,7 @@ export const usersApi = createApi({
         
         return `?${searchParams.toString()}`;
       },
-      // OPTIMIZED: Provide specific tags for each user
+      //  Provide specific tags for each user
       providesTags: (result) => 
         result?.users
           ? [
@@ -133,7 +129,7 @@ export const usersApi = createApi({
       keepUnusedDataFor: 300, // 5 minutes
     }),
 
-    // OPTIMIZED: Get user by ID with longer cache
+    //  Get user by ID with longer cache
     getUserById: builder.query({
       query: (id) => id,
       providesTags: (result, error, id) => [{ type: 'User', id }],
@@ -141,7 +137,7 @@ export const usersApi = createApi({
       keepUnusedDataFor: 600, // 10 minutes - user details don't change often
     }),
 
-    // OPTIMIZED: Create user with better error handling
+    //  Create user with better error handling
     createUser: builder.mutation({
       query: (userData) => ({
         url: '',
@@ -157,7 +153,7 @@ export const usersApi = createApi({
       })
     }),
 
-    // OPTIMIZED: Update user with optimistic update
+    //  Update user with optimistic update
     // FIXED: Update user with optimistic update for BOTH detail and list
 updateUser: builder.mutation({
   query: ({ id, ...userData }) => ({
@@ -257,7 +253,7 @@ promoteUser: builder.mutation({
       transformResponse: (response) => response.message
     }),
 
-    // OPTIMIZED: Get promotion eligible users with longer cache
+    //  Get promotion eligible users with longer cache
     getPromotionEligibleUsers: builder.query({
       query: () => 'promotion/eligible',
       providesTags: [{ type: 'Promotion', id: 'ELIGIBLE' }],
@@ -268,7 +264,7 @@ promoteUser: builder.mutation({
       keepUnusedDataFor: 600, // 10 minutes - doesn't change frequently
     }),
 
-    // OPTIMIZED: Enhanced absence management with specific tags
+    //  Enhanced absence management with specific tags
     getAbsences: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -280,7 +276,7 @@ promoteUser: builder.mutation({
         
         return `absences?${searchParams.toString()}`;
       },
-      // OPTIMIZED: Provide specific tags for each absence
+      //  Provide specific tags for each absence
       providesTags: (result) =>
         result && Array.isArray(result)
           ? [
@@ -292,7 +288,7 @@ promoteUser: builder.mutation({
       keepUnusedDataFor: 300, // 5 minutes
     }),
 
-    // OPTIMIZED: Create absence with optimistic update
+    //  Create absence with optimistic update
     createAbsence: builder.mutation({
       query: (absenceData) => ({
         url: 'absences',
@@ -328,7 +324,7 @@ promoteUser: builder.mutation({
       }
     }),
 
-    // OPTIMIZED: Delete absence with optimistic removal
+    //  Delete absence with optimistic removal
     deleteAbsence: builder.mutation({
       query: (id) => ({
         url: `absences/${id}`,

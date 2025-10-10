@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUserRole, selectIsAuthenticated } from '../../redux/slices/authSlice';
 import { hasPermission, PERMISSIONS } from '../../utils/roles';
@@ -9,12 +9,27 @@ import {
 } from '../../redux/api/auditApi';
 import { useGetUsersQuery } from '../../redux/api/usersApi';
 
+// Debounce hook
+const useDebounce = (value, delay = 800) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
 const AuditLog = () => {
   const userRole = useSelector(selectUserRole);
   const isAuthenticated = useSelector(selectIsAuthenticated);
   console.log('Is authenticated:', isAuthenticated);
   
-  const [filters, setFilters] = useState({
+  // Separate UI state from API query state
+  const [uiFilters, setUiFilters] = useState({
     page: 1,
     limit: 50,
     dateFrom: '',
@@ -23,6 +38,31 @@ const AuditLog = () => {
     performedBy: '',
     taskId: '',
   });
+
+  // Applied filters (actually sent to API)
+  const [appliedFilters, setAppliedFilters] = useState({
+    page: 1,
+    limit: 50,
+    dateFrom: '',
+    dateTo: '',
+    action: '',
+    performedBy: '',
+    taskId: '',
+  });
+
+  // Debounce taskId to prevent API calls on every keystroke
+  const debouncedTaskId = useDebounce(uiFilters.taskId, 800);
+
+  // Auto-apply debounced taskId
+  useEffect(() => {
+    if (debouncedTaskId !== appliedFilters.taskId) {
+      setAppliedFilters(prev => ({
+        ...prev,
+        taskId: debouncedTaskId,
+        page: 1
+      }));
+    }
+  }, [debouncedTaskId]);
 
   // FIXED: Check permissions using correct backend-aligned roles
   const canViewFullAudit = hasPermission(userRole, PERMISSIONS.AUDIT_READ_ALL);
@@ -45,13 +85,14 @@ const AuditLog = () => {
     );
   }
 
-  // API Queries - Using corrected API endpoints
+  // API Queries - Using applied filters (not UI filters)
   const { 
     data: auditData, 
     isLoading: isAuditLoading, 
     error: auditError,
-    refetch: refetchAudit
-  } = useGetAuditLogsQuery(filters, {
+    refetch: refetchAudit,
+    isFetching
+  } = useGetAuditLogsQuery(appliedFilters, {
     pollingInterval: 60000, // Refresh every minute
     refetchOnMountOrArgChange: true,
   });
@@ -60,8 +101,8 @@ const AuditLog = () => {
     data: statsData, 
     isLoading: isStatsLoading 
   } = useGetAuditStatsQuery({
-    dateFrom: filters.dateFrom,
-    dateTo: filters.dateTo,
+    dateFrom: appliedFilters.dateFrom,
+    dateTo: appliedFilters.dateTo,
   }, {
     pollingInterval: 300000, // Refresh every 5 minutes
   });
@@ -69,13 +110,51 @@ const AuditLog = () => {
   const { data: usersData } = useGetUsersQuery({ limit: 100 });
   const [exportAuditData] = useLazyExportAuditDataQuery();
 
+  // Handle UI filter changes (doesn't trigger API immediately except for taskId via debounce)
   const handleFilterChange = (field, value) => {
-    setFilters(prev => ({
+    setUiFilters(prev => ({
       ...prev,
       [field]: value,
-      page: field !== 'page' ? 1 : value // Reset page when other filters change
     }));
+
+    // Auto-apply for non-text fields (dropdowns, dates, pagination)
+    if (field !== 'taskId') {
+      setAppliedFilters(prev => ({
+        ...prev,
+        [field]: value,
+        page: field !== 'page' && field !== 'limit' ? 1 : value
+      }));
+    }
   };
+
+  // Check if there are any active filters
+  const hasActiveFilters = useCallback(() => {
+    return uiFilters.dateFrom || uiFilters.dateTo || uiFilters.action || 
+           uiFilters.performedBy || uiFilters.taskId;
+  }, [uiFilters]);
+
+  // Apply all filters manually
+  const applyFilters = useCallback(() => {
+    setAppliedFilters({
+      ...uiFilters,
+      page: 1 // Reset to first page when applying filters
+    });
+  }, [uiFilters]);
+
+  // Reset all filters
+  const resetFilters = useCallback(() => {
+    const resetState = {
+      page: 1,
+      limit: 50,
+      dateFrom: '',
+      dateTo: '',
+      action: '',
+      performedBy: '',
+      taskId: '',
+    };
+    setUiFilters(resetState);
+    setAppliedFilters(resetState);
+  }, []);
 
   // FIXED: Export handling to work with backend JSON response
   const handleExport = async (format = 'csv') => {
@@ -83,10 +162,10 @@ const AuditLog = () => {
 
     try {
       const exportParams = {
-        dateFrom: filters.dateFrom,
-        dateTo: filters.dateTo,
-        performedBy: filters.performedBy,
-        action: filters.action,
+        dateFrom: appliedFilters.dateFrom,
+        dateTo: appliedFilters.dateTo,
+        performedBy: appliedFilters.performedBy,
+        action: appliedFilters.action,
         // Note: taskId not supported in export endpoint per backend spec
       };
       
@@ -212,21 +291,8 @@ const AuditLog = () => {
   const auditLogs = auditData?.auditLogs || [];
   const pagination = auditData?.pagination || {};
 
-  if (auditError) {
-    return (
-      <div className="container-lg">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800">Failed to load audit logs. Please try again.</p>
-          <button 
-            onClick={refetchAudit}
-            className="mt-2 btn btn-primary btn-sm"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Non-blocking error display
+  const showError = auditError && !isAuditLoading;
 
   return (
     <div className="container-lg section-md">
@@ -236,6 +302,7 @@ const AuditLog = () => {
           <h1 className="text-heading-1">Audit Log Viewer</h1>
           <p className="text-body text-gray-600 mt-1">
             Track every meaningful action for compliance, accountability, and traceability
+            {isFetching && <span className="ml-2 text-blue-600">• Updating...</span>}
           </p>
         </div>
         
@@ -261,6 +328,35 @@ const AuditLog = () => {
           </div>
         )}
       </div>
+
+      {/* Non-blocking Error Alert */}
+      {showError && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-start">
+            <svg className="w-5 h-5 text-red-600 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-red-800">Error loading audit logs</h3>
+              <p className="text-sm text-red-700 mt-1">
+                {auditError?.data?.message || 'Failed to fetch audit logs. The Task ID might be invalid or the server is unavailable.'}
+              </p>
+              <button 
+                onClick={refetchAudit}
+                className="mt-2 text-sm text-red-800 underline hover:no-underline"
+              >
+                Try again
+              </button>
+            </div>
+            <button 
+              onClick={resetFilters}
+              className="ml-4 text-sm text-red-600 hover:text-red-800"
+            >
+              Reset filters
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Statistics Cards - CORRECTED backend response structure */}
       {statsData && (
@@ -302,6 +398,16 @@ const AuditLog = () => {
 
       {/* Filters */}
       <div className="card mb-6">
+        <div className="card-header">
+          <h3 className="card-title">Filters</h3>
+          {hasActiveFilters() && (
+            <span className="text-xs text-blue-600">
+              {Object.keys(uiFilters).filter(key => 
+                key !== 'page' && key !== 'limit' && uiFilters[key]
+              ).length} filter(s) active
+            </span>
+          )}
+        </div>
         <div className="card-body">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
@@ -309,7 +415,7 @@ const AuditLog = () => {
               <input
                 type="date"
                 className="exchange-date-input"
-                value={filters.dateFrom}
+                value={uiFilters.dateFrom}
                 onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
               />
             </div>
@@ -319,7 +425,7 @@ const AuditLog = () => {
               <input
                 type="date"
                 className="exchange-date-input"
-                value={filters.dateTo}
+                value={uiFilters.dateTo}
                 onChange={(e) => handleFilterChange('dateTo', e.target.value)}
                 max={new Date().toISOString().split('T')[0]}
               />
@@ -329,7 +435,7 @@ const AuditLog = () => {
               <label className="exchange-form-label">Performed By</label>
               <select
                 className="exchange-form-select"
-                value={filters.performedBy}
+                value={uiFilters.performedBy}
                 onChange={(e) => handleFilterChange('performedBy', e.target.value)}
               >
                 <option value="">All Users</option>
@@ -343,7 +449,7 @@ const AuditLog = () => {
               <label className="exchange-form-label">Action Type</label>
               <select
                 className="exchange-form-select"
-                value={filters.action}
+                value={uiFilters.action}
                 onChange={(e) => handleFilterChange('action', e.target.value)}
               >
                 <option value="">All Actions</option>
@@ -354,21 +460,61 @@ const AuditLog = () => {
             </div>
 
             <div>
-              <label className="exchange-form-label">Task ID</label>
+              <label className="exchange-form-label">
+                Task ID
+                {uiFilters.taskId && uiFilters.taskId !== appliedFilters.taskId && (
+                  <span className="ml-1 text-xs text-gray-500">(typing...)</span>
+                )}
+              </label>
               <input
                 type="text"
                 className="input"
                 placeholder="Filter by task ID..."
-                value={filters.taskId}
+                value={uiFilters.taskId}
                 onChange={(e) => handleFilterChange('taskId', e.target.value)}
               />
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-100">
+            <div className="text-sm text-gray-600">
+              {hasActiveFilters() && (
+                <span>
+                  Active filters: {Object.keys(uiFilters).filter(key => 
+                    key !== 'page' && key !== 'limit' && uiFilters[key]
+                  ).map(key => key.replace(/([A-Z])/g, ' $1').trim()).join(', ')}
+                </span>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button 
+                className="btn btn-secondary"
+                onClick={resetFilters}
+                disabled={!hasActiveFilters()}
+              >
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Reset
+              </button>
+              <button 
+                className="btn btn-primary"
+                onClick={applyFilters}
+                disabled={JSON.stringify(uiFilters) === JSON.stringify(appliedFilters)}
+              >
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
+                </svg>
+                Apply Filters
+              </button>
             </div>
           </div>
         </div>
       </div>
 
       {/* Loading State */}
-      {isAuditLoading && (
+      {isAuditLoading && !auditLogs.length && (
         <div className="card">
           <div className="card-body text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -378,7 +524,7 @@ const AuditLog = () => {
       )}
 
       {/* Audit Log Table */}
-      {!isAuditLoading && (
+      {(!isAuditLoading || auditLogs.length > 0) && (
         <div className="card">
           <div className="table-container">
             <table className="table table-modern">
@@ -427,7 +573,6 @@ const AuditLog = () => {
                           >
                             {log.task.uin}
                           </button>
-                           
                         </div>
                       ) : (
                         <span className="text-gray-500">-</span>
@@ -445,7 +590,7 @@ const AuditLog = () => {
           </div>
 
           {/* Empty State */}
-          {auditLogs.length === 0 && (
+          {auditLogs.length === 0 && !isAuditLoading && (
             <div className="card-body text-center py-12">
               <div className="table-empty">
                 <svg className="table-empty-icon" fill="currentColor" viewBox="0 0 20 20">
@@ -455,6 +600,11 @@ const AuditLog = () => {
                 <p className="table-empty-description">
                   No audit logs match the current filters. Try adjusting your search criteria.
                 </p>
+                {hasActiveFilters() && (
+                  <button onClick={resetFilters} className="mt-4 btn btn-secondary">
+                    Reset Filters
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -493,7 +643,7 @@ const AuditLog = () => {
         <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <div className="flex items-center gap-2">
             <svg className="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
             <span className="text-sm text-yellow-800">
               Export functionality requires COMPLIANCE_ADMIN or ADMIN role.

@@ -31,7 +31,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
   const currentUser = useSelector(selectCurrentUser);
   const permissions = usePermissions();
 
-  // OPTIMIZED: Consolidated modal state
+  //  Consolidated modal state
   const [modals, setModals] = useState({
     followUp: false,
     comments: false,
@@ -52,7 +52,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
   const [statusReason, setStatusReason] = useState('');
   const [closureType, setClosureType] = useState('');
 
-  // OPTIMIZED: Consolidated form data
+  //  Consolidated form data
   const [formData, setFormData] = useState({
     approvalDate: new Date().toISOString().split('T')[0],
     expiryDate: '',
@@ -72,7 +72,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
   const [closeTask, { isLoading: isClosing }] = useCloseTaskMutation();
   const [updateTaskName, { isLoading: isUpdatingName }] = useUpdateTaskNameMutation();
 
-  // OPTIMIZED: Reset state when task changes
+  //  Reset state when task changes
   useEffect(() => {
     if (task) {
       setSelectedTaskType(task.taskType || '');
@@ -81,7 +81,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
     }
   }, [task?.taskType, task?.id, task?.title]);
 
-  // OPTIMIZED: Memoized helper functions
+  //  Memoized helper functions
   const getButtonClass = useCallback((buttonType) => {
     const buttonClasses = {
       'primary': 'btn-primary',
@@ -110,7 +110,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
     return statusStyles[status] || 'bg-gray-100 text-gray-800';
   }, []);
 
-  // OPTIMIZED: Memoized permission checks
+  //  Memoized permission checks
   const canUserActOnThisTask = useMemo(() => {
     if (!task || !currentUser) return false;
     if (permissions.isAdmin) return true;
@@ -151,7 +151,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
     [userRole, task, currentUser]
   );
 
-  // OPTIMIZED: Memoized workflow buttons
+  //  Memoized workflow buttons
   const workflowButtons = useMemo(() => {
     const buttons = [];
     const canAct = canUserActOnThisTask;
@@ -245,12 +245,12 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
     return buttons;
   }, [canUserActOnThisTask, task, isUpdatingStatus, isApproving, isPublishing, permissions.isComplianceUser, permissions.isProductUser, permissions.isAdmin]);
 
-  // OPTIMIZED: Toggle modal helper
+  //  Toggle modal helper
   const toggleModal = useCallback((modalName, value) => {
     setModals(prev => ({ ...prev, [modalName]: value }));
   }, []);
 
-  // OPTIMIZED: All handlers with useCallback
+  //  All handlers with useCallback
   const handleTaskTypeSelection = useCallback((taskType) => {
     setSelectedTaskType(taskType);
     setShowClassificationSubmit(taskType && taskType !== task?.taskType);
