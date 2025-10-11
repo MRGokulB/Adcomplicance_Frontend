@@ -160,6 +160,8 @@ const VersionControl = ({ task, onRefresh }) => {
       files.forEach((file) => {
         formData.append("files", file);
       });
+      
+      const uploadRes = await uploadFiles(formData).unwrap();
 
       // Step 2: Upload to S3      const uploadRes = await uploadFiles(formData).unwrap();      
       if (!uploadRes.files || uploadRes.files.length === 0) {
