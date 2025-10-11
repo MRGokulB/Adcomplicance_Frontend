@@ -3,6 +3,7 @@ import { useGetExchangeTasksReportQuery } from '../../../redux/api/reportsApi';
 import ReportFilters from '../common/ReportFilters';
 import ReportTable from '../common/ReportTable';
 import ExportButtons from '../common/ExportButtons';
+import { useDispatch } from 'react-redux';
 
 const ExchangeTasksReport = () => {
   const [filters, setFilters] = useState({
@@ -17,15 +18,18 @@ const ExchangeTasksReport = () => {
     limit: 50
   });
 
+  const dispatch = useDispatch();
+  
   // API Query with real-time data
-  const { 
-    data: reportData, 
-    isLoading, 
-    error, 
-    refetch 
+  const {
+    data: reportData,
+    isLoading,
+    error,
+    refetch
   } = useGetExchangeTasksReportQuery(filters, {
-    pollingInterval: 60000, // Refresh every minute
+    pollingInterval: 60000,
     refetchOnMountOrArgChange: true,
+    refetchOnFocus: true
   });
 
   const columns = [
@@ -54,37 +58,49 @@ const ExchangeTasksReport = () => {
     approvalStatus: [
       { value: 'PENDING', label: 'Pending' },
       { value: 'APPROVED', label: 'Approved' },
-      { value: 'REJECTED', label: 'Rejected' }
+      { value: 'REJECTED', label: 'Rejected' },
+      { value: 'NOT_SENT', label: 'Not Sent' }
     ],
     taskStatus: [
       { value: 'OPEN', label: 'Open' },
       { value: 'PRODUCT_REVIEW', label: 'Product Review' },
       { value: 'COMPLIANCE_REVIEW', label: 'Compliance Review' },
       { value: 'APPROVED', label: 'Approved' },
-      { value: 'PUBLISHED', label: 'Published' }
+      { value: 'PUBLISHED', label: 'Published' },
+      { value: 'CLOSED_EXCHANGE', label: 'Closed Exchange' },
+      { value: 'CLOSED_INTERNAL', label: 'Closed Internal' }
     ]
   };
 
   const handleFilterChange = (newFilters) => {
-    setFilters(prev => ({
-      ...prev,
-      ...newFilters,
-      page: 1 // Reset to first page when filters change
-    }));
+    // Clean up filters and remove empty values
+    const cleanedFilters = {
+      page: 1,
+      limit: 50
+    };
+
+    Object.entries(newFilters).forEach(([key, value]) => {
+      if (value !== '' && value !== null && value !== undefined) {
+        cleanedFilters[key] = value;
+      }
+    });
+
+    setFilters(cleanedFilters);
   };
 
-  // Transform API data for table display
+  // Transform API data for table display - REMOVED FRONTEND FILTERING
   const transformData = (apiData) => {
     if (!apiData?.data) return [];
-    
+
+    // Backend already filtered the data, just transform it for display
     return apiData.data.map(item => ({
-      id: item.uin,
+      id: item.uin + '-' + item.exchangeName, // Make unique ID for each row
       uin: item.uin,
       title: item.title,
       createdBy: item.createdBy,
       taskStatus: item.taskStatus,
       exchangeName: item.exchangeName,
-      typeOfContent: item.typeOfContent,
+      typeOfContent: item.typeOfContent || '-',
       approvalStatus: item.approvalStatus,
       referenceNumber: item.referenceNumber || '-',
       createdAt: new Date(item.createdAt).toLocaleDateString(),
@@ -103,7 +119,7 @@ const ExchangeTasksReport = () => {
       <div className="p-6">
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <p className="text-red-800">Failed to load exchange tasks report. Please try again.</p>
-          <button 
+          <button
             onClick={refetch}
             className="mt-2 btn btn-primary btn-sm"
           >
@@ -118,8 +134,7 @@ const ExchangeTasksReport = () => {
     <div>
       <div className="flex-between mb-4">
         <h2 className="text-heading-3">Exchange Tasks Report</h2>
-        {/* FIXED: Added required props to ExportButtons */}
-        <ExportButtons 
+        <ExportButtons
           data={tableData}
           columns={columns}
           filename="exchange-tasks-report"
@@ -127,16 +142,15 @@ const ExchangeTasksReport = () => {
         />
       </div>
 
-      <ReportFilters 
+      <ReportFilters
         filters={filters}
         onFilterChange={handleFilterChange}
         options={filterOptions}
         filterFields={[
-          { id: 'dateFrom', type: 'date', label: 'Date From' },
-          { id: 'dateTo', type: 'date', label: 'Date To' },
+          { id: 'dateRange', type: 'dateRange', label: 'Date Range' },
           { id: 'exchangeName', type: 'select', label: 'Exchange', options: filterOptions.exchangeName },
           { id: 'approvalStatus', type: 'select', label: 'Approval Status', options: filterOptions.approvalStatus },
-          { id: 'taskStatus', type: 'select', label: 'Task Status', options: filterOptions.taskStatus }
+          { id: 'status', type: 'select', label: 'Task Status', options: filterOptions.taskStatus }
         ]}
       />
 
@@ -184,7 +198,7 @@ const ExchangeTasksReport = () => {
       )}
 
       {/* Exchange Distribution Chart */}
-      {summary.exchangeDistribution && (
+      {summary.exchangeDistribution && Object.keys(summary.exchangeDistribution).length > 0 && (
         <div className="mb-6 p-4 bg-gray-50 rounded-lg">
           <h3 className="text-sm font-medium text-gray-700 mb-3">Exchange Distribution</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -208,7 +222,7 @@ const ExchangeTasksReport = () => {
 
       {/* Report Table */}
       {!isLoading && (
-        <ReportTable 
+        <ReportTable
           columns={columns}
           data={tableData}
           emptyMessage="No exchange tasks found for the selected filters."

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGetRejectedTasksReportQuery } from '../../../redux/api/reportsApi';
 import { useGetUsersQuery } from '../../../redux/api/usersApi';
 import ReportFilters from '../common/ReportFilters';
@@ -14,19 +14,55 @@ const RejectedTasksReport = () => {
     limit: 50
   });
 
+  // NEW: Store raw unfiltered data
+  const [rawData, setRawData] = useState(null);
+  const [filteredData, setFilteredData] = useState(null);
+
+  // NEW: Only send date filters to API
+  const apiFilters = {
+    dateFrom: filters.dateFrom,
+    dateTo: filters.dateTo,
+    page: filters.page,
+    limit: filters.limit
+  };
+
   // API Query with real-time data
   const { 
     data: reportData, 
     isLoading, 
     error, 
     refetch 
-  } = useGetRejectedTasksReportQuery(filters, {
+  } = useGetRejectedTasksReportQuery(apiFilters, {
     pollingInterval: 60000, // Refresh every minute
     refetchOnMountOrArgChange: true,
   });
 
   // Get users for filter options
   const { data: usersData } = useGetUsersQuery({ limit: 100 });
+
+  // NEW: Apply frontend filtering whenever data or closureType filter changes
+  useEffect(() => {
+    if (!reportData) return;
+
+    setRawData(reportData);
+
+    // Apply closureType filter on frontend
+    if (filters.closureType) {
+      const filtered = reportData.data.filter(task => task.status === filters.closureType);
+      
+      // Recalculate summary for filtered data
+      const summary = {
+        totalRejected: filtered.length,
+        avgDaysActive: filtered.length > 0
+          ? Math.round(filtered.reduce((sum, t) => sum + (t.daysActive || 0), 0) / filtered.length)
+          : 0
+      };
+
+      setFilteredData({ summary, data: filtered });
+    } else {
+      setFilteredData(reportData);
+    }
+  }, [reportData, filters.closureType]);
 
   const columns = [
     { id: 'uin', label: 'UIN', sortable: true },
@@ -55,7 +91,6 @@ const RejectedTasksReport = () => {
 
   const filterOptions = {
     closureType: [
-      { value: 'REJECTED', label: 'Rejected' },
       { value: 'CLOSED_INTERNAL', label: 'Closed Internal' },
       { value: 'CLOSED_EXCHANGE', label: 'Closed Exchange' }
     ],
@@ -80,18 +115,19 @@ const RejectedTasksReport = () => {
       title: item.title,
       taskType: item.taskType === 'EXCHANGE' ? 'Exchange' : 'Internal',
       createdBy: item.createdBy,
-      rejectedDate: item.rejectedDate ? new Date(item.rejectedDate).toLocaleDateString() : '-',
-      rejectedBy: item.rejectedBy || '-',
-      rejectionReason: item.rejectionReason || item.comments || 'No reason specified',
-      closureType: item.closureType?.replace('_', ' ') || 'Rejected',
+      rejectedDate: item.closureDate ? new Date(item.closureDate).toLocaleDateString() : '-',
+      rejectedBy: item.assignedCompliance || '-',
+      rejectionReason: item.closureComments || 'No reason specified',
+      closureType: item.status?.replace('_', ' ') || 'Closed',
       reopened: item.reopened ? 'Yes' : 'No',
-      currentStatus: item.currentStatus?.replace('_', ' ') || item.status?.replace('_', ' ') || '-',
-      daysSinceRejection: item.daysSinceRejection || 0
+      currentStatus: item.status?.replace('_', ' ') || '-',
+      daysSinceRejection: item.daysActive || 0
     }));
   };
 
-  const tableData = transformData(reportData);
-  const summary = reportData?.summary || {};
+  // CHANGED: Use filteredData instead of reportData
+  const tableData = transformData(filteredData);
+  const summary = filteredData?.summary || {};
 
   if (error) {
     return (
@@ -169,9 +205,9 @@ const RejectedTasksReport = () => {
           <div className="card">
             <div className="report-card-stat">
               <div className="report-card-number">
-                {isLoading ? '...' : (summary.avgDaysToResolve || 0)}
+                {isLoading ? '...' : (summary.avgDaysActive || summary.avgDaysToResolve || 0)}
               </div>
-              <div className="report-card-label">Avg Days to Resolve</div>
+              <div className="report-card-label">Avg Days Active</div>
               <div className="text-xs text-gray-500 mt-1">Resolution Time</div>
             </div>
           </div>

@@ -46,8 +46,11 @@ const ReportFilters = ({ filters, onFilterChange, filterFields, options = {} }) 
       label: 'This Week', 
       value: () => {
         const today = new Date();
-        const firstDay = new Date(today.setDate(today.getDate() - today.getDay()));
-        const lastDay = new Date(today.setDate(today.getDate() - today.getDay() + 6));
+        const currentDay = today.getDay();
+        const firstDay = new Date(today);
+        firstDay.setDate(today.getDate() - currentDay);
+        const lastDay = new Date(today);
+        lastDay.setDate(today.getDate() - currentDay + 6);
         return { 
           dateFrom: firstDay.toISOString().split('T')[0],
           dateTo: lastDay.toISOString().split('T')[0]
@@ -70,7 +73,8 @@ const ReportFilters = ({ filters, onFilterChange, filterFields, options = {} }) 
       label: 'Last 30 Days', 
       value: () => {
         const today = new Date();
-        const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(today.getDate() - 30);
         return { 
           dateFrom: thirtyDaysAgo.toISOString().split('T')[0],
           dateTo: new Date().toISOString().split('T')[0]
@@ -139,7 +143,7 @@ const ReportFilters = ({ filters, onFilterChange, filterFields, options = {} }) 
               className="exchange-date-input"
               value={localFilters[field.id] || ''}
               onChange={(e) => handleInputChange(field.id, e.target.value)}
-              max={field.maxDate || new Date().toISOString().split('T')[0]}
+              max={field.maxDate}
             />
           </div>
         );
@@ -155,7 +159,7 @@ const ReportFilters = ({ filters, onFilterChange, filterFields, options = {} }) 
                 placeholder="From"
                 value={localFilters.dateFrom || ''}
                 onChange={(e) => handleInputChange('dateFrom', e.target.value)}
-                max={localFilters.dateTo || new Date().toISOString().split('T')[0]}
+                max={localFilters.dateTo || undefined}
               />
               <input
                 type="date"
@@ -163,8 +167,7 @@ const ReportFilters = ({ filters, onFilterChange, filterFields, options = {} }) 
                 placeholder="To"
                 value={localFilters.dateTo || ''}
                 onChange={(e) => handleInputChange('dateTo', e.target.value)}
-                min={localFilters.dateFrom}
-                max={new Date().toISOString().split('T')[0]}
+                min={localFilters.dateFrom || undefined}
               />
             </div>
           </div>

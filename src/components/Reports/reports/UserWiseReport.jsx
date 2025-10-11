@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUserRole } from '../../../redux/slices/authSlice';
 import { hasPermission, PERMISSIONS } from '../../../utils/roles';
@@ -15,11 +15,21 @@ const UserWiseReport = ({ type, onTypeChange }) => {
     userId: ''
   });
 
+  // NEW: Store raw unfiltered data
+  const [rawData, setRawData] = useState(null);
+  const [filteredData, setFilteredData] = useState(null);
+
   const userRole = useSelector(selectUserRole);
 
   // Check permissions for current report type
   const canAccessCompliance = hasPermission(userRole, PERMISSIONS.REPORT_COMPLIANCE_USERS);
   const canAccessProduct = hasPermission(userRole, PERMISSIONS.REPORT_PRODUCT_USERS);
+
+  // NEW: Only send date filters to API, not userId
+  const apiFilters = {
+    dateFrom: filters.dateFrom,
+    dateTo: filters.dateTo
+  };
 
   // Conditional API calls based on report type AND permissions
   const { 
@@ -27,8 +37,8 @@ const UserWiseReport = ({ type, onTypeChange }) => {
     isLoading: isComplianceLoading, 
     error: complianceError,
     refetch: refetchCompliance
-  } = useGetComplianceUsersReportQuery(filters, {
-    skip: type !== 'compliance' || !canAccessCompliance, // Skip if no permission
+  } = useGetComplianceUsersReportQuery(apiFilters, {
+    skip: type !== 'compliance' || !canAccessCompliance,
     pollingInterval: 60000,
     refetchOnMountOrArgChange: true,
   });
@@ -38,11 +48,47 @@ const UserWiseReport = ({ type, onTypeChange }) => {
     isLoading: isProductLoading, 
     error: productError,
     refetch: refetchProduct
-  } = useGetProductUsersReportQuery(filters, {
-    skip: type !== 'product' || !canAccessProduct, // Skip if no permission
+  } = useGetProductUsersReportQuery(apiFilters, {
+    skip: type !== 'product' || !canAccessProduct,
     pollingInterval: 60000,
     refetchOnMountOrArgChange: true,
   });
+
+  // NEW: Apply frontend filtering whenever data or userId filter changes
+  useEffect(() => {
+    const currentData = type === 'compliance' ? complianceData : productData;
+    if (!currentData) return;
+
+    setRawData(currentData);
+
+    // Apply userId filter on frontend
+    if (filters.userId) {
+      const filtered = currentData.data.filter(user => user.userId === filters.userId);
+      
+      // Recalculate summary for filtered data
+      const summary = type === 'compliance' 
+        ? {
+            totalUsers: filtered.length,
+            totalTasksAssigned: filtered.reduce((sum, u) => sum + u.totalAssigned, 0),
+            totalPending: filtered.reduce((sum, u) => sum + u.pending, 0),
+            totalApproved: filtered.reduce((sum, u) => sum + u.approved, 0),
+            avgProductivity: filtered.length > 0 
+              ? Math.round(filtered.reduce((sum, u) => sum + u.productivityScore, 0) / filtered.length) 
+              : 0
+          }
+        : {
+            totalUsers: filtered.length,
+            totalTasksCreated: filtered.reduce((sum, u) => sum + u.tasksCreated, 0),
+            totalVersionsUploaded: filtered.reduce((sum, u) => sum + u.versionsUploaded, 0),
+            totalCommentsAdded: filtered.reduce((sum, u) => sum + u.commentsAdded, 0),
+            totalPublished: filtered.reduce((sum, u) => sum + u.publishedTasks, 0)
+          };
+
+      setFilteredData({ summary, data: filtered });
+    } else {
+      setFilteredData(currentData);
+    }
+  }, [complianceData, productData, filters.userId, type]);
 
   // Handle permission-based access control
   if (type === 'compliance' && !canAccessCompliance) {
@@ -101,8 +147,7 @@ const UserWiseReport = ({ type, onTypeChange }) => {
     );
   }
 
-  // Current data based on selected type and permissions
-  const currentData = type === 'compliance' ? complianceData : productData;
+  // CHANGED: Use filteredData instead of currentData
   const isLoading = type === 'compliance' ? isComplianceLoading : isProductLoading;
   const error = type === 'compliance' ? complianceError : productError;
   const refetch = type === 'compliance' ? refetchCompliance : refetchProduct;
@@ -138,10 +183,10 @@ const UserWiseReport = ({ type, onTypeChange }) => {
   // Get current columns and data for export
   const currentColumns = type === 'compliance' ? complianceColumns : productColumns;
   
-  // Get unique users for filter options from current data
+  // CHANGED: Get user options from rawData instead of filteredData
   const getUserFilterOptions = () => {
-    if (!currentData?.data) return [];
-    return currentData.data.map(user => ({
+    if (!rawData?.data) return [];
+    return rawData.data.map(user => ({
       value: user.userId,
       label: user.fullName
     }));
@@ -164,8 +209,9 @@ const UserWiseReport = ({ type, onTypeChange }) => {
     }));
   };
 
-  const tableData = transformData(currentData);
-  const summary = currentData?.summary || {};
+  // CHANGED: Use filteredData instead of currentData
+  const tableData = transformData(filteredData);
+  const summary = filteredData?.summary || {};
 
   // Only show API errors for reports the user has permission to access
   if (error) {

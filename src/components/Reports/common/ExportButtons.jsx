@@ -15,7 +15,6 @@ const ExportButtons = ({
   const convertToCSV = (data, columns) => {
     if (!data.length) return '';
 
-    // Use provided columns or infer from data
     const headers = columns.length > 0 
       ? columns.map(col => col.label || col.id)
       : Object.keys(data[0]);
@@ -24,15 +23,11 @@ const ExportButtons = ({
       ? columns.map(col => col.id)
       : Object.keys(data[0]);
 
-    // Create CSV content
     const csvContent = [
-      // Header row
       headers.join(','),
-      // Data rows
       ...data.map(row => 
         columnIds.map(id => {
           const value = row[id];
-          // Handle values that contain commas, quotes, or newlines
           if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
             return `"${value.replace(/"/g, '""')}"`;
           }
@@ -46,9 +41,133 @@ const ExportButtons = ({
 
   // Convert data to Excel-compatible format
   const convertToExcel = (data, columns) => {
-    // This is a simplified Excel export - for full Excel support, you'd use a library like xlsx
     const csvData = convertToCSV(data, columns);
     return csvData;
+  };
+
+  // Generate PDF using jsPDF
+  const generatePDF = async (data, columns) => {
+    // Load jsPDF from CDN
+    if (!window.jspdf) {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      document.head.appendChild(script);
+      await new Promise((resolve) => { script.onload = resolve; });
+    }
+
+    // Load jsPDF autoTable plugin
+    if (!window.jspdf.jsPDF.prototype.autoTable) {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js';
+      document.head.appendChild(script);
+      await new Promise((resolve) => { script.onload = resolve; });
+    }
+
+    const { jsPDF } = window.jspdf;
+    
+    // Determine orientation based on number of columns
+    const numColumns = columns.length > 0 ? columns.length : Object.keys(data[0] || {}).length;
+    const orientation = numColumns > 6 ? 'landscape' : 'portrait';
+    
+    const doc = new jsPDF({
+      orientation: orientation,
+      unit: 'mm',
+      format: 'a4'
+    });
+    
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    
+    // Add header with styling
+    doc.setFillColor(41, 128, 185);
+    doc.rect(0, 0, pageWidth, 35, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.setFont(undefined, 'bold');
+    doc.text('Report Export', 14, 15);
+    
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 23);
+    doc.text(`Total Records: ${data.length}`, 14, 29);
+    
+    // Reset text color for table
+    doc.setTextColor(0, 0, 0);
+
+    // Prepare table data
+    const headers = columns.length > 0 
+      ? columns.map(col => col.label || col.id)
+      : Object.keys(data[0]);
+
+    const columnIds = columns.length > 0 
+      ? columns.map(col => col.id)
+      : Object.keys(data[0]);
+
+    const tableData = data.map(row => 
+      columnIds.map(id => {
+        const value = row[id];
+        if (value === null || value === undefined) return '';
+        if (typeof value === 'object') return JSON.stringify(value);
+        return String(value);
+      })
+    );
+
+    // Generate table with improved styling
+    doc.autoTable({
+      head: [headers],
+      body: tableData,
+      startY: 38,
+      styles: { 
+        fontSize: 9,
+        cellPadding: 3,
+        overflow: 'linebreak',
+        cellWidth: 'wrap',
+        valign: 'middle',
+        lineColor: [200, 200, 200],
+        lineWidth: 0.1
+      },
+      headStyles: {
+        fillColor: [52, 73, 94],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        halign: 'left',
+        fontSize: 10,
+        cellPadding: 4
+      },
+      alternateRowStyles: {
+        fillColor: [248, 249, 250]
+      },
+      rowStyles: {
+        fillColor: [255, 255, 255]
+      },
+      margin: { left: 14, right: 14, top: 38, bottom: 25 },
+      tableWidth: 'auto',
+      theme: 'grid',
+      didDrawPage: function (data) {
+        // Footer
+        doc.setFillColor(240, 240, 240);
+        doc.rect(0, pageHeight - 20, pageWidth, 20, 'F');
+        
+        // Page numbers
+        doc.setFontSize(9);
+        doc.setTextColor(100, 100, 100);
+        const pageText = `Page ${data.pageNumber} of ${doc.internal.getNumberOfPages()}`;
+        doc.text(pageText, pageWidth / 2, pageHeight - 10, { align: 'center' });
+        
+        // Timestamp in footer
+        doc.setFontSize(8);
+        doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, pageHeight - 10);
+      },
+      didParseCell: function(data) {
+        // Add zebra striping
+        if (data.section === 'body' && data.row.index % 2 === 0) {
+          data.cell.styles.fillColor = [248, 249, 250];
+        }
+      }
+    });
+
+    return doc;
   };
 
   // Create and download file
@@ -62,22 +181,6 @@ const ExportButtons = ({
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
-  };
-
-  // Generate PDF (basic implementation - for advanced PDFs, use jsPDF or similar)
-  const generatePDF = (data, columns) => {
-    const csvData = convertToCSV(data, columns);
-    const timestamp = new Date().toLocaleString();
-    
-    const pdfContent = `
-REPORT EXPORT
-Generated: ${timestamp}
-Total Records: ${data.length}
-
-${csvData.split('\n').map(line => line.replace(/,/g, ' | ')).join('\n')}
-    `.trim();
-
-    return pdfContent;
   };
 
   const handleExport = async (format) => {
@@ -103,25 +206,24 @@ ${csvData.split('\n').map(line => line.replace(/,/g, ' | ')).join('\n')}
           content = convertToCSV(data, columns);
           mimeType = 'text/csv;charset=utf-8;';
           extension = 'csv';
+          downloadFile(content, `${fullFilename}.${extension}`, mimeType);
           break;
 
         case 'excel':
-          content = '\ufeff' + convertToExcel(data, columns); // BOM for Excel UTF-8 support
+          content = '\ufeff' + convertToExcel(data, columns);
           mimeType = 'application/vnd.ms-excel;charset=utf-8;';
-          extension = 'csv'; // Using CSV format that Excel can open
+          extension = 'csv';
+          downloadFile(content, `${fullFilename}.${extension}`, mimeType);
           break;
 
         case 'pdf':
-          content = generatePDF(data, columns);
-          mimeType = 'text/plain;charset=utf-8;';
-          extension = 'txt'; // Basic text format - upgrade to actual PDF with proper library
+          const pdf = await generatePDF(data, columns);
+          pdf.save(`${fullFilename}.pdf`);
           break;
 
         default:
           throw new Error(`Unsupported export format: ${format}`);
       }
-
-      downloadFile(content, `${fullFilename}.${extension}`, mimeType);
 
     } catch (error) {
       console.error('Export failed:', error);

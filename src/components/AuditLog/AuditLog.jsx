@@ -374,14 +374,7 @@ const AuditLog = () => {
       {/* Filters */}
       <div className="card mb-6">
         <div className="card-header">
-          <h3 className="card-title">Filters</h3>
-          {hasActiveFilters() && (
-            <span className="text-xs text-blue-600">
-              {Object.keys(uiFilters).filter(key => 
-                key !== 'page' && key !== 'limit' && uiFilters[key]
-              ).length} filter(s) active
-            </span>
-          )}
+          <h3 className="card-title">Filters</h3> 
         </div>
         <div className="card-body">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -436,10 +429,7 @@ const AuditLog = () => {
 
             <div>
               <label className="exchange-form-label">
-                Task UIN
-                {uiFilters.taskId && hasUnappliedChanges && (
-                  <span className="ml-1 text-xs text-orange-600">(not applied)</span>
-                )}
+                Task UIN 
               </label>
               <input
                 type="text"
@@ -447,10 +437,7 @@ const AuditLog = () => {
                 placeholder="e.g., AOL-20251009 or full UIN"
                 value={uiFilters.taskId}
                 onChange={(e) => handleFilterChange('taskId', e.target.value)}
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Supports partial search (e.g., "AOL-20251009")
-              </p>
+              /> 
             </div>
           </div>
 
