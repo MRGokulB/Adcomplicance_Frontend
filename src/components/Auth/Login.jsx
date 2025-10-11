@@ -26,7 +26,6 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [formErrors, setFormErrors] = useState({})
 
-  // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
       const from = location.state?.from?.pathname || '/dashboard'
@@ -34,12 +33,10 @@ const Login = () => {
     }
   }, [isAuthenticated, navigate, location])
 
-  // Clear auth errors when component mounts
   useEffect(() => {
     dispatch(clearAuthError())
   }, [dispatch])
 
-  // Clear form errors when user starts typing
   useEffect(() => {
     if (Object.keys(formErrors).length > 0) {
       setFormErrors({})
@@ -71,7 +68,6 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    // Client-side validation
     const errors = validateForm()
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors)
@@ -87,16 +83,12 @@ const Login = () => {
         rememberMe: formData.rememberMe
       }).unwrap()
       
-      // Navigation will happen automatically via useEffect
-      console.log('Login successful:', result.message)
     } catch (err) {
       console.error('Login failed:', err)
-      // Error is handled by RTK Query and auth slice
     }
   }
 
   const getErrorMessage = () => {
-    // Priority: API error -> Auth error -> Form validation errors
     if (loginError?.data?.message) return loginError.data.message
     if (loginError?.error) return 'Network error occurred. Please check your connection.'
     if (authError) return authError
@@ -108,7 +100,6 @@ const Login = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
-        {/* Header */}
         <div className="text-center">
           <div className="mx-auto h-16 w-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
             <svg className="h-10 w-10 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -123,10 +114,8 @@ const Login = () => {
           </p>
         </div>
 
-        {/* Login Form */}
         <div className="bg-white shadow-xl rounded-xl p-8">
           <form className="space-y-6" onSubmit={handleSubmit}>
-            {/* Global Error Message */}
             {getErrorMessage() && (
               <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-md">
                 <div className="flex">
@@ -142,7 +131,6 @@ const Login = () => {
             )}
 
             <div className="space-y-5">
-              {/* Username Field */}
               <div>
                 <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
                   Username
@@ -173,7 +161,6 @@ const Login = () => {
                 )}
               </div>
 
-              {/* Password Field */}
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                   Password
@@ -222,7 +209,6 @@ const Login = () => {
                 )}
               </div>
 
-              {/* Remember Me */}
               <div className="flex items-center">
                 <input
                   id="rememberMe"
@@ -239,7 +225,6 @@ const Login = () => {
               </div>
             </div>
 
-            {/* Submit Button */}
             <div>
               <button
                 type="submit"
@@ -270,7 +255,6 @@ const Login = () => {
             </div>
           </form>
 
-          {/* Footer */}
           <div className="mt-6 text-center">
             <p className="text-xs text-gray-500">
               Having trouble signing in? Contact your system administrator

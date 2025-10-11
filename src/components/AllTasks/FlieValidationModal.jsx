@@ -1,4 +1,3 @@
-// src/components/AllTasks/FileValidationModal.jsx
 import React, { useState } from 'react';
 
 const FileValidationModal = ({ onClose, onValidate, isValidating }) => {
@@ -11,7 +10,6 @@ const FileValidationModal = ({ onClose, onValidate, isValidating }) => {
     const urls = e.target.value;
     setFileUrls(urls);
     
-    // Parse URLs from textarea (one per line or comma separated)
     const urlList = urls
       .split(/[\n,]/)
       .map(url => url.trim())
@@ -46,15 +44,12 @@ const FileValidationModal = ({ onClose, onValidate, isValidating }) => {
 
   return (
     <>
-      {/* Modal Overlay */}
       <div className="fixed inset-0 z-50 overflow-y-auto">
         <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
           <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={handleClose}></div>
 
-          {/* Modal Content */}
           <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
             
-            {/* Header */}
             <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900">
@@ -75,7 +70,6 @@ const FileValidationModal = ({ onClose, onValidate, isValidating }) => {
                 One URL per line or comma-separated.
               </p>
 
-              {/* File URLs Input */}
               <div className="mb-4">
                 <label className="info-label">File URLs</label>
                 <textarea
@@ -93,19 +87,16 @@ https://example.com/file3.doc"
                 </p>
               </div>
 
-              {/* Error Display */}
               {error && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-sm text-red-700">{error}</p>
                 </div>
               )}
 
-              {/* Validation Results */}
               {validationResults && (
                 <div className="mb-4">
                   <h4 className="text-sm font-medium text-gray-900 mb-3">Validation Results</h4>
                   
-                  {/* Summary */}
                   <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
                       <div>
@@ -129,7 +120,6 @@ https://example.com/file3.doc"
                     </div>
                   </div>
 
-                  {/* Detailed Results */}
                   <div className="max-h-64 overflow-y-auto">
                     {validationResults.results?.map((result, index) => (
                       <div key={index} className="mb-2 p-2 border rounded-lg">
@@ -170,7 +160,6 @@ https://example.com/file3.doc"
               )}
             </div>
 
-            {/* Footer */}
             <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
               <button
                 onClick={handleValidate}

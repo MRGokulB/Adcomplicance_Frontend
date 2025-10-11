@@ -1,4 +1,3 @@
-// src/components/Tasks/TaskMain.jsx - Cleaned UI with better action placement
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -14,11 +13,9 @@ const TaskMain = () => {
   const userRole = useSelector(selectUserRole);
   const [comment, setComment] = useState('');
   
-  // Local state for connection status
   const [isConnected, setIsConnected] = useState(true);
   const [lastSyncTime, setLastSyncTime] = useState(null);
 
-  // Enhanced task query with better error handling
   const {
   data: task,
   isLoading,
@@ -34,13 +31,11 @@ const TaskMain = () => {
 });
  
 
-  // Permission checks
   const canViewTask = hasPermission(userRole, PERMISSIONS.TASK_READ_ALL) ||
                      hasPermission(userRole, PERMISSIONS.TASK_READ_TEAM) ||
                      hasPermission(userRole, PERMISSIONS.TASK_READ_OWN) ||
                      hasPermission(userRole, PERMISSIONS.TASK_READ_ASSIGNED);
 
-  // Enhanced error handling
   const getErrorMessage = () => {
     if (error?.status === 404) {
       return 'Task not found or you do not have permission to view it.';
@@ -58,11 +53,10 @@ const TaskMain = () => {
     return error?.data?.message || 'An error occurred while fetching task details';
   };
 
-  // Monitor connection status
   useEffect(() => {
   const handleOnline = () => {
     setIsConnected(true);
-    refetch(); // Use refetch instead
+    refetch();  
   };
   
   const handleOffline = () => setIsConnected(false);
@@ -76,7 +70,6 @@ const TaskMain = () => {
   };
 }, [refetch]);
 
-  // Enhanced refresh with better error handling
   const handleRefresh = async () => {
   try {
     setLastSyncTime(new Date());
@@ -90,22 +83,18 @@ const TaskMain = () => {
   }
 };
 
-  // Auto-retry mechanism for failed requests
   useEffect(() => {
     if (isError && !isConnected) {
       const retryTimer = setTimeout(() => {
-        console.log('Attempting to reconnect...');
         handleRefresh();
-      }, 5000); // Retry after 5 seconds
+      }, 5000);  
 
       return () => clearTimeout(retryTimer);
     }
   }, [isError, isConnected]);
 
-  // Check if task classification is needed
   const needsClassification = task && !task.taskType && task.status === 'OPEN';
 
-  // Enhanced loading state with connection status
   if (isLoading && !task) {
     return (
       <div className="container-lg section-md">
@@ -127,12 +116,10 @@ const TaskMain = () => {
     );
   }
 
-  // Enhanced error state with retry functionality
   if (isError) {
     return (
       <div className="container-lg section-md">
         <div className="text-center py-12">
-          {/* Connection status indicator */}
           {!isConnected && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
               <div className="flex items-center justify-center gap-2 text-red-600">
@@ -193,7 +180,6 @@ const TaskMain = () => {
     );
   }
 
-  // Permission check
   if (!canViewTask) {
     return (
       <div className="container-lg section-md">
@@ -215,7 +201,6 @@ const TaskMain = () => {
     );
   }
 
-  // No task found state
   if (!task) {
     return (
       <div className="container-lg section-md">
@@ -245,7 +230,6 @@ const TaskMain = () => {
   return (
     <div className="container-lg section-md">
 
-      {/* Connection Status Banner - Only show when offline */}
       {!isConnected && (
         <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg">
           <div className="flex items-center justify-between">
@@ -267,7 +251,6 @@ const TaskMain = () => {
         </div>
       )}
 
-      {/* Classification Notice */}
       {needsClassification && (
         <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <div className="flex items-center gap-2">
@@ -284,7 +267,6 @@ const TaskMain = () => {
         </div>
       )}
 
-      {/* Task Header with integrated actions */}
       <TaskHeader 
         task={task} 
         refetch={refetch} 
@@ -297,21 +279,18 @@ const TaskMain = () => {
         lastSyncTime={lastSyncTime}
       />
       
-      {/* Version Control Section - Show for all classified tasks */}
       {task.taskType && (
         <div className="mt-8">
           <VersionControl task={task} onRefresh={handleRefresh} />
         </div>
       )}
       
-      {/* Exchange Approval Section - Only for EXCHANGE tasks */}
       {task.taskType === 'EXCHANGE' && (
         <div className="mt-8">
           <ExchangeApproval task={task} onRefresh={handleRefresh} />
         </div>
       )}
 
-      {/* Clean Task Footer - Essential info only */}
       <div className="mt-8 pt-6 border-t border-gray-200">
         <div className="flex items-center justify-between text-sm text-gray-500">
           <div className="flex items-center gap-4">
@@ -324,7 +303,6 @@ const TaskMain = () => {
             
             <span>• Created: {new Date(task.createdAt).toLocaleDateString()}</span>
             
-            {/* Connection Status Indicator */}
             <div className="flex items-center gap-1">
               <span>•</span>
               {isConnected ? (

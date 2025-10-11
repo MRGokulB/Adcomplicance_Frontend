@@ -5,7 +5,6 @@ const ReportFilters = ({ filters, onFilterChange, filterFields, options = {} }) 
   const [localFilters, setLocalFilters] = useState(filters);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // Sync local filters with parent when filters prop changes
   useEffect(() => {
     setLocalFilters(filters);
   }, [filters]);
@@ -28,12 +27,10 @@ const ReportFilters = ({ filters, onFilterChange, filterFields, options = {} }) 
     onFilterChange(emptyFilters);
   };
 
-  // Check if any filters are applied
   const hasActiveFilters = () => {
     return Object.values(localFilters).some(value => value && value !== '');
   };
 
-  // Get quick filter presets for common date ranges
   const getDatePresets = () => [
     { 
       label: 'Today', 
@@ -219,7 +216,6 @@ const ReportFilters = ({ filters, onFilterChange, filterFields, options = {} }) 
   return (
     <div className="card mb-6">
       <div className="card-body">
-        {/* Filter Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <h3 className="text-sm font-medium text-gray-700">Filters</h3> 
@@ -234,7 +230,6 @@ const ReportFilters = ({ filters, onFilterChange, filterFields, options = {} }) 
 
         {!isCollapsed && (
           <>
-            {/* Date Range Presets */}
             {filterFields.some(field => field.type === 'date' || field.type === 'dateRange') && (
               <div className="mb-4"> 
                 <div className="flex flex-wrap gap-2">
@@ -251,12 +246,10 @@ const ReportFilters = ({ filters, onFilterChange, filterFields, options = {} }) 
               </div>
             )}
 
-            {/* Filter Fields Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {filterFields.map(field => renderFilterField(field))}
             </div>
 
-            {/* Action Buttons */}
             <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-100">
               <div ></div>
               <div className="flex gap-3">

@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { selectCurrentUser, selectUserRole } from '../../redux/slices/authSlice';
 import { useLogoutUserMutation } from '../../redux/api/authApi';
-// Import notifications API for real-time badge count
 import { 
   useGetCountsQuery, 
   useGetNotificationsQuery 
@@ -16,7 +15,6 @@ import {
   USER_ROLES
 } from '../../utils/roles';
 
-// Theme toggle function
 function toggleTheme() {
   const html = document.documentElement;
   const currentTheme = html.classList.contains('dark') ? 'dark' : 'light';
@@ -31,7 +29,6 @@ function toggleTheme() {
   localStorage.setItem('theme', newTheme);
 }
 
-// Load saved theme on page load
 document.addEventListener('DOMContentLoaded', () => {
   const savedTheme = localStorage.getItem('theme') || 'light';
   if (savedTheme === 'dark') {
@@ -44,38 +41,33 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Redux selectors
   const currentUser = useSelector(selectCurrentUser);
   const userRole = useSelector(selectUserRole);
   
-  // RTK Query mutations and queries
   const [logoutUser] = useLogoutUserMutation();
   
-  // Real-time notifications count query - matching exactly with Notifications component
   const { 
     data: counts, 
     isLoading: isCountsLoading,
     error: countsError 
   } = useGetCountsQuery(undefined, {
-    pollingInterval: 30000, // Update every 30 seconds
-    refetchOnFocus: true,    // Refetch when window gains focus
+    pollingInterval: 30000,  
+    refetchOnFocus: true,     
     refetchOnReconnect: true, 
     refetchOnMountOrArgChange: true,
   });
 
-  // Fallback notifications query (same as Notifications component)
   const { 
     data: notificationsData 
   } = useGetNotificationsQuery({
     page: 1,
     limit: 20,
-    isRead: undefined // Get all to match Notifications component
+    isRead: undefined  
   }, {
-    pollingInterval: 30000, // Same as Notifications component
+    pollingInterval: 30000,  
     refetchOnMountOrArgChange: true,
   });
 
-  // Use the exact same logic as Notifications component for getting unread count
   const summary = {
     total: counts?.total ?? notificationsData?.pagination?.totalCount ?? 0,
     unread: counts?.unread ?? notificationsData?.unreadCount ?? 0,
@@ -83,11 +75,9 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
 
   const unreadNotificationsCount = summary.unread;
 
-  // Dynamic navigation items based on user role
   const getNavigationItems = () => {
     const items = [];
 
-    // Dashboard - All authenticated users
     items.push({
       id: 'dashboard',
       label: 'Dashboard',
@@ -101,7 +91,6 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
       show: true
     });
 
-    // Tasks - Based on task permissions
     const canViewTasks = hasPermission(userRole, PERMISSIONS.TASK_READ_ALL) ||
                          hasPermission(userRole, PERMISSIONS.TASK_READ_TEAM) ||
                          hasPermission(userRole, PERMISSIONS.TASK_READ_OWN) ||
@@ -117,12 +106,11 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
             <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
           </svg>
         ),
-        badge: null, // You can add task-specific badge logic here if needed
+        badge: null,  
         show: true
       });
     }
 
-    // Notifications - All authenticated users with real-time unread count
     items.push({
       id: 'notifications',
       label: 'Notifications',
@@ -132,11 +120,9 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
           <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
         </svg>
       ),
-      badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : null, // Only show badge if there are unread notifications
-      show: true
+      badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : null,  
     });
 
-    // User Management - Based on user management permissions
     if (canManageUsers(userRole)) {
       items.push({
         id: 'user-management',
@@ -151,7 +137,6 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
       });
     }
 
-    // Absence Tracker - For compliance and admin roles
     if (hasPermission(userRole, PERMISSIONS.ABSENCE_MANAGE) || 
         hasPermission(userRole, PERMISSIONS.ABSENCE_READ_ALL)) {
       items.push({
@@ -167,7 +152,6 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
       });
     }
 
-    // Audit Log - Based on audit permissions
     if (hasPermission(userRole, PERMISSIONS.AUDIT_READ_ALL) || 
         hasPermission(userRole, PERMISSIONS.AUDIT_READ_LIMITED)) {
       items.push({
@@ -183,7 +167,6 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
       });
     }
 
-    // Reports - Based on report permissions
     if (canAccessReports(userRole)) {
       items.push({
         id: 'reports',
@@ -252,18 +235,12 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
     if (itemId === 'logout') {
       try {
         await logoutUser().unwrap();
-        // Navigation will happen automatically via auth state change
       } catch (error) {
         console.error('Logout failed:', error);
-        // Even if API call fails, Redux state is cleared
       }
-    } else if (itemId === 'settings') {
-      // Navigate to settings page (to be implemented)
-      console.log('Navigate to settings');
+    } else if (itemId === 'settings') { 
     } else if (itemId === 'profile') {
       navigate('/profile');
-      // Navigate to profile page (to be implemented)  
-      console.log('Navigate to profile');
     } else if (itemId === 'theme') {
       toggleTheme();
     }
@@ -271,22 +248,18 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
 
   const handleNavigationClick = (item) => {
     navigate(item.path);
-    // Close mobile sidebar if open
     if (window.innerWidth < 1024) {
       onToggle();
     }
   };
 
-  // Check if current path matches navigation item
   const isActiveItem = (item) => {
     if (item.path === '/tasks') {
-      // For tasks, also consider /tasks/:id as active
       return location.pathname === '/tasks' || location.pathname.startsWith('/tasks/');
     }
     return location.pathname === item.path;
   };
 
-  // Get user initials for avatar
   const getUserInitials = () => {
     if (!currentUser?.fullName) return 'U';
     return currentUser.fullName
@@ -297,7 +270,6 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
       .slice(0, 2);
   };
 
-  // Get user role display name
   const getRoleDisplayName = (role) => {
     const roleNames = {
       [USER_ROLES.ADMIN]: 'Administrator',
@@ -312,16 +284,12 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
 
   return (
     <>
-      {/* Sidebar Overlay for Mobile */}
       {!isCollapsed && (
         <div className="sidebar-overlay lg:hidden" onClick={onToggle} />
       )}
 
-      {/* Sidebar */}
       <div className={`sidebar sidebar-theme-primary flex flex-col ${isCollapsed ? 'sidebar-collapsed' : 'sidebar-expanded'}`}>
-        {/* Sidebar Header */}
         <div className="sidebar-header flex-shrink-0">
-          {/* Only show AdTrack logo when sidebar is expanded */}
           {!isCollapsed && (
             <div className="sidebar-logo">
               <div className="sidebar-logo-icon">
@@ -343,9 +311,7 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
           </button>
         </div>
 
-        {/* Sidebar Navigation - Takes up available space */}
         <div className="sidebar-nav flex-1 overflow-y-auto overflow-x-hidden">
-          {/* Main Menu Section */}
           <div className="sidebar-nav-section">
             <div className="sidebar-nav-list">
               {navigationItems.map((item) => (
@@ -363,7 +329,6 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
                   {isCollapsed && (
                     <div className="sidebar-tooltip">
                       {item.label}
-                      {/* Show unread count in tooltip when collapsed */}
                       {item.id === 'notifications' && unreadNotificationsCount > 0 && (
                         <span className="ml-2 text-red-400">({unreadNotificationsCount} unread)</span>
                       )}
@@ -375,7 +340,6 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
           </div>
         </div>
 
-        {/* Sidebar Footer - Profile Section - Stays at bottom */}
         <div className="sidebar-footer flex-shrink-0 mt-auto">
           <div className="relative">
             <div
@@ -400,7 +364,6 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
               )}
             </div>
 
-            {/* Profile Dropdown */}
             {showProfileDropdown && !isCollapsed && (
               <div className="sidebar-profile-dropdown">
                 {profileMenuItems.map((item) => (

@@ -6,17 +6,16 @@ import ExportButtons from '../common/ExportButtons';
 
 const DailyTaskMovementReport = () => {
   const [filters, setFilters] = useState({
-    date: new Date().toISOString().split('T')[0] // Today's date
+    date: new Date().toISOString().split('T')[0]  
   });
 
-  // API Query with real-time data
   const { 
     data: reportData, 
     isLoading, 
     error, 
     refetch 
   } = useGetDailyMovementReportQuery(filters, {
-    pollingInterval: 30000, // Refresh every 30 seconds for real-time activity
+    pollingInterval: 30000,  
     refetchOnMountOrArgChange: true,
   });
 
@@ -36,7 +35,6 @@ const DailyTaskMovementReport = () => {
     setFilters(newFilters);
   };
 
-  // Transform API data for table display
   const transformData = (apiData) => {
     if (!apiData?.movements) return [];
     
@@ -88,7 +86,6 @@ const DailyTaskMovementReport = () => {
         ]}
       />
 
-      {/* Summary Cards with real API data */}
       {summary && (
         <div className="report-summary mb-6">
           <div className="card">
@@ -135,7 +132,6 @@ const DailyTaskMovementReport = () => {
         </div>
       )}
 
-      {/* Activity by Action Type */}
       {summary.movementsByAction && (
         <div className="mb-6 p-4 bg-gray-50 rounded-lg">
           <h3 className="text-sm font-medium text-gray-700 mb-3">Activity Breakdown</h3>
@@ -150,7 +146,6 @@ const DailyTaskMovementReport = () => {
         </div>
       )}
 
-      {/* Activity by Hour Chart */}
       {summary.movementsByHour && (
         <div className="mb-6 p-4 bg-blue-50 rounded-lg">
           <h3 className="text-sm font-medium text-blue-700 mb-3">Activity by Hour</h3>
@@ -165,7 +160,6 @@ const DailyTaskMovementReport = () => {
         </div>
       )}
 
-      {/* Top Active Users */}
       {summary.movementsByUser && (
         <div className="mb-6 p-4 bg-green-50 rounded-lg">
           <h3 className="text-sm font-medium text-green-700 mb-3">Most Active Users</h3>
@@ -183,7 +177,6 @@ const DailyTaskMovementReport = () => {
         </div>
       )}
 
-      {/* Loading State */}
       {isLoading && (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -191,7 +184,6 @@ const DailyTaskMovementReport = () => {
         </div>
       )}
 
-      {/* Report Table */}
       {!isLoading && (
         <ReportTable 
           columns={columns}

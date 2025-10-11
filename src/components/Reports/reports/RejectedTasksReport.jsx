@@ -14,11 +14,9 @@ const RejectedTasksReport = () => {
     limit: 50
   });
 
-  // NEW: Store raw unfiltered data
   const [rawData, setRawData] = useState(null);
   const [filteredData, setFilteredData] = useState(null);
 
-  // NEW: Only send date filters to API
   const apiFilters = {
     dateFrom: filters.dateFrom,
     dateTo: filters.dateTo,
@@ -26,31 +24,26 @@ const RejectedTasksReport = () => {
     limit: filters.limit
   };
 
-  // API Query with real-time data
   const { 
     data: reportData, 
     isLoading, 
     error, 
     refetch 
   } = useGetRejectedTasksReportQuery(apiFilters, {
-    pollingInterval: 60000, // Refresh every minute
+    pollingInterval: 60000,  
     refetchOnMountOrArgChange: true,
   });
 
-  // Get users for filter options
   const { data: usersData } = useGetUsersQuery({ limit: 100 });
 
-  // NEW: Apply frontend filtering whenever data or closureType filter changes
   useEffect(() => {
     if (!reportData) return;
 
     setRawData(reportData);
 
-    // Apply closureType filter on frontend
     if (filters.closureType) {
       const filtered = reportData.data.filter(task => task.status === filters.closureType);
       
-      // Recalculate summary for filtered data
       const summary = {
         totalRejected: filtered.length,
         avgDaysActive: filtered.length > 0
@@ -78,7 +71,6 @@ const RejectedTasksReport = () => {
     { id: 'daysSinceRejection', label: 'Days Since Rejection', sortable: true }
   ];
 
-  // Transform users data for filter options
   const getUserFilterOptions = () => {
     if (!usersData?.users) return [];
     return usersData.users
@@ -101,11 +93,10 @@ const RejectedTasksReport = () => {
     setFilters(prev => ({
       ...prev,
       ...newFilters,
-      page: 1 // Reset to first page when filters change
+      page: 1  
     }));
   };
 
-  // Transform API data for table display
   const transformData = (apiData) => {
     if (!apiData?.data) return [];
     
@@ -125,7 +116,6 @@ const RejectedTasksReport = () => {
     }));
   };
 
-  // CHANGED: Use filteredData instead of reportData
   const tableData = transformData(filteredData);
   const summary = filteredData?.summary || {};
 
@@ -168,7 +158,6 @@ const RejectedTasksReport = () => {
         ]}
       />
 
-      {/* Summary Cards with real API data */}
       {summary && (
         <div className="report-summary mb-6">
           <div className="card">
@@ -214,7 +203,6 @@ const RejectedTasksReport = () => {
         </div>
       )}
 
-      {/* Closure Type Distribution */}
       {summary.closureTypeDistribution && (
         <div className="mb-6 p-4 bg-red-50 rounded-lg">
           <h3 className="text-sm font-medium text-red-700 mb-3">Closure Type Distribution</h3>
@@ -229,7 +217,6 @@ const RejectedTasksReport = () => {
         </div>
       )}
 
-      {/* Top Rejection Reasons */}
       {summary.rejectionReasons && (
         <div className="mb-6 p-4 bg-yellow-50 rounded-lg">
           <h3 className="text-sm font-medium text-yellow-700 mb-3">Top Rejection Reasons</h3>
@@ -247,7 +234,6 @@ const RejectedTasksReport = () => {
         </div>
       )}
 
-      {/* Rejection Timeline */}
       {summary.rejectionsByMonth && (
         <div className="mb-6 p-4 bg-blue-50 rounded-lg">
           <h3 className="text-sm font-medium text-blue-700 mb-3">Rejection Trend (Last 6 Months)</h3>
@@ -262,7 +248,6 @@ const RejectedTasksReport = () => {
         </div>
       )}
 
-      {/* Team Performance */}
       {summary.rejectionsByReviewer && (
         <div className="mb-6 p-4 bg-gray-50 rounded-lg">
           <h3 className="text-sm font-medium text-gray-700 mb-3">Rejections by Reviewer</h3>
@@ -280,7 +265,6 @@ const RejectedTasksReport = () => {
         </div>
       )}
 
-      {/* Loading State */}
       {isLoading && (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -288,7 +272,6 @@ const RejectedTasksReport = () => {
         </div>
       )}
 
-      {/* Report Table */}
       {!isLoading && (
         <ReportTable 
           columns={columns}

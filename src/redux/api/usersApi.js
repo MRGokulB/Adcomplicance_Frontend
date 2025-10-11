@@ -1,4 +1,3 @@
-// src/redux/api/usersApi.js
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { refreshCsrfToken } from './csrfRefreshHandler';
 
@@ -11,7 +10,6 @@ const baseQuery = fetchBaseQuery({
       headers.set('authorization', `Bearer ${token}`);
     }
 
-    // FIXED: Read CSRF token from Redux state instead of window
     const csrfToken = getState().csrf?.token;
     if (csrfToken) {
       headers.set('X-CSRF-Token', csrfToken);
@@ -28,15 +26,11 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
     api.dispatch({ type: 'auth/logout' });
   }
   
-  // Handle 403 CSRF token errors - refresh token and retry
   if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {    
-    console.log('🔄 CSRF token invalid in usersApi, refreshing...');
     
-    // Use singleton refresh handler
     const success = await refreshCsrfToken(api);
     
     if (success) {
-      // Retry the original request with new token
       result = await baseQuery(args, api, extraOptions);
     }
   }
@@ -49,20 +43,17 @@ export const usersApi = createApi({
   baseQuery: baseQueryWithReauth,
   tagTypes: ['User', 'Absence', 'Profile', 'Promotion'],
 
-  //  Default cache retention
-  keepUnusedDataFor: 300, // 5 minutes default
+  keepUnusedDataFor: 300,  
   refetchOnMountOrArgChange: 300,
 
   endpoints: (builder) => ({
-    //  Current user profile with longer cache
     getCurrentUserProfile: builder.query({
       query: () => 'profile/me',
       providesTags: [{ type: 'Profile', id: 'CURRENT' }],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 600, // 10 minutes - rarely changes
+      keepUnusedDataFor: 600,  
     }),
 
-    //  Update profile with optimistic update
     updateCurrentUserProfile: builder.mutation({
       query: (userData) => ({
         url: 'profile/me',
@@ -75,7 +66,6 @@ export const usersApi = createApi({
       ],
       transformResponse: (response) => response.user,
       async onQueryStarted(patch, { dispatch, queryFulfilled }) {
-        // Optimistic update
         const patchResult = dispatch(
           usersApi.util.updateQueryData('getCurrentUserProfile', undefined, (draft) => {
             Object.assign(draft, patch);
@@ -84,7 +74,6 @@ export const usersApi = createApi({
 
         try {
           const { data: updatedUser } = await queryFulfilled;
-          // Update auth slice with new user data
           dispatch({
             type: 'auth/updateUser',
             payload: updatedUser
@@ -95,7 +84,6 @@ export const usersApi = createApi({
       }
     }),
 
-    //  Enhanced user listing with specific tags
     getUsers: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -108,7 +96,6 @@ export const usersApi = createApi({
 
         return `?${searchParams.toString()}`;
       },
-      //  Provide specific tags for each user
       providesTags: (result) =>
         result?.users
           ? [
@@ -120,18 +107,16 @@ export const usersApi = createApi({
         users: response.users || [],
         pagination: response.pagination || {}
       }),
-      keepUnusedDataFor: 300, // 5 minutes
+      keepUnusedDataFor: 300,  
     }),
 
-    //  Get user by ID with longer cache
     getUserById: builder.query({
       query: (id) => id,
       providesTags: (result, error, id) => [{ type: 'User', id }],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 600, // 10 minutes - user details don't change often
+      keepUnusedDataFor: 600, 
     }),
 
-    //  Create user with better error handling
     createUser: builder.mutation({
       query: (userData) => ({
         url: '',
@@ -147,8 +132,6 @@ export const usersApi = createApi({
       })
     }),
 
-    //  Update user with optimistic update
-    // FIXED: Update user with optimistic update for BOTH detail and list
     updateUser: builder.mutation({
       query: ({ id, ...userData }) => ({
         url: id,
@@ -165,14 +148,12 @@ export const usersApi = createApi({
         changes: response.changes || null
       }),
       async onQueryStarted({ id, ...patch }, { dispatch, queryFulfilled }) {
-        // Optimistic update for getUserById
         const patchDetail = dispatch(
           usersApi.util.updateQueryData('getUserById', id, (draft) => {
             Object.assign(draft, patch);
           })
         );
 
-        // FIXED: Optimistic update for getUsers list
         const patchList = dispatch(
           usersApi.util.updateQueryData('getUsers', undefined, (draft) => {
             const userIndex = draft.users?.findIndex(u => u.id === id);
@@ -191,7 +172,6 @@ export const usersApi = createApi({
       }
     }),
 
-    // FIXED: Promote user with optimistic update for BOTH detail and list
     promoteUser: builder.mutation({
       query: ({ id, newRole, reason }) => ({
         url: `${id}/promote`,
@@ -208,7 +188,6 @@ export const usersApi = createApi({
         changes: response.changes
       }),
       async onQueryStarted({ id, newRole }, { dispatch, queryFulfilled }) {
-        // Optimistic update for getUserById
         const patchDetail = dispatch(
           usersApi.util.updateQueryData('getUserById', id, (draft) => {
             draft.role = newRole;
@@ -216,7 +195,6 @@ export const usersApi = createApi({
           })
         );
 
-        // FIXED: Optimistic update for getUsers list
         const patchList = dispatch(
           usersApi.util.updateQueryData('getUsers', undefined, (draft) => {
             const userIndex = draft.users?.findIndex(u => u.id === id);
@@ -236,7 +214,6 @@ export const usersApi = createApi({
       }
     }),
 
-    // Reset user password - no optimistic update needed
     resetUserPassword: builder.mutation({
       query: ({ id, newPassword }) => ({
         url: `${id}/reset-password`,
@@ -247,7 +224,6 @@ export const usersApi = createApi({
       transformResponse: (response) => response.message
     }),
 
-    //  Get promotion eligible users with longer cache
     getPromotionEligibleUsers: builder.query({
       query: () => 'promotion/eligible',
       providesTags: [{ type: 'Promotion', id: 'ELIGIBLE' }],
@@ -255,10 +231,9 @@ export const usersApi = createApi({
         eligibleUsers: response.eligibleUsers || [],
         summary: response.summary || {}
       }),
-      keepUnusedDataFor: 600, // 10 minutes - doesn't change frequently
+      keepUnusedDataFor: 600,  
     }),
 
-    //  Enhanced absence management with specific tags
     getAbsences: builder.query({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
@@ -270,7 +245,6 @@ export const usersApi = createApi({
 
         return `absences?${searchParams.toString()}`;
       },
-      //  Provide specific tags for each absence
       providesTags: (result) =>
         result && Array.isArray(result)
           ? [
@@ -279,10 +253,9 @@ export const usersApi = createApi({
           ]
           : [{ type: 'Absence', id: 'LIST' }],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 300, // 5 minutes
+      keepUnusedDataFor: 300,  
     }),
 
-    //  Create absence with optimistic update
     createAbsence: builder.mutation({
       query: (absenceData) => ({
         url: 'absences',
@@ -301,7 +274,6 @@ export const usersApi = createApi({
           isOptimistic: true
         };
 
-        // Optimistic addition
         const patchResult = dispatch(
           usersApi.util.updateQueryData('getAbsences', undefined, (draft) => {
             if (Array.isArray(draft)) {
@@ -318,7 +290,6 @@ export const usersApi = createApi({
       }
     }),
 
-    //  Delete absence with optimistic removal
     deleteAbsence: builder.mutation({
       query: (id) => ({
         url: `absences/${id}`,

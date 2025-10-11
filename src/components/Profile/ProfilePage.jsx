@@ -13,7 +13,6 @@ const ProfilePage = () => {
   const currentUser = useSelector(selectCurrentUser);
   const userRole = useSelector(selectUserRole);
 
-  // API hooks
   const { 
     data: profileData, 
     isLoading: isLoadingProfile,
@@ -23,7 +22,6 @@ const ProfilePage = () => {
   const [updateProfile, { isLoading: isUpdating }] = useUpdateCurrentUserProfileMutation();
   const [changePassword, { isLoading: isChangingPassword }] = useChangePasswordMutation();
 
-  // Form states
   const [profileForm, setProfileForm] = useState({
     fullName: '',
     email: '',
@@ -47,7 +45,6 @@ const ProfilePage = () => {
     confirm: false
   });
 
-  // Initialize profile form
   useEffect(() => {
     const userData = profileData || currentUser;
     if (userData) {
@@ -60,7 +57,6 @@ const ProfilePage = () => {
     }
   }, [profileData, currentUser]);
 
-  // Clear success message after 5 seconds
   useEffect(() => {
     if (successMessage) {
       const timer = setTimeout(() => setSuccessMessage(''), 5000);
@@ -68,7 +64,6 @@ const ProfilePage = () => {
     }
   }, [successMessage]);
 
-  // Utility functions
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleString('en-US', {
       year: 'numeric',
@@ -110,7 +105,6 @@ const ProfilePage = () => {
     }
   };
 
-  // Profile form handlers
   const validateProfileForm = () => {
     const errors = {};
 
@@ -174,7 +168,6 @@ const ProfilePage = () => {
     }
   };
 
-  // Password form handlers
   const validatePasswordForm = () => {
     const errors = {};
 
@@ -277,7 +270,6 @@ const ProfilePage = () => {
 
   return (
     <div className="container-lg section-md">
-      {/* Success Message */}
       {successMessage && (
         <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md">
           <div className="flex">
@@ -290,31 +282,26 @@ const ProfilePage = () => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Profile Overview Card */}
         <div className="lg:col-span-1">
           <div className="card">
             <div className="card-body text-center">
-              {/* Avatar */}
               <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-3xl font-bold text-white">
                   {userData?.fullName?.charAt(0) || 'U'}
                 </span>
               </div>
 
-              {/* Basic Info */}
               <h3 className="text-xl font-semibold text-gray-900 mb-1">
                 {userData?.fullName || 'User'}
               </h3>
               <p className="text-gray-600 mb-3">{userData?.email}</p>
 
-              {/* Role Badge */}
               <div className="mb-4">
                 <span className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium border ${getRoleColor(userData?.role)}`}>
                   {getRoleDisplayName(userData?.role)}
                 </span>
               </div>
 
-              {/* Account Stats */}
               <div className="border-t border-gray-100 pt-4 space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Status</span>
@@ -339,10 +326,8 @@ const ProfilePage = () => {
           </div>
         </div>
 
-        {/* Profile Management */}
         <div className="lg:col-span-2">
           <div className="card">
-            {/* Tab Navigation */}
             <div className="card-header border-b border-gray-100">
               <div className="flex space-x-6">
                 <button
@@ -369,11 +354,9 @@ const ProfilePage = () => {
             </div>
 
             <div className="card-body">
-              {/* Profile Settings Tab */}
               {activeTab === 'profile' && (
                 <form onSubmit={handleProfileSubmit} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Full Name */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Full Name *
@@ -391,7 +374,6 @@ const ProfilePage = () => {
                       )}
                     </div>
 
-                    {/* Email */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Email Address *
@@ -409,7 +391,6 @@ const ProfilePage = () => {
                       )}
                     </div>
 
-                    {/* Username (Read-only) */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Username
@@ -423,7 +404,6 @@ const ProfilePage = () => {
                       <p className="mt-1 text-xs text-gray-500">Username cannot be changed</p>
                     </div>
 
-                    {/* Mobile Number */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Mobile Number
@@ -441,7 +421,6 @@ const ProfilePage = () => {
                       )}
                     </div>
 
-                    {/* Team */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Team
@@ -456,7 +435,6 @@ const ProfilePage = () => {
                       />
                     </div>
 
-                    {/* Role (Read-only) */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Role
@@ -471,14 +449,12 @@ const ProfilePage = () => {
                     </div>
                   </div>
 
-                  {/* Error Message */}
                   {profileErrors.submit && (
                     <div className="p-3 bg-red-50 border border-red-200 rounded-md">
                       <p className="text-sm text-red-700">{profileErrors.submit}</p>
                     </div>
                   )}
 
-                  {/* Submit Button */}
                   <div className="flex justify-end">
                     <button
                       type="submit"
@@ -501,10 +477,8 @@ const ProfilePage = () => {
                 </form>
               )}
 
-              {/* Change Password Tab */}
               {activeTab === 'password' && (
                 <form onSubmit={handlePasswordSubmit} className="space-y-6">
-                  {/* Current Password */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Current Password *
@@ -540,7 +514,6 @@ const ProfilePage = () => {
                     )}
                   </div>
 
-                  {/* New Password */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       New Password *
@@ -579,7 +552,6 @@ const ProfilePage = () => {
                     </p>
                   </div>
 
-                  {/* Confirm Password */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Confirm New Password *
@@ -615,14 +587,12 @@ const ProfilePage = () => {
                     )}
                   </div>
 
-                  {/* Error Message */}
                   {passwordErrors.submit && (
                     <div className="p-3 bg-red-50 border border-red-200 rounded-md">
                       <p className="text-sm text-red-700">{passwordErrors.submit}</p>
                     </div>
                   )}
 
-                  {/* Security Notice */}
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
                     <div className="flex">
                       <svg className="w-5 h-5 text-blue-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -639,7 +609,6 @@ const ProfilePage = () => {
                     </div>
                   </div>
 
-                  {/* Submit Button */}
                   <div className="flex justify-end">
                     <button
                       type="submit"

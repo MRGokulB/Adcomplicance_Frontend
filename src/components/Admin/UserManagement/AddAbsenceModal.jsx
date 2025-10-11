@@ -1,4 +1,3 @@
-// src/components/Admin/AbsenceTracker/AddAbsenceModal.jsx - OPTIMIZED VERSION
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useGetUsersQuery } from '../../../redux/api/usersApi';
 import { USER_ROLES } from '../../../utils/roles';
@@ -13,29 +12,25 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // OPTIMIZED: Memoize query params
   const usersQueryParams = useMemo(() => ({
     role: USER_ROLES.COMPLIANCE_USER,
     isActive: true,
     limit: 100
   }), []);
 
-  // OPTIMIZED: Only fetch users when modal is open
   const {
     data: usersData,
     isLoading: isLoadingUsers
   } = useGetUsersQuery(usersQueryParams, {
-    skip: !isOpen, // Skip query when modal is closed
-    refetchOnMountOrArgChange: 600, // 10 minutes
+    skip: !isOpen,  
+    refetchOnMountOrArgChange: 600,  
   });
-
-  // OPTIMIZED: Memoize compliance users list
+ 
   const complianceUsers = useMemo(() => 
     usersData?.users || [], 
     [usersData?.users]
   );
-
-  // OPTIMIZED: Memoize sample tasks function
+ 
   const getSampleTasksForUser = useCallback((userId) => {
     const taskSets = {
       1: [
@@ -53,14 +48,12 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
     };
     return taskSets[userId] || taskSets.default;
   }, []);
-
-  // OPTIMIZED: Memoize selected user tasks
+ 
   const selectedUserTasks = useMemo(() => 
     formData.user ? getSampleTasksForUser(formData.user) : [], 
     [formData.user, getSampleTasksForUser]
   );
-
-  // Reset form when modal closes
+ 
   useEffect(() => {
     if (!isOpen) {
       setFormData({
@@ -73,8 +66,7 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
       setIsSubmitting(false);
     }
   }, [isOpen]);
-
-  // OPTIMIZED: Memoize status badge class function
+ 
   const getStatusBadgeClass = useCallback((status) => {
     switch (status) {
       case 'In Progress':
@@ -87,8 +79,7 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
         return 'badge-secondary';
     }
   }, []);
-
-  // OPTIMIZED: Memoize validation function
+ 
   const validateForm = useCallback(() => {
     const newErrors = {};
 
@@ -122,8 +113,7 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
 
     return newErrors;
   }, [formData]);
-
-  // OPTIMIZED: Memoize input change handler
+ 
   const handleInputChange = useCallback((field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -137,8 +127,7 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
       }));
     }
   }, [errors]);
-
-  // OPTIMIZED: Memoize submit handler
+ 
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     
@@ -166,15 +155,13 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
       setIsSubmitting(false);
     }
   }, [formData, validateForm, onAddAbsence]);
-
-  // OPTIMIZED: Memoize close handler
+ 
   const handleClose = useCallback(() => {
     if (!isSubmitting) {
       onClose();
     }
   }, [isSubmitting, onClose]);
-
-  // OPTIMIZED: Memoize submit button disabled state
+ 
   const isSubmitDisabled = useMemo(() => 
     isSubmitting || !formData.user || !formData.fromDate || !formData.toDate,
     [isSubmitting, formData.user, formData.fromDate, formData.toDate]

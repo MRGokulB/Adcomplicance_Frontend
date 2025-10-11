@@ -25,13 +25,11 @@ const Dashboard = () => {
   const permissions = usePermissions();
   const navigate = useNavigate();
 
-  // Track page visibility
   useEffect(() => {
     const handleVisibilityChange = () => {
       const visible = document.visibilityState === 'visible';
       setIsVisible(visible);
       
-      // When tab becomes visible, record as user action to trigger fresh data
       if (visible) {
         setLastUserAction(Date.now());
       }
@@ -41,14 +39,9 @@ const Dashboard = () => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
-  // SMART POLLING: Adjust intervals based on user activity
-  // - Active user (recent clicks): 45s
-  // - Idle user: 90s
-  // - Tab hidden: No polling
   const [userActive, setUserActive] = useState(true);
   
   useEffect(() => {
-    // Track user activity (clicks, keyboard)
     const resetActivityTimer = () => {
       setLastUserAction(Date.now());
       setUserActive(true);
@@ -57,13 +50,12 @@ const Dashboard = () => {
     window.addEventListener('click', resetActivityTimer);
     window.addEventListener('keydown', resetActivityTimer);
     
-    // Check if user is idle (no activity for 2 minutes)
     const idleCheckInterval = setInterval(() => {
       const timeSinceLastAction = Date.now() - lastUserAction;
-      if (timeSinceLastAction > 120000) { // 2 minutes
+      if (timeSinceLastAction > 120000) {  
         setUserActive(false);
       }
-    }, 30000); // Check every 30s
+    }, 30000);  
     
     return () => {
       window.removeEventListener('click', resetActivityTimer);
@@ -72,23 +64,18 @@ const Dashboard = () => {
     };
   }, [lastUserAction]);
 
-  // DYNAMIC POLLING INTERVALS based on activity and visibility
   const getPollingInterval = (baseInterval) => {
-    if (!isVisible) return 0; // Stop polling when tab hidden
-    if (userActive) return baseInterval; // Normal interval when active
-    return baseInterval * 2; // Slower polling when idle
+    if (!isVisible) return 0;  
+    if (userActive) return baseInterval;  
+    return baseInterval * 2;  
   };
 
-  // Critical data: 45s active, 90s idle
   const criticalPolling = getPollingInterval(45000);
   
-  // Important data: 60s active, 120s idle
   const importantPolling = getPollingInterval(60000);
   
-  // Background data: 120s active, 240s idle
   const backgroundPolling = getPollingInterval(120000);
 
-  // Dashboard - Main overview data
   const { 
     data: dashboardData, 
     isLoading: isDashboardLoading, 
@@ -99,43 +86,37 @@ const Dashboard = () => {
     skip: !isVisible,
   });
 
-  // Quick stats - User sees these immediately
   const { 
     data: quickStats, 
     isLoading: isStatsLoading,
     refetch: refetchStats 
   } = useGetQuickStatsQuery(undefined, {
-    pollingInterval: criticalPolling, // More frequent - user-facing metrics
+    pollingInterval: criticalPolling,  
     skip: !isVisible,
   });
 
-  // Task buckets - Static unless user takes action
   const { 
     data: taskBuckets, 
     isLoading: isBucketsLoading,
     refetch: refetchBuckets 
   } = useGetTaskBucketsQuery(undefined, {
-    pollingInterval: 0, // No automatic polling
+    pollingInterval: 0,  
   });
 
-  // Workload chart - Background analytics
   const { 
     data: workloadChart, 
     isLoading: isWorkloadLoading,
     refetch: refetchWorkload 
   } = useGetWorkloadChartQuery(undefined, {
-    pollingInterval: backgroundPolling, // Slowest polling
+    pollingInterval: backgroundPolling,  
     skip: !isVisible,
   });
 
-  // Activity feed - Recent updates
-  // RESTRICTED: Compliance & Product users only see activities for their assigned tasks
   const activityParams = React.useMemo(() => {
     const params = { limit: 10 };
     
-    // Filter by assigned tasks for restricted roles
     if ([USER_ROLES.COMPLIANCE_USER, USER_ROLES.PRODUCT_USER].includes(userRole)) {
-      params.assignedToMe = true; // Backend should filter by current user's assigned tasks
+      params.assignedToMe = true;  
     }
     
     return params;
@@ -146,11 +127,10 @@ const Dashboard = () => {
     isLoading: isActivityLoading,
     refetch: refetchActivity 
   } = useGetActivityFeedQuery(activityParams, {
-    pollingInterval: criticalPolling, // Frequent - shows recent actions
+    pollingInterval: criticalPolling,  
     skip: !isVisible,
   });
 
-  // Performance metrics - Admin only, background data
   const { 
     data: performanceMetrics, 
     isLoading: isMetricsLoading,
@@ -160,9 +140,8 @@ const Dashboard = () => {
     skip: !permissions.isAdmin || !isVisible,
   });
 
-  // MANUAL REFRESH: Give users control
   const handleRefreshAll = useCallback(() => {
-    setLastUserAction(Date.now()); // Mark as active
+    setLastUserAction(Date.now());  
     refetchDashboard();
     refetchStats();
     refetchBuckets();
@@ -171,9 +150,7 @@ const Dashboard = () => {
     if (permissions.isAdmin) refetchMetrics();
   }, [refetchDashboard, refetchStats, refetchBuckets, refetchWorkload, refetchActivity, refetchMetrics, permissions.isAdmin]);
 
-  // AUTO-REFRESH on critical user actions
   const handleTaskCreated = useCallback(() => {
-    // When user creates task, immediately refresh relevant data
     refetchStats();
     refetchBuckets();
     refetchActivity();
@@ -311,7 +288,6 @@ const Dashboard = () => {
             </div>
           </div>
           
-          {/* MANUAL REFRESH BUTTON - Gives user control */}
           <button 
             onClick={handleRefreshAll}
             className="btn btn-secondary btn-sm"

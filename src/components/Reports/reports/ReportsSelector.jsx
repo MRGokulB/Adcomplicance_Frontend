@@ -9,13 +9,10 @@ const ReportSelector = ({
   userRole
 }) => {
   
-  // Define available reports based on user role and permissions
   const getAvailableReports = () => {
     const reports = [];
 
-    // Internal Tasks Report - Available to PRODUCT_USER (filtered), PRODUCT_ADMIN (full), and higher roles
     if (hasPermission(userRole, PERMISSIONS.REPORT_INTERNAL_TASKS)) {
-      // Different description for PRODUCT_USER since they see filtered data
       const description = userRole === USER_ROLES.PRODUCT_USER 
         ? 'Internal tasks assigned to you or created by you'
         : 'Comprehensive report of all internal advertising tasks';
@@ -27,9 +24,7 @@ const ReportSelector = ({
       });
     }
 
-    // Exchange Tasks Report - Available to PRODUCT_USER (filtered), PRODUCT_ADMIN (full), and higher roles
     if (hasPermission(userRole, PERMISSIONS.REPORT_EXCHANGE_TASKS)) {
-      // Different description for PRODUCT_USER since they see filtered data
       const description = userRole === USER_ROLES.PRODUCT_USER 
         ? 'Exchange tasks assigned to you or created by you'
         : 'Report of tasks requiring exchange approvals';
@@ -41,7 +36,6 @@ const ReportSelector = ({
       });
     }
 
-    // User-wise Reports - Available based on specific permissions
     if (hasPermission(userRole, PERMISSIONS.REPORT_COMPLIANCE_USERS) || 
         hasPermission(userRole, PERMISSIONS.REPORT_PRODUCT_USERS)) {
       reports.push({
@@ -51,7 +45,6 @@ const ReportSelector = ({
       });
     }
 
-    // Expiring Soon Report - Available to compliance and managers
     if (hasPermission(userRole, PERMISSIONS.REPORT_EXPIRING_SOON)) {
       reports.push({
         id: 'expiring-soon',
@@ -60,7 +53,6 @@ const ReportSelector = ({
       });
     }
 
-    // Daily Movement Report - Available to managers and admin
     if (hasPermission(userRole, PERMISSIONS.REPORT_DAILY_MOVEMENT)) {
       reports.push({
         id: 'daily-movement',
@@ -69,7 +61,6 @@ const ReportSelector = ({
       });
     }
 
-    // Rejected Tasks Report - Available to most roles for analysis
     if (hasPermission(userRole, PERMISSIONS.REPORT_REJECTED_TASKS)) {
       reports.push({
         id: 'rejected-tasks',
@@ -83,11 +74,9 @@ const ReportSelector = ({
 
   const availableReports = getAvailableReports();
 
-  // Check if user can access specific user report types
   const canAccessComplianceUsers = hasPermission(userRole, PERMISSIONS.REPORT_COMPLIANCE_USERS);
   const canAccessProductUsers = hasPermission(userRole, PERMISSIONS.REPORT_PRODUCT_USERS);
 
-  // Auto-select first available report if current selection is not available
   if (availableReports.length > 0 && !availableReports.find(r => r.id === selectedReportType)) {
     onReportTypeChange(availableReports[0].id);
   }
@@ -110,7 +99,6 @@ const ReportSelector = ({
         ))}
       </div>
       
-      {/* User-wise report sub-navigation */}
       {selectedReportType === 'user-wise' && (
         <div className="flex gap-3 mb-2">
           {canAccessComplianceUsers && (
@@ -130,7 +118,6 @@ const ReportSelector = ({
             </button>
           )}
           
-          {/* Show message if user has no access to any user-wise reports */}
           {!canAccessComplianceUsers && !canAccessProductUsers && (
             <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-sm text-yellow-800">
@@ -141,7 +128,6 @@ const ReportSelector = ({
         </div>
       )}
 
-      {/* No access message */}
       {availableReports.length === 0 && (
         <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <p className="text-yellow-800">

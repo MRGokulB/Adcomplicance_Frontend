@@ -15,24 +15,19 @@ const ReportsPage = () => {
   const [userReportType, setUserReportType] = useState('compliance');
   const userRole = useSelector(selectUserRole);
 
-  // Set correct initial userReportType based on user permissions
   useEffect(() => {
     const canAccessCompliance = hasPermission(userRole, PERMISSIONS.REPORT_COMPLIANCE_USERS);
     const canAccessProduct = hasPermission(userRole, PERMISSIONS.REPORT_PRODUCT_USERS);
     
-    // If user can't access compliance but can access product, default to product
     if (!canAccessCompliance && canAccessProduct) {
       setUserReportType('product');
     } else if (canAccessCompliance && !canAccessProduct) {
       setUserReportType('compliance');
     } else if (canAccessCompliance && canAccessProduct) {
-      // If user has access to both, keep current selection or default to compliance
-      // This maintains existing behavior for users with full access
       setUserReportType('compliance');
     }
   }, [userRole]);
 
-  // Check if user has access to reports
   if (!canAccessReports(userRole)) {
     return (
       <div className="min-h-screen flex items-center justify-center">

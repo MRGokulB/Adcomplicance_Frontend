@@ -1,4 +1,3 @@
-// src/components/Admin/UserManagement/UserManagement.jsx - OPTIMIZED VERSION
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import CreateUserModal from './CreateUserModal';
@@ -37,7 +36,6 @@ const UserManagement = () => {
 
   const currentUserRole = useSelector(selectUserRole);
 
-  // OPTIMIZED: Page visibility detection for conditional polling
   const [isPageVisible, setIsPageVisible] = useState(!document.hidden);
 
   useEffect(() => {
@@ -49,8 +47,7 @@ const UserManagement = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
-
-  // OPTIMIZED: Conditional polling instead of setInterval
+ 
   const { 
     data: usersResponse, 
     isLoading, 
@@ -58,16 +55,15 @@ const UserManagement = () => {
     error,
     refetch 
   } = useGetUsersQuery(filters, {
-    pollingInterval: isPageVisible ? 30000 : 0, // Only poll when tab is visible
-    refetchOnMountOrArgChange: 300, // 5 minutes
+    pollingInterval: isPageVisible ? 30000 : 0,  
+    refetchOnMountOrArgChange: 300,  
   });
 
   const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
   const [updateUser, { isLoading: isUpdating }] = useUpdateUserMutation();
   const [resetPassword, { isLoading: isResetting }] = useResetUserPasswordMutation();
   const [promoteUser, { isLoading: isPromoting }] = usePromoteUserMutation();
-
-  // OPTIMIZED: Memoize permission checks
+ 
   const canCreateUsers = useMemo(() => 
     hasPermission(currentUserRole, PERMISSIONS.USER_CREATE_ANY) ||
     hasPermission(currentUserRole, PERMISSIONS.USER_CREATE_PRODUCT) ||
@@ -95,12 +91,10 @@ const UserManagement = () => {
     hasPermission(currentUserRole, PERMISSIONS.USER_READ_ALL),
     [currentUserRole]
   );
-
-  // OPTIMIZED: Memoize derived data
+ 
   const users = useMemo(() => usersResponse?.users || [], [usersResponse?.users]);
   const pagination = useMemo(() => usersResponse?.pagination || {}, [usersResponse?.pagination]);
-
-  // OPTIMIZED: Memoize utility functions
+ 
   const getRoleBadgeClass = useCallback((role) => {
     switch (role) {
       case USER_ROLES.PRODUCT_USER:
@@ -131,8 +125,7 @@ const UserManagement = () => {
       day: 'numeric'
     });
   }, []);
-
-  // OPTIMIZED: Memoize filter handlers
+ 
   const handleFilterChange = useCallback((key, value) => {
     setFilters(prev => ({
       ...prev,
@@ -155,8 +148,7 @@ const UserManagement = () => {
       limit: 20
     });
   }, []);
-
-  // OPTIMIZED: Memoize CRUD handlers
+ 
   const handleCreateUser = useCallback(async (userData) => {
     try {
       const allowedRoles = [];
@@ -184,8 +176,7 @@ const UserManagement = () => {
         team: userData.team || undefined
       }).unwrap();
 
-      setModals(prev => ({ ...prev, createUser: false }));
-      // Optimistic update handles cache refresh
+      setModals(prev => ({ ...prev, createUser: false })); 
     } catch (error) {
       console.error('Failed to create user:', error);
       throw error;
@@ -202,9 +193,7 @@ const UserManagement = () => {
       setModals(prev => ({ ...prev, editUser: false }));
       setSelectedUser(null);
 
-      if (result.changes?.roleChanged) {
-        console.log(`User promoted from ${result.changes.previousRole} to ${result.changes.newRole}`);
-      }
+       
     } catch (error) {
       console.error('Failed to update user:', error);
       throw error;
@@ -218,13 +207,11 @@ const handlePromoteUser = useCallback(async (promotionData) => {
       newRole: promotionData.newRole,
       reason: promotionData.reason
     }).unwrap();
-
-    // FIXED: Close the modal after promotion
+ 
     setModals(prev => ({ ...prev, userDetail: false }));
     setSelectedUser(null);
     
-    console.log(`User promoted from ${result.changes.previousRole} to ${result.changes.newRole}`);
-  } catch (error) {
+   } catch (error) {
     console.error('Failed to promote user:', error);
     throw error;
   }
@@ -244,8 +231,7 @@ const handlePromoteUser = useCallback(async (promotionData) => {
       throw error;
     }
   }, [selectedUser, resetPassword]);
-
-  // OPTIMIZED: Memoize export functions
+ 
   const convertToCSV = useCallback((data) => {
     if (!data.length) return '';
     
@@ -291,8 +277,7 @@ const handlePromoteUser = useCallback(async (promotionData) => {
       setIsExporting(false);
     }
   }, [users, convertToCSV, downloadCSV]);
-
-  // OPTIMIZED: Memoize modal handlers
+ 
   const openModal = useCallback((modalName, user = null) => {
     setSelectedUser(user);
     setModals(prev => ({ ...prev, [modalName]: true }));
@@ -302,13 +287,11 @@ const handlePromoteUser = useCallback(async (promotionData) => {
     setModals(prev => ({ ...prev, [modalName]: false }));
     setSelectedUser(null);
   }, []);
-
-  // OPTIMIZED: Memoize pagination handler
+ 
   const handlePageChange = useCallback((newPage) => {
     setFilters(prev => ({ ...prev, page: newPage }));
   }, []);
-
-  // OPTIMIZED: Memoize pagination display text
+ 
   const paginationText = useMemo(() => {
     if (pagination.totalCount > 0) {
       const start = ((pagination.page - 1) * pagination.limit) + 1;
@@ -317,8 +300,7 @@ const handlePromoteUser = useCallback(async (promotionData) => {
     }
     return '';
   }, [pagination]);
-
-  // OPTIMIZED: Memoize empty state message
+ 
   const emptyStateMessage = useMemo(() => {
     if (filters.search || filters.role || filters.team || filters.isActive) {
       return 'No users match your current filters. Try adjusting your search criteria.';

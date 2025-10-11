@@ -1,4 +1,3 @@
-// src/components/ProtectedRoute.jsx
 import React, { useEffect } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { Navigate, useLocation } from 'react-router-dom'
@@ -24,29 +23,24 @@ const ProtectedRoute = ({
   const isLoading = useSelector(selectAuthLoading)
   const userRole = useSelector(selectUserRole)
 
-  // Verify session with server on mount
-  // IMPORTANT: Don't skip this check - we need to verify session even if Redux state is cleared
   const { 
     data: currentUserData, 
     isLoading: isCheckingSession,
     error: sessionError 
   } = useGetCurrentUserQuery(undefined, {
-    skip: false, // Always check session on mount (handles page refresh)
+    skip: false,  
   })
 
-  // Initialize auth on component mount
   useEffect(() => {
     dispatch(initializeAuth())
   }, [dispatch])
 
-  // Handle session errors (expired/invalid session)
   useEffect(() => {
     if (sessionError) {
       dispatch(setSessionInvalid())
     }
   }, [sessionError, dispatch])
 
-  // Show loading while checking authentication or session
   if (isCheckingSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -58,12 +52,10 @@ const ProtectedRoute = ({
     )
   }
 
-  // Redirect to login if session check failed or user not authenticated
   if (sessionError || (!isAuthenticated && !currentUserData)) {
     return <Navigate to={fallbackPath} state={{ from: location }} replace />
   }
 
-  // Check role-based access
   if (requiredRole && userRole !== requiredRole) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -93,18 +85,13 @@ const ProtectedRoute = ({
     )
   }
 
-  // Check permission-based access (implement when needed)
-  if (requiredPermissions.length > 0) {
-    // This would be implemented when we have a more detailed permission system
-    console.log('Checking permissions:', requiredPermissions)
-  }
+  if (requiredPermissions.length > 0) {}
 
   return children
 }
 
 export default ProtectedRoute
 
-// Higher-order component for role-based routes
 export const withRoleProtection = (Component, requiredRole) => {
   return (props) => (
     <ProtectedRoute requiredRole={requiredRole}>
@@ -113,7 +100,6 @@ export const withRoleProtection = (Component, requiredRole) => {
   )
 }
 
-// Higher-order component for permission-based routes
 export const withPermissionProtection = (Component, requiredPermissions) => {
   return (props) => (
     <ProtectedRoute requiredPermissions={requiredPermissions}>

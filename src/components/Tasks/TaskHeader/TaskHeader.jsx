@@ -1,4 +1,3 @@
-// src/components/Tasks/TaskHeader/TaskHeader.jsx - OPTIMIZED VERSION
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUserRole, selectCurrentUser } from '../../../redux/slices/authSlice';
@@ -31,7 +30,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
   const currentUser = useSelector(selectCurrentUser);
   const permissions = usePermissions();
 
-  //  Consolidated modal state
   const [modals, setModals] = useState({
     followUp: false,
     comments: false,
@@ -42,7 +40,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
     status: false
   });
 
-  // Local state
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(task?.title || '');
   const [selectedTaskType, setSelectedTaskType] = useState(task?.taskType || '');
@@ -52,7 +49,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
   const [statusReason, setStatusReason] = useState('');
   const [closureType, setClosureType] = useState('');
 
-  //  Consolidated form data
   const [formData, setFormData] = useState({
     approvalDate: new Date().toISOString().split('T')[0],
     expiryDate: '',
@@ -62,7 +58,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
     closureComments: ''
   });
 
-  // API mutations
   const [updateTaskStatus, { isLoading: isUpdatingStatus }] = useUpdateTaskStatusMutation();
   const [classifyTask, { isLoading: isClassifying }] = useClassifyTaskMutation();
   const [followUpTask, { isLoading: isFollowingUp }] = useFollowUpTaskMutation();
@@ -72,7 +67,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
   const [closeTask, { isLoading: isClosing }] = useCloseTaskMutation();
   const [updateTaskName, { isLoading: isUpdatingName }] = useUpdateTaskNameMutation();
 
-  //  Reset state when task changes
   useEffect(() => {
     if (task) {
       setSelectedTaskType(task.taskType || '');
@@ -81,7 +75,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
     }
   }, [task?.taskType, task?.id, task?.title]);
 
-  //  Memoized helper functions
   const getButtonClass = useCallback((buttonType) => {
     const buttonClasses = {
       'primary': 'btn-primary',
@@ -110,7 +103,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
     return statusStyles[status] || 'bg-gray-100 text-gray-800';
   }, []);
 
-  //  Memoized permission checks
   const canUserActOnThisTask = useMemo(() => {
     if (!task || !currentUser) return false;
     if (permissions.isAdmin) return true;
@@ -151,7 +143,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
     [userRole, task, currentUser]
   );
 
-  //  Memoized workflow buttons
   const workflowButtons = useMemo(() => {
     const buttons = [];
     const canAct = canUserActOnThisTask;
@@ -453,7 +444,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
       <div className="info-card bg-gray-50">
         <div className="flex-between items-start info-card-header">
           <div className="flex-1">
-            {/* UIN and Title */}
             <div className="mb-4">
               <div className="flex items-center gap-4 mb-2">
                 <span className="text-sm font-medium text-gray-600">UIN:</span>
@@ -515,7 +505,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
               </div>
             </div>
 
-            {/* Task Type and Status */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="exchange-form-label">Task Type</label>
@@ -645,7 +634,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
               </div>
             </div>
 
-            {/* Task Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 mb-2">
               <div>
                 <label className="exchange-form-label">Platform</label>
@@ -702,7 +690,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
 )}
 
 
-            {/* Assignments */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="exchange-form-label">Assigned Product Users</label>
@@ -742,7 +729,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="flex flex-col gap-2 ml-4">
             {(permissions.isComplianceUser || permissions.isAdmin || permissions.isSeniorManager) && (
               <button
@@ -773,7 +759,6 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
         </div>
       </div>
 
-      {/* MODALS - Using optimized modal state */}
       {modals.approval && (
         <div className="modal-overlay" onClick={() => toggleModal('approval', false)}>
           <div className="modal max-w-lg" onClick={(e) => e.stopPropagation()}>

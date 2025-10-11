@@ -16,18 +16,16 @@ const InternalTasksReport = () => {
     limit: 50
   });
 
-  // API Queries
   const { 
     data: reportData, 
     isLoading, 
     error, 
     refetch 
   } = useGetInternalTasksReportQuery(filters, {
-    pollingInterval: 60000, // Refresh every minute
+    pollingInterval: 60000,  
     refetchOnMountOrArgChange: true,
   });
 
-  // Get users for filter options
   const { data: usersData } = useGetUsersQuery({ limit: 100 });
 
   const columns = [
@@ -46,7 +44,6 @@ const InternalTasksReport = () => {
     { id: 'commentCount', label: 'Comments', sortable: true }
   ];
 
-  // Transform users data for filter options
   const getUserFilterOptions = () => {
     if (!usersData?.users) return [];
     return usersData.users.map(user => ({
@@ -72,11 +69,10 @@ const InternalTasksReport = () => {
     setFilters(prev => ({
       ...prev,
       ...newFilters,
-      page: 1 // Reset to first page when filters change
+      page: 1  
     }));
   };
 
-  // Transform API data for table display
   const transformData = (apiData) => {
     if (!apiData?.data) return [];
     
@@ -121,7 +117,6 @@ const InternalTasksReport = () => {
     <div>
       <div className="flex-between mb-4">
         <h2 className="text-heading-3">Internal Tasks Report</h2>
-        {/* FIXED: Pass the required props to ExportButtons */}
         <ExportButtons 
           data={tableData}
           columns={columns}
@@ -143,7 +138,6 @@ const InternalTasksReport = () => {
         ]}
       />
 
-      {/* Summary Cards with real data */}
       {summary && (
         <div className="report-summary mb-6">
           <div className="card">
@@ -184,23 +178,7 @@ const InternalTasksReport = () => {
           </div>
         </div>
       )}
-
-      {/* Status Distribution Chart (if available in summary) 
-      {summary.tasksByStatus && (
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-          <h3 className="text-sm font-medium text-gray-700 mb-3">Status Distribution</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Object.entries(summary.tasksByStatus).map(([status, count]) => (
-              <div key={status} className="text-center">
-                <div className="text-lg font-semibold text-gray-900">{count}</div>
-                <div className="text-xs text-gray-600">{status}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}*/}
-
-      {/* Loading State */}
+ 
       {isLoading && (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -208,9 +186,7 @@ const InternalTasksReport = () => {
         </div>
       )}
  
-
-
-      {/* Report Table */}
+ 
       {!isLoading && (
         <ReportTable
           columns={columns}

@@ -1,4 +1,3 @@
-// src/components/Tasks/VersionControl/VersionControl.jsx - Fixed Latest Version Display
 import React, { useState, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUserRole, selectCurrentUser } from '../../../redux/slices/authSlice';
@@ -21,37 +20,31 @@ const VersionControl = ({ task, onRefresh }) => {
   const userRole = useSelector(selectUserRole);
   const permissions = usePermissions();
 
-  // Local state
   const [uploadData, setUploadData] = useState({
     files: [],
     remarks: '',
     comment: '',
-    s3Urls: [] // Add this to track S3 URLs
+    s3Urls: [] 
   });
   const [versionComment, setVersionComment] = useState('');
   const [previewMode, setPreviewMode] = useState(false);
   const [validationResults, setValidationResults] = useState(null);
   const [showValidationResults, setShowValidationResults] = useState(false);
-  const [selectedVersion, setSelectedVersion] = useState(null); // For viewing version details
-  const selectedVersionRef = useRef(null); // Ref for scrolling to selected version
+  const [selectedVersion, setSelectedVersion] = useState(null);  
+  const selectedVersionRef = useRef(null);  
 
-  // API mutations - ALTERNATIVE PATTERN TO AVOID HOOK ISSUES
   const [uploadVersionTrigger, uploadVersionResult] = useUploadVersionMutation();
   const [addComment, { isLoading: isAddingComment }] = useAddCommentMutation();
   const [uploadFiles, { isLoading: isUploadingFiles }] = useUploadFilesMutation();
   const [validateUrls, { isLoading: isValidating }] = useValidateUrlsMutation();
 
-  // Track loading state manually
   const isUploadingVersion = uploadVersionResult.isLoading;
 
-  // FIXED: Get latest version from currentVersion field in API response
   const latestVersion = task?.currentVersion || null;
 
-  // Check if user can upload based on role and task status
   const canUserUploadVersion = () => {
     if (!permissions.canUploadVersion) return false;
     
-    // Product users can upload when task is in Product Review or Open
     if (permissions.isProductUser) {
       const canActOnTask = task.createdBy === currentUser?.id ||
                           task.assignedProductIds?.includes(currentUser?.id) ||
@@ -59,17 +52,14 @@ const VersionControl = ({ task, onRefresh }) => {
                             typeof user === 'object' ? user.id === currentUser?.id : false
                           ));
       
-      // Allow upload in OPEN or PRODUCT_REVIEW status
       return canActOnTask && ['OPEN', 'PRODUCT_REVIEW'].includes(task.status);
     }
     
-    // Admins can upload anytime
     if (permissions.isAdmin) return true;
     
     return false;
   };
 
-  // Get upload guidance based on current status
   const getUploadGuidance = () => {
     if (!task.taskType) {
       return {
@@ -121,7 +111,6 @@ const VersionControl = ({ task, onRefresh }) => {
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files);
     
-    // Validate file count (max 5 as per documentation)
     if (files.length > 5) {
       alert('Maximum 5 files allowed per version');
       return;
@@ -130,14 +119,12 @@ const VersionControl = ({ task, onRefresh }) => {
     setUploadData(prev => ({
       ...prev,
       files: files,
-      s3Urls: [] // Clear previous S3 URLs when new files selected
+      s3Urls: []  
     }));
     
-    // Clear previous validation results
     setValidationResults(null);
     setShowValidationResults(false);
 
-    // Auto-validate files if any are selected
     if (files.length > 0) {
       await handleValidateFiles(files);
     }
@@ -150,12 +137,10 @@ const VersionControl = ({ task, onRefresh }) => {
     }));
   };
 
-  //  Auto-validation with optional files parameter
   const handleValidateFiles = async (filesToValidate = null) => {
     const files = filesToValidate || uploadData.files;
     
     try {      
-      // Step 1: Prepare FormData for upload
       const formData = new FormData();
       files.forEach((file) => {
         formData.append("files", file);
@@ -163,32 +148,23 @@ const VersionControl = ({ task, onRefresh }) => {
       
       const uploadRes = await uploadFiles(formData).unwrap();
 
-      // Step 2: Upload to S3      const uploadRes = await uploadFiles(formData).unwrap();      
       if (!uploadRes.files || uploadRes.files.length === 0) {
         throw new Error('No files were uploaded successfully');
       }
 
-      // Step 3: Extract S3 URLs
       const s3Urls = uploadRes.files.map(f => f.url);
-      console.log('Extracted S3 URLs:', s3Urls);
 
-      // Step 4: Validate S3 URLs using the validate-urls endpoint
-      console.log('Validating S3 URLs...');
       const validationRes = await validateUrls(s3Urls).unwrap();
-      console.log('Validation response:', validationRes);
       
-      // Step 5: Update state with results
       setValidationResults(validationRes);
       setShowValidationResults(true);
 
-      // Step 6: Store the validated S3 URLs for version creation
       setUploadData(prev => ({ 
         ...prev, 
         s3Urls: s3Urls,
-        uploadedFiles: uploadRes.files // Store full file details
+        uploadedFiles: uploadRes.files  
       }));
 
-      console.log('File validation completed successfully');
       return true;
 
     } catch (err) {
@@ -201,18 +177,14 @@ const VersionControl = ({ task, onRefresh }) => {
       });
       setShowValidationResults(true);
       
-      // Clear S3 URLs on error
       setUploadData(prev => ({ ...prev, s3Urls: [] }));
       return false;
     }
   };
 
-  //  Create version with auto-validation if needed
   const handleFileUpload = async () => {
-  console.log("Starting version upload...");  
     
   try {
-    // Check permissions first
     if (!canUserUploadVersion()) {
       alert("You do not have permission to upload versions at this time");
       return;
@@ -223,10 +195,8 @@ const VersionControl = ({ task, onRefresh }) => {
       return;
     }
 
-    // Auto-validate if not already validated or validation failed
     if (!uploadData.s3Urls || uploadData.s3Urls.length === 0 || 
         !validationResults || validationResults.invalid > 0) {
-      console.log('Auto-validating files before version creation...');
       const validationSuccess = await handleValidateFiles();
       if (!validationSuccess) {
         alert("File validation failed. Please check your files and try again.");
@@ -234,21 +204,16 @@ const VersionControl = ({ task, onRefresh }) => {
       }
     }
 
-    // Prepare payload for version creation
     const versionPayload = {
       id: task.id,
       files: uploadData.s3Urls,
       remarks: uploadData.remarks?.trim() || `New version with ${uploadData.s3Urls.length} file(s)`
     };
 
-    // Create version - FIXED: Just await the result, API success means no error was thrown
     const result = await uploadVersionTrigger(versionPayload).unwrap();
-    // If we get here, the upload was successful (no error thrown)
-    // Show success message with guidance
     const guidance = getUploadGuidance();
     alert(`Version uploaded successfully! ${guidance.message}`);
 
-    // Reset form
     setUploadData({
       files: [],
       remarks: '',
@@ -262,7 +227,6 @@ const VersionControl = ({ task, onRefresh }) => {
       fileInputRef.current.value = '';
     }
 
-    // Refresh task data
     onRefresh?.();
 
   } catch (error) {
@@ -299,11 +263,9 @@ const VersionControl = ({ task, onRefresh }) => {
     setPreviewMode(!previewMode);
   };
 
-  // Handle viewing version details
   const handleViewVersion = (version) => {
     setSelectedVersion(version);
     
-    // Scroll to the selected version details card after state update
     setTimeout(() => {
       if (selectedVersionRef.current) {
         selectedVersionRef.current.scrollIntoView({
@@ -312,10 +274,9 @@ const VersionControl = ({ task, onRefresh }) => {
           inline: 'nearest'
         });
       }
-    }, 100); // Small delay to ensure the component has rendered
+    }, 100);  
   };
 
-  // Handle closing version details
   const handleCloseVersionView = () => {
     setSelectedVersion(null);
   };
@@ -384,7 +345,6 @@ const VersionControl = ({ task, onRefresh }) => {
   const uploadGuidance = getUploadGuidance();
   const canUpload = canUserUploadVersion();
 
-  // Check if files are ready for version upload - FIXED: Handle numeric valid count
   const filesReadyForUpload = uploadData.s3Urls.length > 0 && 
     validationResults && 
     (validationResults.valid === true || 
@@ -393,7 +353,6 @@ const VersionControl = ({ task, onRefresh }) => {
 
   return (
     <div>
-      {/* Latest Version Card */}
       <div className="info-section">
         <div className="info-card bg-green-50">
           <div className="info-card-header">
@@ -475,7 +434,6 @@ const VersionControl = ({ task, onRefresh }) => {
                   </span>
                 </div>
                 
-                {/* Version Comments */}
                 <div className="mt-4">
                   {latestVersion.comments && latestVersion.comments.length > 0 && (
                     <div className="mb-3">
@@ -528,7 +486,6 @@ const VersionControl = ({ task, onRefresh }) => {
         </div>
       </div>
 
-      {/* Selected Version Details Card */}
       {selectedVersion && (
         <div className="info-section" ref={selectedVersionRef}>
           <div className="info-card bg-purple-50">
@@ -621,7 +578,6 @@ const VersionControl = ({ task, onRefresh }) => {
                 </span>
               </div>
               
-              {/* Version Comments */}
               {selectedVersion.comments && selectedVersion.comments.length > 0 && (
                 <div className="mt-4">
                   <div className="text-sm font-medium text-gray-700 mb-2">
@@ -645,7 +601,6 @@ const VersionControl = ({ task, onRefresh }) => {
                 </div>
               )}
 
-              {/* NEW: Exchange Approvals Section - Only for Exchange Type Tasks */}
         {task?.taskType === 'EXCHANGE' && selectedVersion.exchangeApprovals && selectedVersion.exchangeApprovals.length > 0 && (
           <div className="mt-6 pt-4 border-t border-purple-200">
             <div className="flex items-center gap-2 mb-3">
@@ -663,7 +618,6 @@ const VersionControl = ({ task, onRefresh }) => {
             <div className="space-y-3">
               {selectedVersion.exchangeApprovals.map((approval, index) => (
                 <div key={approval.id || index} className="bg-white rounded-lg border border-purple-200 p-3">
-                  {/* Exchange Header */}
                   <div className="flex-between items-start mb-2">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-gray-900">{approval.exchangeName}</span>
@@ -682,7 +636,6 @@ const VersionControl = ({ task, onRefresh }) => {
                     </div>
                   </div>
 
-                  {/* Exchange Details */}
                   <div className="space-y-1 text-sm">
                     {approval.approvalDate && (
                       <div className="flex gap-2">
@@ -746,10 +699,7 @@ const VersionControl = ({ task, onRefresh }) => {
             </div>
           </div>
         )}
-
-         
-              
-              {/* Version Statistics */}
+ 
               <div className="mt-4 p-3 bg-white rounded border">
                 <div className="text-sm font-medium text-gray-700 mb-2">Version Statistics</div>
                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -780,7 +730,6 @@ const VersionControl = ({ task, onRefresh }) => {
         </div>
       )}
 
-      {/* Upload New Version */}
       <div className="info-section">
         <div className="info-card bg-blue-50">
           <div className="info-card-header flex-between">
@@ -808,7 +757,6 @@ const VersionControl = ({ task, onRefresh }) => {
                   accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.mp4,.avi,.mov,.excel,.csv,.txt"
                 />
                 
-                {/* File Preview */}
                 {uploadData.files.length > 0 && (
                   <div className="mb-3 p-3 bg-white rounded border">
                     <div className="text-sm font-medium text-gray-700 mb-2">
@@ -828,7 +776,6 @@ const VersionControl = ({ task, onRefresh }) => {
                   </div>
                 )}
 
-                {/* Validation Results */}
                 {showValidationResults && validationResults && (
                   <div className={`mb-3 p-3 border rounded ${
                     (validationResults.valid === true || 
@@ -884,7 +831,6 @@ const VersionControl = ({ task, onRefresh }) => {
                   </div>
                 )}
 
-                {/* Preview Mode */}
                 {previewMode && uploadData.files.length > 0 && (
                   <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded">
                     <div className="text-sm font-medium text-purple-800 mb-2">Preview Mode</div>
@@ -894,7 +840,6 @@ const VersionControl = ({ task, onRefresh }) => {
                         <div>Remarks: "{uploadData.remarks}"</div>
                       )}
                       
-                      {/* Validation Status */}
                       <div className="mt-2 pt-2 border-t border-purple-200">
                         {isValidating ? (
                           <div className="flex items-center gap-2 text-blue-700">
@@ -961,7 +906,6 @@ const VersionControl = ({ task, onRefresh }) => {
                   )}
                 </button>
 
-                {/* Upload Instructions */}
                 <div className="mt-3 text-xs text-gray-500">
                   <p className="mb-1">• Supported formats: PDF, DOC, DOCX, JPG, PNG, GIF, MP4, AVI, MOV</p>
                   <p className="mb-1">• Maximum 5 files per version</p>
@@ -983,7 +927,6 @@ const VersionControl = ({ task, onRefresh }) => {
         </div>
       </div>
 
-      {/* Version History -  Use olderVersions from API response */}
       {task?.olderVersions && task.olderVersions.length > 0 && (
         <div className="info-section">
           <div className="info-card">
@@ -1040,7 +983,6 @@ const VersionControl = ({ task, onRefresh }) => {
                 ))}
               </div>
               
-              {/* Quick Actions for Version History */}
               <div className="mt-4 pt-3 border-t border-gray-200 flex justify-between items-center">
                 <div></div>
                 {selectedVersion && (

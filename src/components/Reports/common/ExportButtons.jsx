@@ -11,7 +11,6 @@ const ExportButtons = ({
 }) => {
   const [exporting, setExporting] = useState(null);
 
-  // Convert data to CSV format
   const convertToCSV = (data, columns) => {
     if (!data.length) return '';
 
@@ -39,15 +38,12 @@ const ExportButtons = ({
     return csvContent;
   };
 
-  // Convert data to Excel-compatible format
   const convertToExcel = (data, columns) => {
     const csvData = convertToCSV(data, columns);
     return csvData;
   };
 
-  // Generate PDF using jsPDF
   const generatePDF = async (data, columns) => {
-    // Load jsPDF from CDN
     if (!window.jspdf) {
       const script = document.createElement('script');
       script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
@@ -55,7 +51,6 @@ const ExportButtons = ({
       await new Promise((resolve) => { script.onload = resolve; });
     }
 
-    // Load jsPDF autoTable plugin
     if (!window.jspdf.jsPDF.prototype.autoTable) {
       const script = document.createElement('script');
       script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js';
@@ -65,7 +60,6 @@ const ExportButtons = ({
 
     const { jsPDF } = window.jspdf;
     
-    // Determine orientation based on number of columns
     const numColumns = columns.length > 0 ? columns.length : Object.keys(data[0] || {}).length;
     const orientation = numColumns > 6 ? 'landscape' : 'portrait';
     
@@ -78,7 +72,6 @@ const ExportButtons = ({
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     
-    // Add header with styling
     doc.setFillColor(41, 128, 185);
     doc.rect(0, 0, pageWidth, 35, 'F');
     
@@ -92,10 +85,8 @@ const ExportButtons = ({
     doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 23);
     doc.text(`Total Records: ${data.length}`, 14, 29);
     
-    // Reset text color for table
     doc.setTextColor(0, 0, 0);
 
-    // Prepare table data
     const headers = columns.length > 0 
       ? columns.map(col => col.label || col.id)
       : Object.keys(data[0]);
@@ -113,7 +104,6 @@ const ExportButtons = ({
       })
     );
 
-    // Generate table with improved styling
     doc.autoTable({
       head: [headers],
       body: tableData,
@@ -145,22 +135,18 @@ const ExportButtons = ({
       tableWidth: 'auto',
       theme: 'grid',
       didDrawPage: function (data) {
-        // Footer
         doc.setFillColor(240, 240, 240);
         doc.rect(0, pageHeight - 20, pageWidth, 20, 'F');
         
-        // Page numbers
         doc.setFontSize(9);
         doc.setTextColor(100, 100, 100);
         const pageText = `Page ${data.pageNumber} of ${doc.internal.getNumberOfPages()}`;
         doc.text(pageText, pageWidth / 2, pageHeight - 10, { align: 'center' });
         
-        // Timestamp in footer
         doc.setFontSize(8);
         doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, pageHeight - 10);
       },
       didParseCell: function(data) {
-        // Add zebra striping
         if (data.section === 'body' && data.row.index % 2 === 0) {
           data.cell.styles.fillColor = [248, 249, 250];
         }
@@ -170,7 +156,6 @@ const ExportButtons = ({
     return doc;
   };
 
-  // Create and download file
   const downloadFile = (content, filename, mimeType) => {
     const blob = new Blob([content], { type: mimeType });
     const url = window.URL.createObjectURL(blob);
@@ -189,13 +174,11 @@ const ExportButtons = ({
     setExporting(format);
 
     try {
-      // If custom export handler is provided, use it
       if (onExport) {
         await onExport(format, data);
         return;
       }
 
-      // Generate timestamp for filename
       const timestamp = new Date().toISOString().split('T')[0];
       const fullFilename = `${filename}_${timestamp}`;
 

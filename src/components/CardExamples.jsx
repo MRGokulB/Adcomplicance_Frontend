@@ -5,7 +5,6 @@ const CardExamples = () => {
     <div className="container-lg section-md">
       <h1 className="text-heading-1 mb-8">Responsive Card Examples</h1>
       
-      {/* Basic Card Variants */}
       <section className="mb-12">
         <h2 className="text-heading-2 mb-6">Basic Card Variants</h2>
         <div className="card-grid">
@@ -39,7 +38,6 @@ const CardExamples = () => {
         </div>
       </section>
 
-      {/* Card with Images */}
       <section className="mb-12">
         <h2 className="text-heading-2 mb-6">Cards with Images</h2>
         <div className="card-grid">
@@ -75,7 +73,6 @@ const CardExamples = () => {
         </div>
       </section>
 
-      {/* Card with Icons */}
       <section className="mb-12">
         <h2 className="text-heading-2 mb-6">Cards with Icons</h2>
         <div className="card-grid">
@@ -117,7 +114,6 @@ const CardExamples = () => {
         </div>
       </section>
 
-      {/* Stat Cards */}
       <section className="mb-12">
         <h2 className="text-heading-2 mb-6">Statistic Cards</h2>
         <div className="card-grid-compact">
@@ -147,7 +143,6 @@ const CardExamples = () => {
         </div>
       </section>
 
-      {/* Accent Cards */}
       <section className="mb-12">
         <h2 className="text-heading-2 mb-6">Accent Cards</h2>
         <div className="card-grid">
@@ -181,7 +176,6 @@ const CardExamples = () => {
         </div>
       </section>
 
-      {/* Special Effect Cards */}
       <section className="mb-12">
         <h2 className="text-heading-2 mb-6">Special Effect Cards</h2>
         <div className="card-grid">
@@ -215,7 +209,6 @@ const CardExamples = () => {
         </div>
       </section>
 
-      {/* Complex Cards */}
       <section className="mb-12">
         <h2 className="text-heading-2 mb-6">Complex Cards</h2>
         <div className="card-grid-wide">
@@ -273,7 +266,6 @@ const CardExamples = () => {
         </div>
       </section>
 
-      {/* Loading States */}
       <section className="mb-12">
         <h2 className="text-heading-2 mb-6">Loading States</h2>
         <div className="card-grid">
@@ -303,7 +295,6 @@ const CardExamples = () => {
         </div>
       </section>
 
-      {/* Responsive Grid Examples */}
       <section className="mb-12">
         <h2 className="text-heading-2 mb-6">Responsive Grid Layouts</h2>
         

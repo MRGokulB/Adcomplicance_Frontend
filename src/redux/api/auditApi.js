@@ -1,4 +1,3 @@
-// src/redux/api/auditApi.js - Updated with Redux CSRF
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { refreshCsrfToken } from './csrfRefreshHandler';
 
@@ -29,7 +28,6 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
   }
 
   if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
-    console.log('🔄 CSRF token invalid in tasksApi, refreshing...');
 
     const success = await refreshCsrfToken(api);
 

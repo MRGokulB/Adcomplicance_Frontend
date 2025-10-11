@@ -1,16 +1,8 @@
-// src/hooks/useTaskSync.js - Custom hook for managing task synchronization
 import { useEffect, useCallback, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { tasksApi, invalidateTaskCache, updateTaskInCache } from '../redux/api/tasksApi';
 
-/**
- * Custom hook for managing real-time task synchronization across components
- * @param {Object} options - Configuration options
- * @param {string} options.taskId - Task ID to sync
- * @param {boolean} options.autoRefresh - Enable automatic refresh
- * @param {number} options.refreshInterval - Refresh interval in milliseconds
- * @param {Function} options.onUpdate - Callback when task updates
- */
+ 
 export const useTaskSync = ({
   taskId,
   autoRefresh = true,
@@ -21,7 +13,6 @@ export const useTaskSync = ({
   const intervalRef = useRef(null);
   const lastUpdateRef = useRef(null);
 
-  // Clear intervals on unmount
   useEffect(() => {
     return () => {
       if (intervalRef.current) {
@@ -30,23 +21,19 @@ export const useTaskSync = ({
     };
   }, []);
 
-  // Listen for task update events from other components
   useEffect(() => {
     const handleTaskUpdate = (event) => {
       const { taskId: updatedTaskId, status, ...updates } = event.detail;
       
       if (taskId && updatedTaskId === taskId) {
-        // Update cache immediately
         updateTaskInCache(dispatch, taskId, {
           status,
           ...updates,
           updatedAt: new Date().toISOString()
         });
         
-        // Call update callback
         onUpdate?.(updates);
         
-        // Track last update time
         lastUpdateRef.current = Date.now();
       }
     };
@@ -58,12 +45,10 @@ export const useTaskSync = ({
     };
   }, [taskId, dispatch, onUpdate]);
 
-  // Auto-refresh mechanism
   useEffect(() => {
     if (!autoRefresh || !taskId) return;
 
     intervalRef.current = setInterval(() => {
-      // Only refresh if no recent updates
       const timeSinceUpdate = Date.now() - (lastUpdateRef.current || 0);
       
       if (timeSinceUpdate > refreshInterval / 2) {
@@ -78,7 +63,6 @@ export const useTaskSync = ({
     };
   }, [autoRefresh, taskId, refreshInterval, dispatch]);
 
-  // Manual refresh function
   const refresh = useCallback(() => {
     if (taskId) {
       invalidateTaskCache(dispatch, taskId);
@@ -86,7 +70,6 @@ export const useTaskSync = ({
     }
   }, [taskId, dispatch]);
 
-  // Broadcast update function for other components
   const broadcastUpdate = useCallback((updates) => {
     if (taskId) {
       window.dispatchEvent(new CustomEvent('taskUpdated', {
@@ -95,7 +78,6 @@ export const useTaskSync = ({
     }
   }, [taskId]);
 
-  // Optimistic update function
   const optimisticUpdate = useCallback((updates) => {
     if (taskId) {
       updateTaskInCache(dispatch, taskId, {
@@ -112,9 +94,7 @@ export const useTaskSync = ({
   };
 };
 
-/**
- * Hook for managing task list synchronization
- */
+ 
 export const useTaskListSync = ({
   autoRefresh = true,
   refreshInterval = 60000,
@@ -131,10 +111,8 @@ export const useTaskListSync = ({
     };
   }, []);
 
-  // Listen for any task updates that might affect the list
   useEffect(() => {
     const handleTaskUpdate = (event) => {
-      // Invalidate list cache when any task updates
       dispatch(tasksApi.util.invalidateTags([
         { type: 'Task', id: 'LIST' }
       ]));
@@ -149,7 +127,6 @@ export const useTaskListSync = ({
     };
   }, [dispatch, onUpdate]);
 
-  // Auto-refresh for task lists
   useEffect(() => {
     if (!autoRefresh) return;
 
@@ -178,19 +155,15 @@ export const useTaskListSync = ({
   return { refreshList };
 };
 
-/**
- * Hook for managing cache warming and preloading
- */
+ 
 export const useTaskCacheManager = () => {
   const dispatch = useDispatch();
 
   const preloadTask = useCallback((taskId) => {
-    // Trigger task fetch if not in cache
     dispatch(tasksApi.endpoints.getTaskById.initiate(taskId));
   }, [dispatch]);
 
   const warmCache = useCallback((taskIds) => {
-    // Preload multiple tasks
     taskIds.forEach(id => {
       dispatch(tasksApi.endpoints.getTaskById.initiate(id));
     });

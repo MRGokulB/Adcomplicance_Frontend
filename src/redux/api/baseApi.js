@@ -1,4 +1,3 @@
-// src/redux/api/baseApi.js
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 export const API_ENDPOINTS = {
@@ -14,7 +13,6 @@ export const API_ENDPOINTS = {
   CSRF: '/api/csrf-token'
 }
 
-// Updated to not include Authorization header (using sessions now)
 export const getAuthHeaders = () => ({
   'Content-Type': 'application/json',
 })

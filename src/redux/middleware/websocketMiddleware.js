@@ -1,4 +1,3 @@
-// src/redux/middleware/websocketMiddleware.js
 import { io } from 'socket.io-client'
 import { notificationsApi } from '../api/notificationsApi'
 
@@ -13,7 +12,7 @@ const connect = (store) => {
   
   socket = io(wsUrl, {
     transports: ['websocket', 'polling'],
-    withCredentials: true, // Send session cookies
+    withCredentials: true,  
     reconnection: true,
     reconnectionAttempts: 10,
     reconnectionDelay: 1000,
@@ -22,7 +21,6 @@ const connect = (store) => {
   })
 
   socket.on('connect', () => {
-    console.log('WebSocket connected:', socket.id)
     if (reconnectTimer) {
       clearTimeout(reconnectTimer)
       reconnectTimer = null
@@ -34,36 +32,27 @@ const connect = (store) => {
   }
 
   socket.on('notification:new', (data) => {
-    console.log('New notification received:', data)
     invalidate()
   })
   
   socket.on('notification:update', (data) => {
-    console.log('Notification updated:', data)
     invalidate()
   })
   
   socket.on('notification:unreadCount', (data) => {
-    console.log('Unread count updated:', data)
     invalidate()
   })
 
   socket.on('disconnect', (reason) => {
-    console.log('WebSocket disconnected:', reason)
-    // Auto-reconnect is handled by socket.io
   })
 
   socket.on('connect_error', (error) => {
     console.error('WebSocket connection error:', error.message)
     
-    // If authentication error, the session might have expired
     if (error.message === 'Authentication required' || error.message === 'Invalid token') {
       console.warn('Session expired - WebSocket authentication failed')
-      // Optionally dispatch logout
-      // store.dispatch({ type: 'auth/logout' })
     }
     
-    // Throttle reconnection attempts
     if (!reconnectTimer) {
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null
@@ -78,7 +67,6 @@ const connect = (store) => {
 
 const disconnect = () => {
   if (socket) {
-    console.log('Disconnecting WebSocket...')
     socket.removeAllListeners()
     socket.disconnect()
     socket = null
@@ -90,26 +78,22 @@ const disconnect = () => {
 }
 
 export const websocketMiddleware = (store) => (next) => (action) => {
-  // Initialize connection on first run if authenticated
   if (!initialized) {
     initialized = true
     const isAuthenticated = store.getState()?.auth?.isAuthenticated
     if (isAuthenticated) {
-      setTimeout(() => connect(store), 1000) // Delay to ensure session is established
+      setTimeout(() => connect(store), 1000)  
     }
   }
 
-  // Connect on login
   if (action.type === 'auth/setCredentials') {
-    setTimeout(() => connect(store), 500) // Small delay after login
+    setTimeout(() => connect(store), 500)  
   }
 
-  // Disconnect on logout
   if (action.type === 'auth/logout') {
     disconnect()
   }
 
-  // Manual connection/disconnection
   if (action.type === 'websocket/connect') {
     connect(store)
   }

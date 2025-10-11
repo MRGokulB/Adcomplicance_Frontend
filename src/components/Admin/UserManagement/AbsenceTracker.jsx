@@ -1,4 +1,3 @@
-// src/components/Admin/AbsenceTracker/AbsenceTracker.jsx - OPTIMIZED VERSION
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUserRole } from '../../../redux/slices/authSlice';
@@ -12,7 +11,6 @@ const AbsenceTracker = () => {
   
   const currentUserRole = useSelector(selectUserRole);
 
-  // OPTIMIZED: Page visibility detection for conditional polling
   const [isPageVisible, setIsPageVisible] = useState(!document.hidden);
 
   useEffect(() => {
@@ -25,13 +23,11 @@ const AbsenceTracker = () => {
     };
   }, []);
 
-  // OPTIMIZED: Memoize query params
   const absenceParams = useMemo(() => ({ 
     page, 
     limit: 20 
   }), [page]);
 
-  // OPTIMIZED: Conditional polling based on page visibility
   const {
     data: absencesData,
     isLoading,
@@ -39,8 +35,8 @@ const AbsenceTracker = () => {
     error,
     refetch
   } = useGetAbsencesQuery(absenceParams, {
-    pollingInterval: isPageVisible ? 60000 : 0, // Poll every minute when visible
-    refetchOnMountOrArgChange: 60, // 5 minutes
+    pollingInterval: isPageVisible ? 60000 : 0,  
+    refetchOnMountOrArgChange: 60,  
     skip: !hasPermission(currentUserRole, PERMISSIONS.ABSENCE_READ_ALL) && 
           !hasPermission(currentUserRole, PERMISSIONS.ABSENCE_MANAGE),
   });
@@ -48,7 +44,6 @@ const AbsenceTracker = () => {
   const [createAbsence, { isLoading: isCreating }] = useCreateAbsenceMutation();
   const [deleteAbsence, { isLoading: isDeleting }] = useDeleteAbsenceMutation();
 
-  // OPTIMIZED: Memoize permission checks
   const canManageAbsences = useMemo(() => 
     hasPermission(currentUserRole, PERMISSIONS.ABSENCE_MANAGE), 
     [currentUserRole]
@@ -58,8 +53,7 @@ const AbsenceTracker = () => {
     hasPermission(currentUserRole, PERMISSIONS.ABSENCE_READ_ALL) || canManageAbsences, 
     [currentUserRole, canManageAbsences]
   );
-
-  // OPTIMIZED: Memoize derived data
+ 
   const absences = useMemo(() => 
     Array.isArray(absencesData) ? absencesData : (absencesData?.absences || []), 
     [absencesData]
@@ -69,8 +63,7 @@ const AbsenceTracker = () => {
     absencesData?.pagination, 
     [absencesData?.pagination]
   );
-
-  // OPTIMIZED: Memoize handlers with useCallback
+ 
   const handleAddAbsence = useCallback(() => {
     if (canManageAbsences) {
       setShowAddAbsenceModal(true);
@@ -87,8 +80,7 @@ const AbsenceTracker = () => {
       }).unwrap();
 
       setShowAddAbsenceModal(false);
-      // No need to refetch - optimistic update handles it
-    } catch (error) {
+     } catch (error) {
       console.error('Failed to create absence:', error);
       throw error;
     }
@@ -100,8 +92,7 @@ const AbsenceTracker = () => {
     if (window.confirm('Are you sure you want to delete this absence record?')) {
       try {
         await deleteAbsence(absenceId).unwrap();
-        // No need to refetch - optimistic update handles it
-      } catch (error) {
+       } catch (error) {
         console.error('Failed to delete absence:', error);
       }
     }
@@ -115,7 +106,6 @@ const AbsenceTracker = () => {
     setPage(newPage);
   }, []);
 
-  // OPTIMIZED: Memoize date formatters
   const formatDate = useCallback((dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -134,8 +124,7 @@ const AbsenceTracker = () => {
     });
   }, []);
 
-  // Loading state
-  if (isLoading) {
+   if (isLoading) {
     return (
       <div className="container-lg section-md">
         <div className="card">
@@ -150,8 +139,7 @@ const AbsenceTracker = () => {
     );
   }
 
-  // Error state
-  if (isError) {
+   if (isError) {
     return (
       <div className="container-lg section-md">
         <div className="card">
@@ -174,7 +162,6 @@ const AbsenceTracker = () => {
     );
   }
 
-  // Permission check
   if (!canViewAbsences) {
     return (
       <div className="container-lg section-md">
@@ -198,7 +185,6 @@ const AbsenceTracker = () => {
   return (
     <div className="container-lg section-md">
       <div className="card">
-        {/* Header */}
         <div className="card-header">
           <div className="flex-between">
             <h2 className="card-title">Compliance User Absence Tracker</h2>
@@ -217,7 +203,6 @@ const AbsenceTracker = () => {
           </div>
         </div>
 
-        {/* Results count */}
         {pagination && (
           <div className="card-body border-b border-gray-100">
             <div className="text-sm text-gray-600">
@@ -226,7 +211,6 @@ const AbsenceTracker = () => {
           </div>
         )}
 
-        {/* Absence Table */}
         <div className="table-container">
           <table className="table table-modern">
             <thead className="table-header">
@@ -295,7 +279,6 @@ const AbsenceTracker = () => {
           </table>
         </div>
 
-        {/* Pagination */}
         {pagination && pagination.totalPages > 1 && (
           <div className="card-body border-t border-gray-100">
             <div className="flex-between">
@@ -323,7 +306,6 @@ const AbsenceTracker = () => {
         )}
       </div>
 
-      {/* Add Absence Modal */}
       <AddAbsenceModal
         isOpen={showAddAbsenceModal}
         onClose={handleCloseModal}

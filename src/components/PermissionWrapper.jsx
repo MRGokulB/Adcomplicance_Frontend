@@ -3,24 +3,21 @@ import { useSelector } from 'react-redux'
 import { selectUserRole } from '../redux/slices/authSlice'
 import { hasPermission, hasAnyPermission, USER_ROLES, PERMISSIONS } from '../utils/roles'
 
-// Wrapper component for conditional rendering based on permissions
 const PermissionWrapper = ({ 
   children, 
   requiredRoles = [],
   requiredPermissions = [],
   requireAllPermissions = false,
   fallback = null,
-  inverse = false // Show when user DOESN'T have permission
+  inverse = false  
 }) => {
   const userRole = useSelector(selectUserRole)
 
-  // Check role access
   const hasRoleAccess = () => {
     if (!requiredRoles.length) return true
     return requiredRoles.includes(userRole)
   }
 
-  // Check permission access
   const hasPermissionAccess = () => {
     if (!requiredPermissions.length) return true
     
@@ -33,13 +30,11 @@ const PermissionWrapper = ({
 
   const hasAccess = hasRoleAccess() && hasPermissionAccess()
   
-  // Apply inverse logic if needed
   const shouldShow = inverse ? !hasAccess : hasAccess
 
   return shouldShow ? children : fallback
 }
 
-// Existing specific permission wrappers
 export const CanCreateTask = ({ children, fallback = null }) => (
   <PermissionWrapper 
     requiredPermissions={[PERMISSIONS.TASK_CREATE]} 
@@ -101,7 +96,6 @@ export const CanViewTaskBuckets = ({ children, fallback = null }) => (
   </PermissionWrapper>
 )
 
-// NEW: Additional specific permission wrappers for new backend routes
 export const CanReassignTask = ({ children, fallback = null }) => (
   <PermissionWrapper 
     requiredPermissions={[PERMISSIONS.TASK_REASSIGN]} 
@@ -183,7 +177,6 @@ export const CanPerformBulkOperations = ({ children, fallback = null }) => (
   </PermissionWrapper>
 )
 
-// Existing role-based wrappers
 export const AdminOnly = ({ children, fallback = null }) => (
   <PermissionWrapper 
     requiredRoles={[USER_ROLES.ADMIN]} 
@@ -243,7 +236,6 @@ export const SeniorManagerAccess = ({ children, fallback = null }) => (
   </PermissionWrapper>
 )
 
-// UPDATED Hook for checking permissions in components with NEW permissions
 export const usePermissions = () => {
   const userRole = useSelector(selectUserRole)
   
@@ -254,26 +246,23 @@ export const usePermissions = () => {
     hasRole: (role) => userRole === role,
     hasAnyRole: (roles) => roles.includes(userRole),
     
-    // Task permissions - Updated with new ones
     canCreateTask: hasPermission(userRole, PERMISSIONS.TASK_CREATE),
     canApproveTask: hasPermission(userRole, PERMISSIONS.TASK_APPROVE),
     canClassifyTask: hasPermission(userRole, PERMISSIONS.TASK_CLASSIFY),
     canPublishTask: hasPermission(userRole, PERMISSIONS.TASK_PUBLISH),
     canCloseTask: hasPermission(userRole, PERMISSIONS.TASK_CLOSE),
-    canReassignTask: hasPermission(userRole, PERMISSIONS.TASK_REASSIGN), // NEW
-    canValidateFiles: hasPermission(userRole, PERMISSIONS.TASK_VALIDATE_FILES), // NEW
-    canViewAssignmentOptions: hasPermission(userRole, PERMISSIONS.TASK_VIEW_ASSIGNMENT_OPTIONS), // NEW
+    canReassignTask: hasPermission(userRole, PERMISSIONS.TASK_REASSIGN),  
+    canValidateFiles: hasPermission(userRole, PERMISSIONS.TASK_VALIDATE_FILES),  
+    canViewAssignmentOptions: hasPermission(userRole, PERMISSIONS.TASK_VIEW_ASSIGNMENT_OPTIONS),  
     canViewTaskBuckets: hasPermission(userRole, PERMISSIONS.TASK_VIEW_BUCKETS),
     canPerformBulkOperations: hasPermission(userRole, PERMISSIONS.BULK_OPERATIONS),
 
-    // Analytics permissions - NEW
-    canViewUserWorkload: hasPermission(userRole, PERMISSIONS.TASK_VIEW_USER_WORKLOAD), // NEW
-    canViewTeamOverview: hasPermission(userRole, PERMISSIONS.TASK_VIEW_TEAM_OVERVIEW), // NEW
-    canViewPerformanceMetrics: hasPermission(userRole, PERMISSIONS.TASK_VIEW_PERFORMANCE_METRICS), // NEW
-    canViewHealthCheck: hasPermission(userRole, PERMISSIONS.TASK_VIEW_HEALTH_CHECK), // NEW
-    canViewDashboardStats: hasPermission(userRole, PERMISSIONS.TASK_VIEW_DASHBOARD_STATS), // NEW
+    canViewUserWorkload: hasPermission(userRole, PERMISSIONS.TASK_VIEW_USER_WORKLOAD),  
+    canViewTeamOverview: hasPermission(userRole, PERMISSIONS.TASK_VIEW_TEAM_OVERVIEW),  
+    canViewPerformanceMetrics: hasPermission(userRole, PERMISSIONS.TASK_VIEW_PERFORMANCE_METRICS),  
+    canViewHealthCheck: hasPermission(userRole, PERMISSIONS.TASK_VIEW_HEALTH_CHECK),  
+    canViewDashboardStats: hasPermission(userRole, PERMISSIONS.TASK_VIEW_DASHBOARD_STATS),  
 
-    // User management permissions
     canManageUsers: hasAnyPermission(userRole, [
       PERMISSIONS.USER_CREATE_ANY,
       PERMISSIONS.USER_CREATE_PRODUCT, 
@@ -281,21 +270,17 @@ export const usePermissions = () => {
     ]),
     canPromoteUser: hasPermission(userRole, PERMISSIONS.USER_PROMOTE),
 
-    // Upload permissions
     canUploadFiles: hasPermission(userRole, PERMISSIONS.UPLOAD_FILES),
     canManageUploads: hasPermission(userRole, PERMISSIONS.UPLOAD_MANAGE),
 
-    // Version permissions
     canUploadVersion: hasPermission(userRole, PERMISSIONS.VERSION_UPLOAD),
 
-    // Exchange permissions
     canManageExchangeApprovals: hasAnyPermission(userRole, [
       PERMISSIONS.EXCHANGE_CREATE,
       PERMISSIONS.EXCHANGE_UPDATE,
       PERMISSIONS.EXCHANGE_DELETE
     ]),
 
-    // Report permissions - Updated to use new helper function
     canAccessReports: hasAnyPermission(userRole, [
       PERMISSIONS.REPORT_INTERNAL_TASKS,
       PERMISSIONS.REPORT_EXCHANGE_TASKS,
@@ -306,26 +291,21 @@ export const usePermissions = () => {
       PERMISSIONS.REPORT_REJECTED_TASKS
     ]),
 
-    // Audit permissions
     canViewAudit: hasAnyPermission(userRole, [
       PERMISSIONS.AUDIT_READ_ALL,
       PERMISSIONS.AUDIT_READ_LIMITED
     ]),
 
-    // Dashboard permissions
     canViewAllDashboard: hasPermission(userRole, PERMISSIONS.DASHBOARD_VIEW_ALL),
     canViewTeamDashboard: hasPermission(userRole, PERMISSIONS.DASHBOARD_VIEW_TEAM),
     canViewOwnDashboard: hasPermission(userRole, PERMISSIONS.DASHBOARD_VIEW_OWN),
 
-    // System permissions
     canConfigSystem: hasPermission(userRole, PERMISSIONS.SYSTEM_CONFIG),
     canOverrideSystem: hasPermission(userRole, PERMISSIONS.SYSTEM_OVERRIDE),
     canViewSystemStatus: hasPermission(userRole, PERMISSIONS.SYSTEM_STATUS),
 
-    // Advanced search
     canAdvancedSearch: hasPermission(userRole, PERMISSIONS.ADVANCED_SEARCH),
 
-    // Role checks
     isAdmin: userRole === USER_ROLES.ADMIN,
     isSeniorManager: userRole === USER_ROLES.SENIOR_MANAGER,
     isComplianceUser: [USER_ROLES.COMPLIANCE_ADMIN, USER_ROLES.COMPLIANCE_USER].includes(userRole),

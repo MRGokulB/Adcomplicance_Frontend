@@ -1,4 +1,3 @@
-// src/components/Notifications/Notifications.jsx - OPTIMIZED VERSION
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -14,7 +13,6 @@ const Notifications = () => {
   const [page, setPage] = useState(1);
   const limit = 20;
 
-  // OPTIMIZED: Page visibility detection
   const [isPageVisible, setIsPageVisible] = useState(!document.hidden);
 
   useEffect(() => {

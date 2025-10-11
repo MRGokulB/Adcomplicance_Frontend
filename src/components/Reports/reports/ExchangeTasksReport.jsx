@@ -20,7 +20,6 @@ const ExchangeTasksReport = () => {
 
   const dispatch = useDispatch();
   
-  // API Query with real-time data
   const {
     data: reportData,
     isLoading,
@@ -73,7 +72,6 @@ const ExchangeTasksReport = () => {
   };
 
   const handleFilterChange = (newFilters) => {
-    // Clean up filters and remove empty values
     const cleanedFilters = {
       page: 1,
       limit: 50
@@ -88,13 +86,11 @@ const ExchangeTasksReport = () => {
     setFilters(cleanedFilters);
   };
 
-  // Transform API data for table display - REMOVED FRONTEND FILTERING
   const transformData = (apiData) => {
     if (!apiData?.data) return [];
 
-    // Backend already filtered the data, just transform it for display
     return apiData.data.map(item => ({
-      id: item.uin + '-' + item.exchangeName, // Make unique ID for each row
+      id: item.uin + '-' + item.exchangeName,  
       uin: item.uin,
       title: item.title,
       createdBy: item.createdBy,
@@ -154,7 +150,6 @@ const ExchangeTasksReport = () => {
         ]}
       />
 
-      {/* Summary Cards with real API data */}
       {summary && (
         <div className="report-summary mb-6">
           <div className="card">
@@ -197,7 +192,6 @@ const ExchangeTasksReport = () => {
         </div>
       )}
 
-      {/* Exchange Distribution Chart */}
       {summary.exchangeDistribution && Object.keys(summary.exchangeDistribution).length > 0 && (
         <div className="mb-6 p-4 bg-gray-50 rounded-lg">
           <h3 className="text-sm font-medium text-gray-700 mb-3">Exchange Distribution</h3>
@@ -212,7 +206,6 @@ const ExchangeTasksReport = () => {
         </div>
       )}
 
-      {/* Loading State */}
       {isLoading && (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -220,7 +213,6 @@ const ExchangeTasksReport = () => {
         </div>
       )}
 
-      {/* Report Table */}
       {!isLoading && (
         <ReportTable
           columns={columns}

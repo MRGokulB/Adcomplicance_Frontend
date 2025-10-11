@@ -13,7 +13,6 @@ import { reportsApi } from './api/reportsApi'
 import { auditApi } from './api/auditApi'
 import { websocketMiddleware } from './middleware/websocketMiddleware'
 
-// Combine all API reducers
 const apiReducers = {
   [authApi.reducerPath]: authApi.reducer,
   [usersApi.reducerPath]: usersApi.reducer,
@@ -26,7 +25,6 @@ const apiReducers = {
   [auditApi.reducerPath]: auditApi.reducer,
 }
 
-// Combine all feature reducers
 const featureReducers = {
   auth: authReducer,
   csrf: csrfReducer,
@@ -43,20 +41,15 @@ export const store = configureStore({
         ignoredActions: [
           'persist/PERSIST', 
           'persist/REHYDRATE',
-          // Ignore RTK Query subscription option updates that may contain functions
           'tasksApi/subscriptions/updateSubscriptionOptions',
         ],
-        // Correct option name is ignoredActionPaths
         ignoredActionPaths: [
           'meta.arg',
           'payload.timestamp',
-          // Allow function-valued pollingInterval passed by RTK Query
           'payload.options',
           'payload.options.pollingInterval',
-          // Ignore RTK Query's non-serializable fetch Request/Response objects added to action meta
           'meta.baseQueryMeta.request',
           'meta.baseQueryMeta.response',
-          // Some RTKQ errors may place baseQueryMeta under payload
           'payload.baseQueryMeta.request',
           'payload.baseQueryMeta.response',
         ],
@@ -75,7 +68,6 @@ export const store = configureStore({
   devTools: process.env.NODE_ENV !== 'production',
 })
 
-// Enable automatic refetching of queries on network reconnect
 setupListeners(store.dispatch)
 
 export default store

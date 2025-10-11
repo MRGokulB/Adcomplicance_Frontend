@@ -1,4 +1,3 @@
-// src/components/AllTasks/BulkOperationsModal.jsx
 import React, { useState, useEffect } from 'react';
 import { useGetAssignmentOptionsQuery } from '../../redux/api/tasksApi';
 
@@ -19,7 +18,6 @@ const BulkOperationsModal = ({
   });
   const [error, setError] = useState('');
 
-  // Get assignment options for bulk assignment
   const {
     data: assignmentOptions,
     isLoading: isLoadingOptions
@@ -28,7 +26,6 @@ const BulkOperationsModal = ({
     { skip: operationType !== 'bulk_assignment' || selectedTasks.length === 0 }
   );
 
-  // Reset form when operation type changes
   useEffect(() => {
     setOperationData({
       status: '',
@@ -47,7 +44,6 @@ const BulkOperationsModal = ({
   };
 
   const handleExecute = async () => {
-    // Validation based on operation type
     if (operationType === 'bulk_status_update' && !operationData.status) {
       setError('Please select a status to update');
       return;
@@ -221,15 +217,12 @@ const BulkOperationsModal = ({
 
   return (
     <>
-      {/* Modal Overlay */}
       <div className="fixed inset-0 z-50 overflow-y-auto">
         <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
           <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={handleClose}></div>
 
-          {/* Modal Content */}
           <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
             
-            {/* Header */}
             <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900">
@@ -250,7 +243,6 @@ const BulkOperationsModal = ({
                 {getOperationDescription()}
               </p>
 
-              {/* Selected Tasks Summary */}
               <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-900">
@@ -262,10 +254,8 @@ const BulkOperationsModal = ({
                 </div>
               </div>
 
-              {/* Operation-specific fields */}
               {renderOperationFields()}
 
-              {/* Reason/Notes field (common for all operations) */}
               <div className="mb-4">
                 <label className="info-label">
                   {operationType === 'bulk_delete' ? 'Reason for Deletion *' : 'Notes (Optional)'}
@@ -287,14 +277,12 @@ const BulkOperationsModal = ({
                 />
               </div>
 
-              {/* Error Display */}
               {error && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-sm text-red-700">{error}</p>
                 </div>
               )}
 
-              {/* Operation Summary */}
               {(operationData.status || operationData.userId) && (
                 <div className="mb-4 p-3 bg-blue-50 rounded-lg">
                   <h4 className="text-sm font-medium text-blue-900 mb-2">Operation Summary</h4>
@@ -313,7 +301,6 @@ const BulkOperationsModal = ({
               )}
             </div>
 
-            {/* Footer */}
             <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
               <button
                 onClick={handleExecute}

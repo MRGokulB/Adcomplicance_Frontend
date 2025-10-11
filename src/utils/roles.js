@@ -1,6 +1,4 @@
-// src/utils/roles.js - Updated for new backend permissions
 
-// User Roles - Exact backend roles
 export const USER_ROLES = {
   ADMIN: 'ADMIN',
   SENIOR_MANAGER: 'SENIOR_MANAGER',
@@ -10,9 +8,7 @@ export const USER_ROLES = {
   PRODUCT_USER: 'PRODUCT_USER'
 }
 
-// Permission Categories - Aligned with backend route permissions
 export const PERMISSIONS = {
-  // User Management - Updated based on backend routes
   USER_CREATE_ANY: 'user:create:any',
   USER_CREATE_PRODUCT: 'user:create:product',
   USER_CREATE_COMPLIANCE: 'user:create:compliance',
@@ -25,7 +21,6 @@ export const PERMISSIONS = {
   USER_PROMOTE: 'user:promote',
   USER_VIEW_PROMOTION_ELIGIBLE: 'user:view_promotion_eligible',
 
-  // Task Management - Updated with backend workflow
   TASK_CREATE: 'task:create',
   TASK_READ_ALL: 'task:read:all',
   TASK_READ_TEAM: 'task:read:team',
@@ -44,35 +39,29 @@ export const PERMISSIONS = {
   TASK_FOLLOW_UP: 'task:follow_up',
   TASK_VALIDATE_FILES: 'task:validate_files',
 
-  // Task Buckets - From backend
   TASK_VIEW_BUCKETS: 'task:view_buckets',
   TASK_VIEW_APPROVED_NOT_PUBLISHED: 'task:view_approved_not_published',
   TASK_VIEW_EXPIRING_SOON: 'task:view_expiring_soon',
 
-  // Task Analytics & Monitoring - NEW permissions from backend routes
-  TASK_VIEW_ASSIGNMENT_OPTIONS: 'task:view_assignment_options', // NEW
-  TASK_VIEW_USER_WORKLOAD: 'task:view_user_workload', // NEW
-  TASK_VIEW_TEAM_OVERVIEW: 'task:view_team_overview', // NEW
-  TASK_VIEW_PERFORMANCE_METRICS: 'task:view_performance_metrics', // NEW
-  TASK_VIEW_HEALTH_CHECK: 'task:view_health_check', // NEW
-  TASK_VIEW_DASHBOARD_STATS: 'task:view_dashboard_stats', // NEW
+  TASK_VIEW_ASSIGNMENT_OPTIONS: 'task:view_assignment_options',  
+  TASK_VIEW_USER_WORKLOAD: 'task:view_user_workload',  
+  TASK_VIEW_TEAM_OVERVIEW: 'task:view_team_overview',  
+  TASK_VIEW_PERFORMANCE_METRICS: 'task:view_performance_metrics',  
+  TASK_VIEW_HEALTH_CHECK: 'task:view_health_check',  
+  TASK_VIEW_DASHBOARD_STATS: 'task:view_dashboard_stats',  
 
-  // Comments
   COMMENT_CREATE: 'comment:create',
   COMMENT_READ_ALL: 'comment:read:all',
   COMMENT_READ_TASK: 'comment:read:task',
 
-  // Versions
   VERSION_UPLOAD: 'version:upload',
   VERSION_READ_ALL: 'version:read:all',
 
-  // Exchange Approvals
   EXCHANGE_CREATE: 'exchange:create',
   EXCHANGE_UPDATE: 'exchange:update',
   EXCHANGE_DELETE: 'exchange:delete',
   EXCHANGE_READ_ALL: 'exchange:read:all',
 
-  // Reports - Updated with backend restrictions
   REPORT_INTERNAL_TASKS: 'report:internal_tasks',
   REPORT_EXCHANGE_TASKS: 'report:exchange_tasks',
   REPORT_COMPLIANCE_USERS: 'report:compliance_users',
@@ -81,46 +70,37 @@ export const PERMISSIONS = {
   REPORT_DAILY_MOVEMENT: 'report:daily_movement',
   REPORT_REJECTED_TASKS: 'report:rejected_tasks',
 
-  // Audit
   AUDIT_READ_ALL: 'audit:read:all',
   AUDIT_READ_LIMITED: 'audit:read:limited',
   AUDIT_EXPORT: 'audit:export',
 
-  // Notifications
   NOTIFICATION_READ: 'notification:read',
   NOTIFICATION_MANAGE: 'notification:manage',
 
-  // Absences
   ABSENCE_CREATE: 'absence:create',
   ABSENCE_READ_ALL: 'absence:read:all',
   ABSENCE_MANAGE: 'absence:manage',
 
-  // Upload
   UPLOAD_FILES: 'upload:files',
   UPLOAD_MANAGE: 'upload:manage',
   UPLOAD_LIST: 'upload:list',
 
-  // Dashboard
   DASHBOARD_VIEW_ALL: 'dashboard:view:all',
   DASHBOARD_VIEW_TEAM: 'dashboard:view:team',
   DASHBOARD_VIEW_OWN: 'dashboard:view:own',
   DASHBOARD_WORKLOAD_CHART: 'dashboard:workload_chart',
   DASHBOARD_PERFORMANCE_METRICS: 'dashboard:performance_metrics',
 
-  // System
   SYSTEM_CONFIG: 'system:config',
   SYSTEM_OVERRIDE: 'system:override',
   SYSTEM_STATUS: 'system:status',
 
-  // Bulk Operations
   BULK_OPERATIONS: 'bulk:operations',
   ADVANCED_SEARCH: 'search:advanced'
 }
 
-// Role to Permissions Mapping - Updated with new permissions
 export const ROLE_PERMISSIONS = {
   [USER_ROLES.ADMIN]: [
-    // Complete system access
     PERMISSIONS.USER_CREATE_ANY,
     PERMISSIONS.USER_READ_ALL,
     PERMISSIONS.USER_UPDATE_ANY,
@@ -131,23 +111,23 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.TASK_READ_ALL,
     PERMISSIONS.TASK_UPDATE_ALL,
     PERMISSIONS.TASK_ASSIGN,
-    PERMISSIONS.TASK_REASSIGN, // NEW
+    PERMISSIONS.TASK_REASSIGN,  
     PERMISSIONS.TASK_APPROVE,
     PERMISSIONS.TASK_REJECT,
     PERMISSIONS.TASK_PUBLISH,
     PERMISSIONS.TASK_CLASSIFY,
     //PERMISSIONS.TASK_CLOSE,
     PERMISSIONS.TASK_FOLLOW_UP,
-    PERMISSIONS.TASK_VALIDATE_FILES, // NEW
+    PERMISSIONS.TASK_VALIDATE_FILES,  
     PERMISSIONS.TASK_VIEW_BUCKETS,
     PERMISSIONS.TASK_VIEW_APPROVED_NOT_PUBLISHED,
     PERMISSIONS.TASK_VIEW_EXPIRING_SOON,
-    PERMISSIONS.TASK_VIEW_ASSIGNMENT_OPTIONS, // NEW
-    PERMISSIONS.TASK_VIEW_USER_WORKLOAD, // NEW
-    PERMISSIONS.TASK_VIEW_TEAM_OVERVIEW, // NEW
-    PERMISSIONS.TASK_VIEW_PERFORMANCE_METRICS, // NEW
-    PERMISSIONS.TASK_VIEW_HEALTH_CHECK, // NEW
-    PERMISSIONS.TASK_VIEW_DASHBOARD_STATS, // NEW
+    PERMISSIONS.TASK_VIEW_ASSIGNMENT_OPTIONS,  
+    PERMISSIONS.TASK_VIEW_USER_WORKLOAD,  
+    PERMISSIONS.TASK_VIEW_TEAM_OVERVIEW,  
+    PERMISSIONS.TASK_VIEW_PERFORMANCE_METRICS,  
+    PERMISSIONS.TASK_VIEW_HEALTH_CHECK,  
+    PERMISSIONS.TASK_VIEW_DASHBOARD_STATS,  
     PERMISSIONS.COMMENT_CREATE,
     PERMISSIONS.COMMENT_READ_ALL,
     PERMISSIONS.VERSION_READ_ALL,
@@ -190,11 +170,11 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.AUDIT_EXPORT,
     PERMISSIONS.TASK_VIEW_APPROVED_NOT_PUBLISHED,
     PERMISSIONS.TASK_VIEW_EXPIRING_SOON,
-    PERMISSIONS.TASK_VIEW_USER_WORKLOAD, // NEW
-    PERMISSIONS.TASK_VIEW_TEAM_OVERVIEW, // NEW
-    PERMISSIONS.TASK_VIEW_PERFORMANCE_METRICS, // NEW
-    PERMISSIONS.TASK_VIEW_HEALTH_CHECK, // NEW
-    PERMISSIONS.TASK_VIEW_DASHBOARD_STATS, // NEW
+    PERMISSIONS.TASK_VIEW_USER_WORKLOAD,  
+    PERMISSIONS.TASK_VIEW_TEAM_OVERVIEW,  
+    PERMISSIONS.TASK_VIEW_PERFORMANCE_METRICS,  
+    PERMISSIONS.TASK_VIEW_HEALTH_CHECK,  
+    PERMISSIONS.TASK_VIEW_DASHBOARD_STATS,  
     PERMISSIONS.COMMENT_CREATE,
     PERMISSIONS.COMMENT_READ_ALL,
     PERMISSIONS.VERSION_READ_ALL,
@@ -230,18 +210,18 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.TASK_APPROVE,
     PERMISSIONS.TASK_REJECT,
     PERMISSIONS.TASK_ASSIGN,
-    PERMISSIONS.TASK_REASSIGN, // NEW
+    PERMISSIONS.TASK_REASSIGN,  
     PERMISSIONS.TASK_CLASSIFY,
     PERMISSIONS.TASK_CLOSE,
     PERMISSIONS.TASK_FOLLOW_UP,
     PERMISSIONS.TASK_VIEW_BUCKETS,
     PERMISSIONS.TASK_VIEW_APPROVED_NOT_PUBLISHED,
     PERMISSIONS.TASK_VIEW_EXPIRING_SOON,
-    PERMISSIONS.TASK_VIEW_ASSIGNMENT_OPTIONS, // NEW
-    PERMISSIONS.TASK_VIEW_USER_WORKLOAD, // NEW
-    PERMISSIONS.TASK_VIEW_TEAM_OVERVIEW, // NEW
-    PERMISSIONS.TASK_VIEW_PERFORMANCE_METRICS, // NEW
-    PERMISSIONS.TASK_VIEW_DASHBOARD_STATS, // NEW
+    PERMISSIONS.TASK_VIEW_ASSIGNMENT_OPTIONS,  
+    PERMISSIONS.TASK_VIEW_USER_WORKLOAD,  
+    PERMISSIONS.TASK_VIEW_TEAM_OVERVIEW,  
+    PERMISSIONS.TASK_VIEW_PERFORMANCE_METRICS,  
+    PERMISSIONS.TASK_VIEW_DASHBOARD_STATS,  
     PERMISSIONS.COMMENT_CREATE,
     PERMISSIONS.COMMENT_READ_ALL,
     PERMISSIONS.VERSION_READ_ALL,
@@ -276,7 +256,7 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.TASK_CLOSE,
     PERMISSIONS.TASK_FOLLOW_UP,
     PERMISSIONS.TASK_VIEW_BUCKETS,
-    PERMISSIONS.TASK_VIEW_DASHBOARD_STATS, // NEW
+    PERMISSIONS.TASK_VIEW_DASHBOARD_STATS,  
     PERMISSIONS.COMMENT_CREATE,
     PERMISSIONS.COMMENT_READ_TASK,
     PERMISSIONS.VERSION_READ_ALL,
@@ -293,7 +273,7 @@ export const ROLE_PERMISSIONS = {
 
   [USER_ROLES.PRODUCT_ADMIN]: [
     PERMISSIONS.USER_CREATE_PRODUCT,
-    PERMISSIONS.USER_READ_ALL, // ENHANCED: Product Admin can read all users
+    PERMISSIONS.USER_READ_ALL,  
     PERMISSIONS.USER_UPDATE_TEAM,
     PERMISSIONS.USER_PROMOTE,
     PERMISSIONS.AUDIT_EXPORT,
@@ -302,15 +282,15 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.TASK_UPDATE_OWN,
     PERMISSIONS.TASK_ASSIGN,
     PERMISSIONS.TASK_CLOSE,
-    PERMISSIONS.TASK_REASSIGN, // NEW
+    PERMISSIONS.TASK_REASSIGN,  
     PERMISSIONS.TASK_PUBLISH,
-    PERMISSIONS.TASK_VALIDATE_FILES, // NEW
+    PERMISSIONS.TASK_VALIDATE_FILES,  
     PERMISSIONS.TASK_VIEW_BUCKETS,
     PERMISSIONS.TASK_VIEW_APPROVED_NOT_PUBLISHED,
-    PERMISSIONS.TASK_VIEW_ASSIGNMENT_OPTIONS, // NEW
-    PERMISSIONS.TASK_VIEW_USER_WORKLOAD, // NEW
-    PERMISSIONS.TASK_VIEW_TEAM_OVERVIEW, // NEW
-    PERMISSIONS.TASK_VIEW_DASHBOARD_STATS, // NEW
+    PERMISSIONS.TASK_VIEW_ASSIGNMENT_OPTIONS,  
+    PERMISSIONS.TASK_VIEW_USER_WORKLOAD,  
+    PERMISSIONS.TASK_VIEW_TEAM_OVERVIEW,  
+    PERMISSIONS.TASK_VIEW_DASHBOARD_STATS,  
 
     PERMISSIONS.COMMENT_CREATE,
     PERMISSIONS.COMMENT_READ_TASK,
@@ -330,10 +310,10 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.TASK_READ_OWN,
     PERMISSIONS.TASK_UPDATE_OWN,
     PERMISSIONS.TASK_PUBLISH,
-    PERMISSIONS.TASK_VALIDATE_FILES, // NEW
+    PERMISSIONS.TASK_VALIDATE_FILES,  
     PERMISSIONS.TASK_VIEW_APPROVED_NOT_PUBLISHED,
-    PERMISSIONS.TASK_VIEW_DASHBOARD_STATS, // NEW
-    PERMISSIONS.USER_READ_TEAM, // NEW: Allow reading team users for task assignment
+    PERMISSIONS.TASK_VIEW_DASHBOARD_STATS,  
+    PERMISSIONS.USER_READ_TEAM,  
     PERMISSIONS.COMMENT_CREATE,
     PERMISSIONS.COMMENT_READ_TASK,
     PERMISSIONS.VERSION_UPLOAD,
@@ -346,7 +326,6 @@ export const ROLE_PERMISSIONS = {
   ]
 }
 
-// Helper Functions - Updated with new permissions
 export const hasPermission = (userRole, permission) => {
   if (!userRole || !permission) return false
   return ROLE_PERMISSIONS[userRole]?.includes(permission) || false
@@ -362,7 +341,6 @@ export const hasAllPermissions = (userRole, permissions) => {
   return permissions.every(permission => hasPermission(userRole, permission))
 }
 
-// Backend-aligned helper functions - Updated with new functions
 export const canCreateTask = (userRole) => {
   return hasPermission(userRole, PERMISSIONS.TASK_CREATE)
 }
@@ -399,7 +377,6 @@ export const canManageExchangeApprovals = (userRole) => {
   ])
 }
 
-// NEW helper functions based on backend routes
 export const canReassignTask = (userRole) => {
   return hasPermission(userRole, PERMISSIONS.TASK_REASSIGN)
 }
@@ -488,14 +465,11 @@ export const canClassifyOrReclassifyTask = (userRole, task = null, currentUserId
     return false
   }
 
-  // If task is provided and already classified, check if user can reclassify
   if (task && task.taskType) {
-    // FIXED: COMPLIANCE_ADMIN and ADMIN can reclassify ANY task (no assignment check)
     if ([USER_ROLES.COMPLIANCE_ADMIN, USER_ROLES.ADMIN].includes(userRole)) {
       return true
     }
 
-    // COMPLIANCE_USER can only reclassify tasks assigned to them
     if (userRole === USER_ROLES.COMPLIANCE_USER && currentUserId) {
       return task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
     }
@@ -503,12 +477,10 @@ export const canClassifyOrReclassifyTask = (userRole, task = null, currentUserId
     return false
   }
 
-  // For new classification, check assignment only for COMPLIANCE_USER
   if (userRole === USER_ROLES.COMPLIANCE_USER && task && currentUserId) {
     return task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
   }
 
-  // COMPLIANCE_ADMIN and ADMIN can classify any task
   return [USER_ROLES.COMPLIANCE_ADMIN, USER_ROLES.ADMIN].includes(userRole)
 }
 
@@ -517,12 +489,10 @@ export const canCloseSpecificTask = (userRole, task = null, currentUserId = null
     return false
   }
 
-  // ADMIN, SENIOR_MANAGER, COMPLIANCE_ADMIN can close any task
   if ([USER_ROLES.ADMIN, USER_ROLES.SENIOR_MANAGER, USER_ROLES.COMPLIANCE_ADMIN].includes(userRole)) {
     return true
   }
 
-  // MODIFIED: Assigned COMPLIANCE_USER can close tasks assigned to them (replacing PRODUCT_ADMIN logic)
   if (userRole === USER_ROLES.COMPLIANCE_USER && task && currentUserId) {
     return task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
   }
@@ -531,12 +501,10 @@ export const canCloseSpecificTask = (userRole, task = null, currentUserId = null
 }
 
 export const canReclassifyTask = (userRole, task = null, currentUserId = null) => {
-  // FIXED: COMPLIANCE_ADMIN and ADMIN can reclassify ANY task (no assignment check)
   if ([USER_ROLES.COMPLIANCE_ADMIN, USER_ROLES.ADMIN].includes(userRole)) {
     return true
   }
 
-  // COMPLIANCE_USER can only reclassify assigned tasks
   if (userRole === USER_ROLES.COMPLIANCE_USER && task && currentUserId) {
     return task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
   }
@@ -549,7 +517,6 @@ export const getClassificationActions = (userRole, task = null, currentUserId = 
     return { canClassify: false, canReclassify: false }
   }
 
-  // FIXED: For COMPLIANCE_USER only, check if assigned to task
   if (userRole === USER_ROLES.COMPLIANCE_USER && task && currentUserId) {
     const isAssigned = task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
     if (!isAssigned) {
@@ -557,13 +524,12 @@ export const getClassificationActions = (userRole, task = null, currentUserId = 
     }
   }
 
-  const canClassify = !task || !task.taskType // Can classify if task has no type
+  const canClassify = !task || !task.taskType  
 
-  // FIXED: COMPLIANCE_ADMIN and ADMIN can reclassify ANY task
   let canReclassify = false
   if (task && task.taskType) {
     if ([USER_ROLES.COMPLIANCE_ADMIN, USER_ROLES.ADMIN].includes(userRole)) {
-      canReclassify = true // No assignment check for admins
+      canReclassify = true  
     } else if (userRole === USER_ROLES.COMPLIANCE_USER && currentUserId) {
       canReclassify = task.assignedComplianceId === currentUserId || task.assignedCompliance?.id === currentUserId
     }
@@ -578,12 +544,10 @@ export const getClosureActions = (userRole, task = null, currentUserId = null) =
     return { canClose: false, reason: 'No close permission' }
   }
 
-  // Full admin access
   if ([USER_ROLES.ADMIN, USER_ROLES.SENIOR_MANAGER, USER_ROLES.COMPLIANCE_ADMIN].includes(userRole)) {
     return { canClose: true, reason: 'Admin access' }
   }
 
-  // MODIFIED: Assigned COMPLIANCE_USER can close tasks assigned to them (replacing PRODUCT_ADMIN logic)
   if (userRole === USER_ROLES.COMPLIANCE_USER) {
     if (!task || !currentUserId) {
       return { canClose: false, reason: 'Task or user information missing' }
@@ -617,14 +581,14 @@ export default {
   canUploadVersion,
   canViewTaskBuckets,
   canManageExchangeApprovals,
-  canReassignTask, // NEW
-  canViewAssignmentOptions, // NEW
-  canValidateFiles, // NEW
-  canViewUserWorkload, // NEW
-  canViewTeamOverview, // NEW
-  canViewPerformanceMetrics, // NEW
-  canViewHealthCheck, // NEW
-  canViewDashboardStats, // NEW
+  canReassignTask,  
+  canViewAssignmentOptions,  
+  canValidateFiles,  
+  canViewUserWorkload,  
+  canViewTeamOverview,  
+  canViewPerformanceMetrics,  
+  canViewHealthCheck,  
+  canViewDashboardStats,  
   canAccessReports,
   canManageUsers,
   canPromoteUser,

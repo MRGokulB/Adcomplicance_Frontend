@@ -4,14 +4,11 @@ import { selectIsAuthenticated } from './redux/slices/authSlice'
 import { useEffect } from 'react';
 import { useCSRF } from './context/CSRFContext';
 
-// Layout and Protected Route
 import Layout from './components/Layout/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 
-// Auth Components
 import Login from './components/Auth/Login'
 
-// Page Components
 import ProfilePage from './components/Profile/ProfilePage'
 import Dashboard from './components/Dashboard/Dashboard'
 import Notifications from './components/Notifications/Notifications'
@@ -29,7 +26,6 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* Public Routes */}
         <Route
           path="/login"
           element={
@@ -41,34 +37,26 @@ function App() {
           }
         />
 
-        {/* Protected Routes - Wrapped in Layout */}
         <Route path="/*" element={
           <ProtectedRoute>
             <Layout>
               <Routes>
-                {/* Root redirect */}
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
                 <Route path="/profile" element={<ProfilePage />} />
-                {/* Main Application Routes */}
                 <Route path="/dashboard" element={<Dashboard />} />
 
-                {/* Tasks Routes */}
                 <Route path="/tasks" element={<AllTasksPage />} />
                 <Route path="/tasks/:taskId" element={<TaskMain />} />
 
-                {/* Notifications */}
                 <Route path="/notifications" element={<Notifications />} />
 
-                {/* Admin Routes - Role-based access can be added later */}
                 <Route path="/admin/user-management" element={<UserManagement />} />
                 <Route path="/admin/absence-tracker" element={<AbsenceTracker />} />
 
-                {/* Other Routes */}
                 <Route path="/audit-log" element={<AuditLog />} />
                 <Route path="/reports" element={<ReportsPage />} />
 
-                {/* 404 Handler */}
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </Layout>

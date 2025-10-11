@@ -1,4 +1,3 @@
-// redux/api/tasksApi.js - Session-based with CSRF  
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { refreshCsrfToken } from './csrfRefreshHandler';
 
@@ -28,9 +27,7 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
     api.dispatch({ type: 'auth/logout' });
   }
   
-  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {    
-    console.log('🔄 CSRF token invalid in tasksApi, refreshing...');
-    
+  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {        
     const success = await refreshCsrfToken(api);
     
     if (success) {
@@ -54,7 +51,6 @@ export const tasksApi = createApi({
       query: (params = {}) => {
         const searchParams = new URLSearchParams();
 
-        // Add all possible filter parameters
         if (params.page) searchParams.append('page', params.page);
         if (params.limit) searchParams.append('limit', params.limit);
         if (params.status) searchParams.append('status', params.status);
@@ -79,9 +75,7 @@ export const tasksApi = createApi({
           ]
           : [{ type: 'Task', id: 'LIST' }],
       transformResponse: (response) => response,
-      //  Force new cache entry for each unique filter + page combination
       serializeQueryArgs: ({ endpointName, queryArgs }) => {
-        // Create unique cache key based on filters (excluding page/limit)
         const { page, limit, ...filters } = queryArgs;
         const filterKey = Object.keys(filters)
           .sort()
@@ -89,14 +83,10 @@ export const tasksApi = createApi({
           .join('|');
         return `${endpointName}-${filterKey}`;
       },
-      //  Merge results for different pages of same filter
       merge: (currentCache, newItems) => {
-        // Replace cache entirely (no merging needed for pagination)
         return newItems;
       },
-      //  Force refetch when page changes
       forceRefetch({ currentArg, previousArg }) {
-        // Refetch if any parameter changed
         return JSON.stringify(currentArg) !== JSON.stringify(previousArg);
       },
     }),

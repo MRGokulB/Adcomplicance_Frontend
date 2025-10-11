@@ -1,4 +1,3 @@
-// src/components/Admin/UserManagement/UserManagementMain.jsx - OPTIMIZED VERSION
 import React, { useState, useMemo, useCallback } from 'react';
 import UserManagement from './UserManagement';
 import AbsenceTracker from './AbsenceTracker';
@@ -6,7 +5,6 @@ import AbsenceTracker from './AbsenceTracker';
 const UserManagementMain = () => {
   const [activeTab, setActiveTab] = useState('user-management');
 
-  // OPTIMIZED: Memoize tabs array
   const tabs = useMemo(() => [
     {
       id: 'user-management',
@@ -28,12 +26,10 @@ const UserManagementMain = () => {
     }
   ], []);
 
-  // OPTIMIZED: Memoize tab change handler
   const handleTabChange = useCallback((tabId) => {
     setActiveTab(tabId);
   }, []);
 
-  // OPTIMIZED: Memoize rendered content
   const renderContent = useMemo(() => {
     switch (activeTab) {
       case 'user-management':

@@ -1,4 +1,3 @@
-// src/components/Tasks/ExchangeApproval/ExchangeApproval.jsx - With integrated file upload
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUserRole, selectCurrentUser } from '../../../redux/slices/authSlice';
@@ -15,27 +14,21 @@ const ExchangeApproval = ({ task, onRefresh }) => {
   const userRole = useSelector(selectUserRole);
   const permissions = usePermissions();
 
-  // Local state
   const [showModal, setShowModal] = useState(false);
   const [selectedExchange, setSelectedExchange] = useState('');
   const [editingApproval, setEditingApproval] = useState(null);
   
-  // NEW: Local editing state for each approval
   const [editingData, setEditingData] = useState({});
   
-  // NEW: Pending files state (stores File objects before upload)
   const [pendingFiles, setPendingFiles] = useState({});
 
-  // API mutations
   const [addExchangeApproval, { isLoading: isAdding }] = useAddExchangeApprovalMutation();
   const [updateExchangeApproval, { isLoading: isUpdating }] = useUpdateExchangeApprovalMutation();
   const [deleteExchangeApproval, { isLoading: isDeleting }] = useDeleteExchangeApprovalMutation();
   const [uploadFile, { isLoading: isUploading }] = useUploadFileMutation();
 
-  // Get existing approvals from task data
   const approvals = task?.exchangeApprovals || [];
 
-  // Initialize editing data when approvals change
   useEffect(() => {
     const initialData = {};
     approvals.forEach(approval => {
@@ -51,14 +44,11 @@ const ExchangeApproval = ({ task, onRefresh }) => {
     setEditingData(initialData);
   }, [approvals]);
 
-  // Check if user can manage exchange approvals on this specific task
   const canUserManageThisTask = () => {
     if (!permissions.canManageExchangeApprovals) return false;
     
-    // Admin can manage all
     if (permissions.isAdmin) return true;
     
-    // Compliance users: check if assigned to this task
     if (permissions.isComplianceUser) {
       return task?.assignedComplianceId === currentUser?.id ||
              task?.assignedCompliance?.id === currentUser?.id;
@@ -113,7 +103,6 @@ const ExchangeApproval = ({ task, onRefresh }) => {
     }
   };
 
-  // Update local state only
   const handleLocalFieldChange = (approvalId, field, value) => {
     setEditingData(prev => ({
       ...prev,
@@ -124,7 +113,6 @@ const ExchangeApproval = ({ task, onRefresh }) => {
     }));
   };
 
-  // NEW: Store file locally without uploading (following VersionControl pattern)
   const handleFileSelect = (approvalId, file) => {
     if (!file) return;
     
@@ -133,17 +121,14 @@ const ExchangeApproval = ({ task, onRefresh }) => {
       return;
     }
 
-    // Store the file object
     setPendingFiles(prev => ({
       ...prev,
       [approvalId]: file
     }));
     
-    // Update local state with file name
     handleLocalFieldChange(approvalId, 'emailFileName', file.name);
   };
 
-  // NEW: Submit approval with file upload (following VersionControl pattern)
   const handleSubmitApproval = async (approvalId) => {
     if (!canUserManageThisTask()) {
       alert('You do not have permission to update exchange approvals.');
@@ -152,7 +137,6 @@ const ExchangeApproval = ({ task, onRefresh }) => {
 
     const data = editingData[approvalId];
     
-    // Validation for APPROVED status
     if (data.approvalStatus === 'APPROVED') {
       if (!data.approvalDate || !data.expiryDate || !data.referenceNumber) {
         alert('Approval date, expiry date, and reference number are required when status is Approved');
@@ -169,28 +153,17 @@ const ExchangeApproval = ({ task, onRefresh }) => {
       let fileUrl = data.approvalEmailUrl;
       let fileName = data.emailFileName;
       
-      // Step 1: Upload file first if there's a pending one (following VersionControl pattern)
       if (pendingFiles[approvalId]) {
-        console.log('Uploading file to S3...', pendingFiles[approvalId].name);
         
         const formData = new FormData();
         formData.append('file', pendingFiles[approvalId]);
         
         const uploadResult = await uploadFile(formData).unwrap();
-        console.log('Upload result:', uploadResult);
         
         fileUrl = uploadResult.file?.url || uploadResult.url;
         fileName = pendingFiles[approvalId].name;
-        
-        console.log('File uploaded successfully:', fileUrl);
       }
-
-      // Step 2: Update approval with all data including file URL
-      console.log('Submitting approval with data:', {
-        ...data,
-        approvalEmailUrl: fileUrl,
-        emailFileName: fileName
-      });
+ 
 
       await updateExchangeApproval({
         taskId: task.id,
@@ -200,7 +173,6 @@ const ExchangeApproval = ({ task, onRefresh }) => {
         emailFileName: fileName || data.emailFileName
       }).unwrap();
 
-      // Step 3: Clear pending file
       setPendingFiles(prev => {
         const newState = { ...prev };
         delete newState[approvalId];
@@ -269,14 +241,12 @@ const ExchangeApproval = ({ task, onRefresh }) => {
     return statusOptions.find(opt => opt.value === status)?.label || status;
   };
 
-  // Check if approval has unsaved changes
   const hasUnsavedChanges = (approvalId) => {
     const approval = approvals.find(a => a.id === approvalId);
     const edited = editingData[approvalId];
     
     if (!approval || !edited) return false;
 
-    // Check if there's a pending file
     if (pendingFiles[approvalId]) return true;
 
     return (
@@ -287,10 +257,8 @@ const ExchangeApproval = ({ task, onRefresh }) => {
     );
   };
 
-  // Check if all approvals are approved (for task approval workflow)
   const allApprovalsApproved = approvals.length > 0 && approvals.every(approval => approval.approvalStatus === 'APPROVED');
 
-  // Show different content based on task type
   if (!task || task.taskType !== 'EXCHANGE') {
     return (
       <div className="info-section">
@@ -309,7 +277,6 @@ const ExchangeApproval = ({ task, onRefresh }) => {
 
   return (
     <div className="">
-      {/* Header with Add Button */}
       <div className="flex-between mb-6">
         <div className="">
           <h1 className="text-heading-2">Exchange Approval Management</h1>
@@ -329,7 +296,6 @@ const ExchangeApproval = ({ task, onRefresh }) => {
         )}
       </div>
 
-      {/* Exchange Approval Table */}
       <div className="card">
         <div className="table-container">
           {approvals.length > 0 ? (
@@ -433,7 +399,6 @@ const ExchangeApproval = ({ task, onRefresh }) => {
         </td>
         <td>
           <div className="space-y-2">
-            {/* UPDATED: Show file for everyone, not just when canManage */}
             {approval.approvalEmailUrl && (
               <div>
                 <a 
@@ -450,12 +415,10 @@ const ExchangeApproval = ({ task, onRefresh }) => {
               </div>
             )}
             
-            {/* Show "No file uploaded" message for non-managers if no file exists */}
             {!approval.approvalEmailUrl && !canManage && (
               <span className="text-sm text-gray-500 italic">No file uploaded</span>
             )}
             
-            {/* Pending file indicator - only for managers */}
             {canManage && hasPendingFile && (
               <div className="flex items-center gap-2 text-sm text-orange-600">
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -466,7 +429,6 @@ const ExchangeApproval = ({ task, onRefresh }) => {
               </div>
             )}
             
-            {/* File upload input - only for managers */}
             {canManage && (
               <div className="flex items-center gap-2">
                 <label className="exchange-file-upload cursor-pointer">
@@ -546,7 +508,6 @@ const ExchangeApproval = ({ task, onRefresh }) => {
         </div>
       </div>
 
-      {/* Add Approval Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="exchange-modal" onClick={(e) => e.stopPropagation()}>
@@ -601,7 +562,6 @@ const ExchangeApproval = ({ task, onRefresh }) => {
         </div>
       )}
 
-      {/* Information Panel */}
       {approvals.length > 0 && (
         <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
           <h4 className="text-sm font-medium text-blue-900 mb-2">Exchange Approval Workflow:</h4>

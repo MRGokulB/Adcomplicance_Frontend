@@ -6,17 +6,16 @@ import ExportButtons from '../common/ExportButtons';
 
 const ExpiringTasksReport = () => {
   const [filters, setFilters] = useState({
-    days: 30 // Default to 30 days
+    days: 30  
   });
 
-  // API Query with real-time data
   const { 
     data: reportData, 
     isLoading, 
     error, 
     refetch 
   } = useGetExpiringSoonReportQuery(filters, {
-    pollingInterval: 300000, // Refresh every 5 minutes (more frequent for time-sensitive data)
+    pollingInterval: 300000,  
     refetchOnMountOrArgChange: true,
   });
 
@@ -51,7 +50,6 @@ const ExpiringTasksReport = () => {
     }));
   };
 
-  // Transform API data for table display
   const transformData = (apiData) => {
     if (!apiData?.data) return [];
     
@@ -71,7 +69,6 @@ const ExpiringTasksReport = () => {
     }));
   };
 
-  // Helper function to determine urgency level
   const getUrgencyLevel = (daysRemaining) => {
     if (daysRemaining <= 7) return 'Critical';
     if (daysRemaining <= 15) return 'High';
@@ -119,7 +116,6 @@ const ExpiringTasksReport = () => {
         ]}
       />
 
-      {/* Summary Cards with real API data */}
       {summary && (
         <div className="report-summary mb-6">
           <div className="card">
@@ -166,7 +162,6 @@ const ExpiringTasksReport = () => {
         </div>
       )}
 
-      {/* Urgency Level Distribution */}
       {summary.urgencyLevels && (
         <div className="mb-6 p-4 bg-red-50 rounded-lg">
           <h3 className="text-sm font-medium text-red-700 mb-3">Urgency Level Distribution</h3>
@@ -187,7 +182,6 @@ const ExpiringTasksReport = () => {
         </div>
       )}
 
-      {/* Exchange-wise Breakdown */}
       {summary.exchangeDistribution && (
         <div className="mb-6 p-4 bg-blue-50 rounded-lg">
           <h3 className="text-sm font-medium text-blue-700 mb-3">Exchange-wise Expiring Tasks</h3>
@@ -202,7 +196,6 @@ const ExpiringTasksReport = () => {
         </div>
       )}
 
-      {/* Renewal Status Overview */}
       {summary.renewalStatusDistribution && (
         <div className="mb-6 p-4 bg-yellow-50 rounded-lg">
           <h3 className="text-sm font-medium text-yellow-700 mb-3">Renewal Status Overview</h3>
@@ -217,7 +210,6 @@ const ExpiringTasksReport = () => {
         </div>
       )}
 
-      {/* Loading State */}
       {isLoading && (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -225,7 +217,6 @@ const ExpiringTasksReport = () => {
         </div>
       )}
 
-      {/* Report Table */}
       {!isLoading && (
         <ReportTable 
           columns={columns}

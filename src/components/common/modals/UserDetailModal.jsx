@@ -61,7 +61,6 @@ const UserDetailModal = ({ isOpen, onClose, user }) => {
         </div>
 
         <div className="modal-body">
-          {/* User Avatar and Basic Info */}
           <div className="text-center mb-6">
             <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
               <span className="text-2xl font-bold text-white">
@@ -72,9 +71,7 @@ const UserDetailModal = ({ isOpen, onClose, user }) => {
             <p className="text-gray-600">{user.email}</p>
           </div>
 
-          {/* User Information Grid */}
           <div className="space-y-4">
-            {/* Basic Information */}
             <div className="bg-gray-50 rounded-lg p-4">
               <h5 className="font-medium text-gray-900 mb-3">Basic Information</h5>
               <div className="grid grid-cols-2 gap-4">
@@ -97,7 +94,6 @@ const UserDetailModal = ({ isOpen, onClose, user }) => {
               </div>
             </div>
 
-            {/* Role and Status */}
             <div className="bg-gray-50 rounded-lg p-4">
               <h5 className="font-medium text-gray-900 mb-3">Role & Status</h5>
               <div className="grid grid-cols-2 gap-4">
@@ -133,7 +129,6 @@ const UserDetailModal = ({ isOpen, onClose, user }) => {
               </div>
             </div>
 
-            {/* Account Information */}
             <div className="bg-gray-50 rounded-lg p-4">
               <h5 className="font-medium text-gray-900 mb-3">Account Information</h5>
               <div className="grid grid-cols-1 gap-4">
@@ -156,7 +151,6 @@ const UserDetailModal = ({ isOpen, onClose, user }) => {
               </div>
             </div>
 
-            {/* Permissions Overview */}
             <div className="bg-blue-50 rounded-lg p-4">
               <h5 className="font-medium text-gray-900 mb-3">Role Permissions</h5>
               <div className="text-sm text-gray-600">

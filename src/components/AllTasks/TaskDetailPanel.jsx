@@ -1,4 +1,3 @@
-// src/components/AllTasks/TaskDetailPanel.jsx - New component for task details
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -92,7 +91,6 @@ const TaskDetailPanel = ({ taskId, onClose }) => {
     const renderOverviewTab = () => (
         <div className="task-detail-content">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Basic Information */}
                 <div className="task-detail-section">
                     <h4 className="task-detail-section-title">Basic Information</h4>
                     <div className="space-y-3">
@@ -184,7 +182,6 @@ const TaskDetailPanel = ({ taskId, onClose }) => {
                     </div>
                 </div>
 
-                {/* Assignment Information */}
                 <div className="task-detail-section">
                     <h4 className="task-detail-section-title">Assignment Details</h4>
                     <div className="space-y-3">
@@ -229,7 +226,6 @@ const TaskDetailPanel = ({ taskId, onClose }) => {
 
 
 
-            {/* Approval Dates (if applicable) */}
             {(task.approvalDate || task.publishDate || task.expiryDate) && (
                 <div className="task-detail-section mt-6">
                     <h4 className="task-detail-section-title">Timeline</h4>

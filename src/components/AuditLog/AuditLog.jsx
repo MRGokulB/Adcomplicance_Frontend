@@ -13,7 +13,6 @@ const AuditLog = () => {
   const userRole = useSelector(selectUserRole);
   const isAuthenticated = useSelector(selectIsAuthenticated);
     
-  // Separate UI state from API query state
   const [uiFilters, setUiFilters] = useState({
     page: 1,
     limit: 50,
@@ -24,7 +23,6 @@ const AuditLog = () => {
     taskId: '',
   });
 
-  // Applied filters (actually sent to API)
   const [appliedFilters, setAppliedFilters] = useState({
     page: 1,
     limit: 50,
@@ -35,10 +33,6 @@ const AuditLog = () => {
     taskId: '',
   });
 
-  // REMOVED: Debounce hook and auto-apply for taskId
-  // Now taskId only applies when user clicks "Apply Filters"
-
-  // FIXED: Check permissions using correct backend-aligned roles
   const canViewFullAudit = hasPermission(userRole, PERMISSIONS.AUDIT_READ_ALL);
   const canViewLimitedAudit = hasPermission(userRole, PERMISSIONS.AUDIT_READ_LIMITED);
   const canExportAudit = hasPermission(userRole, PERMISSIONS.AUDIT_EXPORT);
@@ -91,7 +85,6 @@ const AuditLog = () => {
       [field]: value,
     }));
 
-    // FIXED: Auto-apply ONLY for dropdowns, dates, and pagination (NOT taskId)
     if (field !== 'taskId') {
       setAppliedFilters(prev => ({
         ...prev,
@@ -101,21 +94,18 @@ const AuditLog = () => {
     }
   };
 
-  // Check if there are any active filters
   const hasActiveFilters = useCallback(() => {
     return uiFilters.dateFrom || uiFilters.dateTo || uiFilters.action || 
            uiFilters.performedBy || uiFilters.taskId;
   }, [uiFilters]);
 
-  // Apply all filters manually
   const applyFilters = useCallback(() => {
     setAppliedFilters({
       ...uiFilters,
-      page: 1 // Reset to first page when applying filters
+      page: 1 
     });
   }, [uiFilters]);
 
-  // Reset all filters
   const resetFilters = useCallback(() => {
     const resetState = {
       page: 1,
@@ -130,7 +120,6 @@ const AuditLog = () => {
     setAppliedFilters(resetState);
   }, []);
 
-  // FIXED: Export handling to work with backend JSON response
   const handleExport = async (format = 'csv') => {
     if (!canExportAudit) return;
 
@@ -243,7 +232,6 @@ const AuditLog = () => {
     }
   };
 
-  // Get filter options from API data
   const getFilterOptions = () => {
     const users = usersData?.users?.map(user => ({
       value: user.id,
@@ -263,15 +251,12 @@ const AuditLog = () => {
   const auditLogs = auditData?.auditLogs || [];
   const pagination = auditData?.pagination || {};
 
-  // Non-blocking error display
   const showError = auditError && !isAuditLoading;
 
-  // ADDED: Check if filters are different from applied
   const hasUnappliedChanges = JSON.stringify(uiFilters) !== JSON.stringify(appliedFilters);
 
   return (
     <div className="container-lg section-md">
-      {/* Header */}
       <div className="flex-between items-center mb-6">
         <div>
           <h1 className="text-heading-1">Audit Log Viewer</h1>
@@ -304,7 +289,6 @@ const AuditLog = () => {
         )}
       </div>
 
-      {/* Non-blocking Error Alert */}
       {showError && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
           <div className="flex items-start">
@@ -333,7 +317,6 @@ const AuditLog = () => {
         </div>
       )}
 
-      {/* Statistics Cards */}
       {statsData && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="card">
@@ -371,7 +354,6 @@ const AuditLog = () => {
         </div>
       )}
 
-      {/* Filters */}
       <div className="card mb-6">
         <div className="card-header">
           <h3 className="card-title">Filters</h3> 
@@ -441,7 +423,6 @@ const AuditLog = () => {
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-100">
             <div className="text-sm text-gray-600">
               {hasActiveFilters() && (
@@ -478,7 +459,6 @@ const AuditLog = () => {
         </div>
       </div>
 
-      {/* Loading State */}
       {isAuditLoading && !auditLogs.length && (
         <div className="card">
           <div className="card-body text-center py-8">
@@ -488,7 +468,6 @@ const AuditLog = () => {
         </div>
       )}
 
-      {/* Audit Log Table */}
       {(!isAuditLoading || auditLogs.length > 0) && (
         <div className="card">
           <div className="table-container">
@@ -554,7 +533,6 @@ const AuditLog = () => {
             </table>
           </div>
 
-          {/* Empty State */}
           {auditLogs.length === 0 && !isAuditLoading && (
             <div className="card-body text-center py-12">
               <div className="table-empty">
@@ -578,7 +556,6 @@ const AuditLog = () => {
         </div>
       )}
 
-      {/* Pagination */}
       {pagination.totalPages > 1 && (
         <div className="flex items-center justify-between mt-6">
           <div className="text-sm text-gray-700">
@@ -605,7 +582,6 @@ const AuditLog = () => {
         </div>
       )}
 
-      {/* Export Rights Notice */}
       {!canExportAudit && canViewFullAudit && (
         <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <div className="flex items-center gap-2">

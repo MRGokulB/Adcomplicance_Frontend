@@ -1,7 +1,5 @@
-// src/redux/slices/authSlice.js
 import { createSlice } from '@reduxjs/toolkit'
 
-// Helper functions for localStorage (only for user data now)
 const loadAuthFromStorage = () => {
   try {
     const user = localStorage.getItem('auth_user')
@@ -22,7 +20,6 @@ const saveAuthToStorage = (user, rememberMe) => {
       localStorage.setItem('auth_user', JSON.stringify(user))
       localStorage.setItem('auth_remember_me', 'true')
     } else {
-      // If not remembering, clear storage
       clearAuthFromStorage()
     }
   } catch (error) {
@@ -39,21 +36,19 @@ const clearAuthFromStorage = () => {
   }
 }
 
-// Initial state
 const initialState = {
   user: null,
   isAuthenticated: false,
-  isLoading: true, // Initially true to check for existing session
+  isLoading: true,  
   error: null,
   lastActivity: null,
   rememberMe: false,
 }
 
-// Initialize state with data from localStorage (if remembered)
 const persistedAuth = loadAuthFromStorage()
 if (persistedAuth.user && persistedAuth.rememberMe) {
   initialState.user = persistedAuth.user
-  initialState.isAuthenticated = false // Will be verified by session check
+  initialState.isAuthenticated = false  
   initialState.rememberMe = persistedAuth.rememberMe
   initialState.lastActivity = new Date().toISOString()
 }
@@ -71,14 +66,12 @@ const authSlice = createSlice({
       state.lastActivity = new Date().toISOString()
       state.rememberMe = rememberMe
 
-      // Persist to localStorage only if rememberMe is true
       saveAuthToStorage(user, rememberMe)
     },
 
     updateUser: (state, action) => {
       if (state.user) {
         state.user = { ...state.user, ...action.payload }
-        // Update storage if rememberMe was enabled
         if (state.rememberMe) {
           saveAuthToStorage(state.user, state.rememberMe)
         }
@@ -93,7 +86,6 @@ const authSlice = createSlice({
       state.lastActivity = null
       state.rememberMe = false
 
-      // Clear from localStorage
       clearAuthFromStorage()
     },
 
@@ -115,19 +107,15 @@ const authSlice = createSlice({
     },
 
     initializeAuth: (state) => {
-      // This is called on app startup to check for persisted auth
       const persistedAuth = loadAuthFromStorage()
       if (persistedAuth.user && persistedAuth.rememberMe) {
         state.user = persistedAuth.user
         state.rememberMe = persistedAuth.rememberMe
-        state.lastActivity = new Date().toISOString()
-        // Note: isAuthenticated will be set to true only after session verification
-        // This should trigger a session check API call
+        state.lastActivity = new Date().toISOString() 
       }
       state.isLoading = false
     },
 
-    // Session validation - set after successful session check
     setSessionValid: (state, action) => {
       state.isAuthenticated = true
       state.isLoading = false
@@ -139,7 +127,6 @@ const authSlice = createSlice({
       }
     },
 
-    // Session invalid - clear auth
     setSessionInvalid: (state) => {
       state.user = null
       state.isAuthenticated = false
@@ -164,7 +151,6 @@ export const {
   setSessionInvalid,
 } = authSlice.actions
 
-// Selectors
 export const selectCurrentUser = (state) => state.auth.user
 export const selectIsAuthenticated = (state) => state.auth.isAuthenticated
 export const selectAuthLoading = (state) => state.auth.isLoading

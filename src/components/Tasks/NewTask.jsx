@@ -10,7 +10,6 @@ import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 
-//  Validation function memoized outside component
 const validateFormField = (field, value, allValues) => {
   switch (field) {
     case 'title':
@@ -58,11 +57,9 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
   const [taskCreationStatus, setTaskCreationStatus] = useState(null);
   const [uploadedFiles, setUploadedFiles] = useState([]);
 
-  // API hooks
   const [createTask] = useCreateTaskMutation();
   const [uploadFiles, { isLoading: isUploading }] = useUploadFilesMutation();
   
-  //  Memoized user query parameters
   const userQueryParams = useMemo(() => ({
     isActive: true,
     limit: 100
@@ -70,10 +67,8 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
 
   const { data: allUsersData } = useGetUsersQuery(userQueryParams);
 
-  // Permission check
   const canCreateTasks = hasPermission(currentUserRole, PERMISSIONS.TASK_CREATE);
 
-  //  Memoized product users filter
   const productUsers = useMemo(() => {
     if (!allUsersData?.users) return [];
     return allUsersData.users.filter(user => 
@@ -81,7 +76,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     );
   }, [allUsersData]);
 
-  //  Auto-assign current user only once on mount
   useEffect(() => {
     if (currentUser && 
         (currentUser.role === USER_ROLES.PRODUCT_USER || currentUser.role === USER_ROLES.PRODUCT_ADMIN) &&
@@ -91,7 +85,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
         assignedProductIds: [currentUser.id]
       }));
     }
-  }, []); // Empty deps - only run once on mount
+  }, []);  
 
   useEffect(() => {
     if (!canCreateTasks) {
@@ -99,12 +93,11 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     }
   }, [canCreateTasks, onClose]);
 
-  //  Validate all fields at once
   const validateForm = useCallback(() => {
     const newErrors = {};
     
     Object.keys(formData).forEach(field => {
-      if (field === 'remarks') return; // Optional field
+      if (field === 'remarks') return;  
       const error = validateFormField(field, formData[field], formData);
       if (error) newErrors[field] = error;
     });
@@ -112,11 +105,9 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     return newErrors;
   }, [formData]);
 
-  //  Debounced field validation
   const handleInputChange = useCallback((field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     
-    // Clear error immediately when user starts typing
     if (errors[field]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -126,7 +117,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     }
   }, [errors]);
 
-  //  Memoized handlers
   const handleUserSelect = useCallback((userId) => {
     setFormData(prev => {
       if (prev.assignedProductIds.includes(userId)) {
@@ -155,7 +145,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     }));
   }, []);
 
-  //  File validation with better error handling
   const handleFileChange = useCallback((e) => {
     const files = Array.from(e.target.files);
     
@@ -177,7 +166,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     
     const validFiles = files.filter(file => {
       const isValidType = validTypes.some(type => file.type.startsWith(type));
-      const isValidSize = file.size <= 200 * 1024 * 1024; // 200MB
+      const isValidSize = file.size <= 200 * 1024 * 1024;  
       return isValidType && isValidSize;
     });
 
@@ -213,7 +202,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     onClose();
   }, [onClose]);
 
-  //  Streamlined task creation
   const handleCreateTask = useCallback(async () => {
     const validationErrors = validateForm();
     if (Object.keys(validationErrors).length > 0) {
@@ -228,7 +216,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
       let fileUrls = [];
       let uploadedFileDetails = [];
       
-      // Upload files if any
       if (formData.selectedFiles.length > 0) {
         setTaskCreationStatus({ status: 'uploading', message: 'Uploading files...' });
         
@@ -248,7 +235,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
 
       setTaskCreationStatus({ status: 'creating', message: 'Creating task...' });
 
-      // Create task with uploaded file URLs
       const taskData = {
         title: formData.title.trim(),
         description: formData.description.trim(),
@@ -277,7 +263,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
         });
       }
 
-      // Auto-close after showing success
       setTimeout(() => {
         onClose();
       }, 3000);
@@ -307,7 +292,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     }
   }, [formData, validateForm, uploadFiles, createTask, onSuccess, onClose]);
 
-  //  Memoized user lookup
   const getUserName = useCallback((userId) => {
     const user = productUsers.find(u => u.id === userId);
     return user ? user.fullName : 'Unknown User';
@@ -317,7 +301,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
     return productUsers.find(u => u.id === userId) || null;
   }, [productUsers]);
 
-  //  Memoized available users for dropdown
   const availableUsers = useMemo(() => {
     return productUsers.filter(user => !formData.assignedProductIds.includes(user.id));
   }, [productUsers, formData.assignedProductIds]);
@@ -343,7 +326,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
         </div>
         
         <div className="modal-body">
-          {/* Task Creation Status */}
           {taskCreationStatus && (
             <div className={`mb-4 p-4 rounded-md ${
               taskCreationStatus.status === 'success' ? 'bg-green-50 border border-green-200' : 'bg-blue-50 border border-blue-200'
@@ -390,7 +372,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
             </div>
           )}
 
-          {/* Submit Error */}
           {errors.submit && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
               <p className="text-sm text-red-700">{errors.submit}</p>
@@ -398,11 +379,9 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left Column - Basic Information */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Task Information</h3>
               
-              {/* Task Title */}
               <div>
                 <label className="exchange-form-label">Task Title *</label>
                 <input
@@ -424,7 +403,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
                 </div>
               </div>
 
-              {/* Description with Markdown Support */}
               <div>
                 <label className="exchange-form-label">
                   Description * 
@@ -439,7 +417,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
                   maxLength={1000}
                 />
                 
-                {/* Markdown Preview */}
                 {formData.description && (
                   <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <div className="text-xs font-medium text-gray-600 mb-2">Preview:</div>
@@ -483,7 +460,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
                 </div>
               </div>
 
-              {/* Product Category */}
               <div>
                 <label className="exchange-form-label">Product Category *</label>
                 <input
@@ -499,7 +475,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
                 )}
               </div>
 
-              {/* Platform */}
               <div>
                 <label className="exchange-form-label">Platform *</label>
                 <input
@@ -515,7 +490,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
                 )}
               </div>
 
-              {/* Remarks */}
               <div>
                 <label className="exchange-form-label">Remarks (Optional)</label>
                 <textarea
@@ -533,17 +507,13 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
               </div>
             </div>
 
-            {/* Right Column - Assignments and Files */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Assignments & Files</h3>
               
-              {/* Assign Product Users */}
               <div>
                 <label className="exchange-form-label">
                   Assign Product Users *
                 </label>
-                
-                {/* Selected Users */}
                 {formData.assignedProductIds.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-3">
                     {formData.assignedProductIds.map((userId) => {
@@ -570,7 +540,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
                   </div>
                 )}
 
-                {/* User Selector */}
                 <div className="relative">
                   <button
                     type="button"
@@ -622,7 +591,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
                 )}
               </div>
 
-              {/* Upload Files */}
               <div>
                 <label className="exchange-form-label">
                   Upload Files (Optional - Max 5 files, 50MB each)
@@ -679,7 +647,6 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
                 </p>
               </div>
 
-              {/* Uploaded Files Display */}
               {uploadedFiles.length > 0 && (
                 <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
                   <div className="text-sm font-medium text-green-800 mb-2">

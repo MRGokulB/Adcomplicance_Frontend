@@ -1,4 +1,3 @@
-// src/components/AllTasks/AllTasks.jsx - FIXED PAGINATION & FILTERS (NO PRIORITY)
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -25,7 +24,6 @@ import FileValidationModal from './FlieValidationModal';
 import TaskReassignmentModal from './TaskReassignmentModal';
 import BulkOperationsModal from './BulkOperationsModal';
 
-// Debounce hook
 const useDebounce = (value, delay = 500) => {
     const [debouncedValue, setDebouncedValue] = useState(value);
 
@@ -43,13 +41,11 @@ export default function AllTasksPage() {
     const navigate = useNavigate();
     const currentUserRole = useSelector(selectUserRole);
     const permissions = usePermissions();
-    const tableRef = useRef(null); // ✅ For scroll positioning
+    const tableRef = useRef(null);  
 
-    // ✅ FIX: Unified filters state - all server-side (REMOVED priority)
     const [filters, setFilters] = useState({
         taskType: '',
         status: '',
-        // priority: '', // ❌ REMOVED - not in schema
         createdBy: '',
         assignedTo: '',
         dateFrom: '',
@@ -59,17 +55,14 @@ export default function AllTasksPage() {
         limit: 10
     });
 
-    // Separate state for immediate UI update
     const [searchInput, setSearchInput] = useState('');
     const [createdByInput, setCreatedByInput] = useState('');
     const [assignedToInput, setAssignedToInput] = useState('');
 
-    // Debounced values
     const debouncedSearch = useDebounce(searchInput, 500);
     const debouncedCreatedBy = useDebounce(createdByInput, 500);
     const debouncedAssignedTo = useDebounce(assignedToInput, 500);
 
-    // Update filters when debounced values change
     useEffect(() => {
         setFilters(prev => ({ ...prev, search: debouncedSearch, page: 1 }));
     }, [debouncedSearch]);
@@ -82,7 +75,6 @@ export default function AllTasksPage() {
         setFilters(prev => ({ ...prev, assignedTo: debouncedAssignedTo, page: 1 }));
     }, [debouncedAssignedTo]);
 
-    // Advanced search state
     const [advancedSearch, setAdvancedSearch] = useState({
         enabled: false,
         query: '',
@@ -93,21 +85,17 @@ export default function AllTasksPage() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [activeView, setActiveView] = useState('all');
 
-    // Task detail panel state
     const [selectedTaskForDetail, setSelectedTaskForDetail] = useState(null);
     const [showTaskDetail, setShowTaskDetail] = useState(false);
 
-    // Modal states
     const [showFileValidation, setShowFileValidation] = useState(false);
     const [showReassignment, setShowReassignment] = useState(false);
     const [showBulkOperations, setShowBulkOperations] = useState(false);
     const [bulkOperationType, setBulkOperationType] = useState('');
 
-    // Mutations
     const [performBulkOperation, { isLoading: isBulkLoading }] = useBulkTaskOperationsMutation();
     const [validateFiles, { isLoading: isValidating }] = useValidateFilesMutation();
 
-    // Permission checks
     const canCreateTasks = permissions.canCreateTask;
     const canViewTaskBuckets = permissions.canViewTaskBuckets;
     const canPerformBulkOps = permissions.canPerformBulkOperations;
@@ -116,11 +104,9 @@ export default function AllTasksPage() {
     const canViewHealthCheck = permissions.canViewHealthCheck;
     const canAdvancedSearch = permissions.canAdvancedSearch;
 
-    // ✅ FIX: Build clean query params
     const buildQueryParams = (filterObj) => {
     const params = {};
     Object.keys(filterObj).forEach(key => {
-        // Exclude priority - it will be applied client-side
         if (key !== 'priority' && filterObj[key] !== '' && filterObj[key] != null) {
             params[key] = filterObj[key];
         }
@@ -133,7 +119,6 @@ const applyPriorityFilter = useCallback((taskList) => {
     return taskList.filter(task => task.priority === filters.priority);
 }, [filters.priority]);
 
-    // ✅ FIX: API queries with clean params
     const {
         data: tasksData,
         isLoading,
@@ -167,7 +152,6 @@ const applyPriorityFilter = useCallback((taskList) => {
         pollingInterval: 0
     });
 
-    // Advanced search query
     const {
         data: advancedSearchData,
         isLoading: isAdvancedSearchLoading,
@@ -184,13 +168,11 @@ const applyPriorityFilter = useCallback((taskList) => {
         }
     );
 
-    // Health check
     const { data: healthCheckData, refetch: refetchHealthCheck } = useGetTaskHealthCheckQuery(undefined, {
         skip: !canViewHealthCheck,
         pollingInterval: 300000
     });
 
-    // Get current data - server-side + client-side priority
 const getCurrentData = useCallback(() => {
     if (advancedSearch.enabled && advancedSearchData) {
         const results = advancedSearchData?.results || [];
@@ -257,7 +239,6 @@ const getCurrentData = useCallback(() => {
 }, [advancedSearch, advancedSearchData, activeView, tasksData, approvedNotPublishedData, expiringSoonData, isLoading, isLoadingApproved, isLoadingExpiring, isAdvancedSearchLoading, isError, error, isFetching, applyPriorityFilter]);
     const { tasks, pagination, totalCount, isLoading: currentLoading, isError: currentError, error: currentErrorData } = getCurrentData();
 
-    // Tab visibility handler
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
@@ -278,27 +259,22 @@ const getCurrentData = useCallback(() => {
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [activeView, refetch, refetchApproved, refetchExpiring]);
 
-    // Server-side pagination
     const totalPages = pagination 
         ? Math.ceil(pagination.totalCount / filters.limit)
         : Math.ceil(totalCount / filters.limit);
 
-    // ✅ FIX: Simplified filter handler
     const handleFilterChange = useCallback((field, value) => {
         setFilters(prev => ({ 
             ...prev, 
             [field]: value,
-            // Reset to page 1 when filter changes (except page/limit)
             ...(field !== 'page' && field !== 'limit' ? { page: 1 } : {})
         }));
     }, []);
 
-    // ✅ FIX: Page change with scroll
     const handlePageChange = useCallback((newPage) => {
         setFilters(prev => ({ ...prev, page: newPage }));
         
-        // Scroll to table container
-        if (tableRef.current) {
+         if (tableRef.current) {
             tableRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     }, []);
@@ -360,12 +336,10 @@ const getCurrentData = useCallback(() => {
         setSelectedRows([]);
     }, []);
 
-    // ✅ FIX: Reset handler (REMOVED priority)
     const handleReset = useCallback(() => {
         setFilters({
             taskType: '',
             status: '',
-            // priority: '', // ❌ REMOVED
             createdBy: '',
             assignedTo: '',
             dateFrom: '',
@@ -479,7 +453,6 @@ const getCurrentData = useCallback(() => {
         });
     };
 
-    // Loading state
     if (currentLoading && !tasks.length && !currentError) {
         return (
             <div className="container-lg section-md">
@@ -514,7 +487,6 @@ const getCurrentData = useCallback(() => {
                 </div>
             </div>
 
-            {/* ✅ FIX: Non-blocking error alert */}
             {currentError && (
                 <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                     <div className="flex items-start">
@@ -562,7 +534,6 @@ const getCurrentData = useCallback(() => {
                 </div>
             )}
 
-            {/* Filter Panel - with debouncing */}
             <div className="filter-panel">
                 <div className="card-header">
                     <h3 className="card-title">Filters</h3>
@@ -600,7 +571,6 @@ const getCurrentData = useCallback(() => {
                             </select>
                         </div>
 
-                        {/* ❌ REMOVED Priority Filter */}
                         <div>
     <label className="info-label">Priority  </label>
     <select
@@ -689,7 +659,6 @@ const getCurrentData = useCallback(() => {
                 </div>
             </div>
 
-            {/* ✅ FIX: Table with ref for scroll */}
             <div className="table-container" ref={tableRef}>
                 <div className="table-toolbar">
                     <div className="table-toolbar-left">
@@ -877,7 +846,6 @@ const getCurrentData = useCallback(() => {
                     </tbody>
                 </table>
 
-                {/* ✅ FIX: Server-side pagination with proper handlers */}
                 <div className="card-footer">
                     <div className="flex-between">
                         <div className="text-sm text-gray-600">

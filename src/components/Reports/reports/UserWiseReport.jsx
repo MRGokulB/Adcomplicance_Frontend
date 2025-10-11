@@ -15,23 +15,19 @@ const UserWiseReport = ({ type, onTypeChange }) => {
     userId: ''
   });
 
-  // NEW: Store raw unfiltered data
   const [rawData, setRawData] = useState(null);
   const [filteredData, setFilteredData] = useState(null);
 
   const userRole = useSelector(selectUserRole);
 
-  // Check permissions for current report type
   const canAccessCompliance = hasPermission(userRole, PERMISSIONS.REPORT_COMPLIANCE_USERS);
   const canAccessProduct = hasPermission(userRole, PERMISSIONS.REPORT_PRODUCT_USERS);
 
-  // NEW: Only send date filters to API, not userId
   const apiFilters = {
     dateFrom: filters.dateFrom,
     dateTo: filters.dateTo
   };
 
-  // Conditional API calls based on report type AND permissions
   const { 
     data: complianceData, 
     isLoading: isComplianceLoading, 
@@ -54,18 +50,15 @@ const UserWiseReport = ({ type, onTypeChange }) => {
     refetchOnMountOrArgChange: true,
   });
 
-  // NEW: Apply frontend filtering whenever data or userId filter changes
   useEffect(() => {
     const currentData = type === 'compliance' ? complianceData : productData;
     if (!currentData) return;
 
     setRawData(currentData);
 
-    // Apply userId filter on frontend
     if (filters.userId) {
       const filtered = currentData.data.filter(user => user.userId === filters.userId);
       
-      // Recalculate summary for filtered data
       const summary = type === 'compliance' 
         ? {
             totalUsers: filtered.length,
@@ -90,7 +83,6 @@ const UserWiseReport = ({ type, onTypeChange }) => {
     }
   }, [complianceData, productData, filters.userId, type]);
 
-  // Handle permission-based access control
   if (type === 'compliance' && !canAccessCompliance) {
     return (
       <div className="p-6">
@@ -147,12 +139,10 @@ const UserWiseReport = ({ type, onTypeChange }) => {
     );
   }
 
-  // CHANGED: Use filteredData instead of currentData
   const isLoading = type === 'compliance' ? isComplianceLoading : isProductLoading;
   const error = type === 'compliance' ? complianceError : productError;
   const refetch = type === 'compliance' ? refetchCompliance : refetchProduct;
 
-  // Different columns based on user type
   const complianceColumns = [
     { id: 'fullName', label: 'Name', sortable: true },
     { id: 'username', label: 'Username', sortable: true },
@@ -180,10 +170,8 @@ const UserWiseReport = ({ type, onTypeChange }) => {
     { id: 'activityScore', label: 'Activity Score', sortable: true }
   ];
 
-  // Get current columns and data for export
   const currentColumns = type === 'compliance' ? complianceColumns : productColumns;
   
-  // CHANGED: Get user options from rawData instead of filteredData
   const getUserFilterOptions = () => {
     if (!rawData?.data) return [];
     return rawData.data.map(user => ({
@@ -200,7 +188,6 @@ const UserWiseReport = ({ type, onTypeChange }) => {
     setFilters(newFilters);
   };
 
-  // Transform API data for table display
   const transformData = (apiData) => {
     if (!apiData?.data) return [];
     return apiData.data.map(item => ({
@@ -209,11 +196,9 @@ const UserWiseReport = ({ type, onTypeChange }) => {
     }));
   };
 
-  // CHANGED: Use filteredData instead of currentData
   const tableData = transformData(filteredData);
   const summary = filteredData?.summary || {};
 
-  // Only show API errors for reports the user has permission to access
   if (error) {
     return (
       <div className="p-6">
@@ -257,7 +242,6 @@ const UserWiseReport = ({ type, onTypeChange }) => {
         ]}
       />
 
-      {/* Summary Cards with real API data */}
       {summary && (
         <div className="report-summary mb-6">
           {type === 'compliance' ? (
@@ -343,7 +327,6 @@ const UserWiseReport = ({ type, onTypeChange }) => {
         </div>
       )}
 
-      {/* Loading State */}
       {isLoading && (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -353,7 +336,6 @@ const UserWiseReport = ({ type, onTypeChange }) => {
         </div>
       )}
 
-      {/* Report Table */}
       {!isLoading && (
         <ReportTable 
           columns={currentColumns}

@@ -14,7 +14,6 @@ const EditUserModal = ({ isOpen, onClose, onUpdateUser, user, currentUserRole })
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Initialize form data when user prop changes
   useEffect(() => {
     if (user) {
       setFormData({
@@ -28,7 +27,6 @@ const EditUserModal = ({ isOpen, onClose, onUpdateUser, user, currentUserRole })
     }
   }, [user]);
 
-  // Reset form when modal closes
   useEffect(() => {
     if (!isOpen) {
       setErrors({});
@@ -36,7 +34,6 @@ const EditUserModal = ({ isOpen, onClose, onUpdateUser, user, currentUserRole })
     }
   }, [isOpen]);
 
-  // Get allowed roles based on current user's permissions
   const getAllowedRoles = () => {
     if (!currentUserRole) return [];
     
@@ -54,7 +51,6 @@ const EditUserModal = ({ isOpen, onClose, onUpdateUser, user, currentUserRole })
     }
     
     if (hasPermission(currentUserRole, PERMISSIONS.USER_UPDATE_TEAM)) {
-      // Can only update users in same team with lower or equal roles
       if (currentUserRole === USER_ROLES.PRODUCT_ADMIN) {
         allowedRoles.push(
           { value: USER_ROLES.PRODUCT_USER, label: 'Product User' },
@@ -77,32 +73,27 @@ const EditUserModal = ({ isOpen, onClose, onUpdateUser, user, currentUserRole })
   const canEditRole = allowedRoles.length > 0;
   const canEditStatus = hasPermission(currentUserRole, PERMISSIONS.USER_UPDATE_ANY);
 
-  // Validation rules
   const validateForm = () => {
     const newErrors = {};
 
-    // Full Name validation
     if (!formData.fullName.trim()) {
       newErrors.fullName = 'Full name is required';
     } else if (formData.fullName.trim().length < 2) {
       newErrors.fullName = 'Full name must be at least 2 characters';
     }
 
-    // Email validation
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Please enter a valid email address';
     }
 
-    // Role validation
     if (canEditRole && !formData.role) {
       newErrors.role = 'Role is required';
     } else if (canEditRole && !allowedRoles.find(role => role.value === formData.role)) {
       newErrors.role = 'Invalid role selected';
     }
 
-    // Mobile number validation (optional but format check)
     if (formData.mobileNumber && !/^[0-9+\-\s()]+$/.test(formData.mobileNumber)) {
       newErrors.mobileNumber = 'Please enter a valid mobile number';
     }
@@ -116,7 +107,6 @@ const EditUserModal = ({ isOpen, onClose, onUpdateUser, user, currentUserRole })
       [field]: value
     }));
     
-    // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({
         ...prev,
@@ -137,7 +127,6 @@ const EditUserModal = ({ isOpen, onClose, onUpdateUser, user, currentUserRole })
     setIsSubmitting(true);
     
     try {
-      // Only include fields that the user has permission to edit
       const updateData = {
         fullName: formData.fullName.trim(),
         email: formData.email.trim().toLowerCase(),
@@ -145,12 +134,10 @@ const EditUserModal = ({ isOpen, onClose, onUpdateUser, user, currentUserRole })
         mobileNumber: formData.mobileNumber.trim() || undefined
       };
 
-      // Add role only if user can edit roles
       if (canEditRole) {
         updateData.role = formData.role;
       }
 
-      // Add status only if user can edit status
       if (canEditStatus) {
         updateData.isActive = formData.isActive;
       }
@@ -186,14 +173,12 @@ const EditUserModal = ({ isOpen, onClose, onUpdateUser, user, currentUserRole })
 
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            {/* Submit Error */}
             {errors.submit && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                 <p className="text-sm text-red-700">{errors.submit}</p>
               </div>
             )}
 
-            {/* User Info Display */}
             <div className="bg-gray-50 rounded-lg p-3 mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
@@ -209,7 +194,6 @@ const EditUserModal = ({ isOpen, onClose, onUpdateUser, user, currentUserRole })
             </div>
 
             <div className="space-y-4">
-              {/* Full Name */}
               <div>
                 <label className="exchange-form-label">
                   Full Name *
@@ -227,7 +211,6 @@ const EditUserModal = ({ isOpen, onClose, onUpdateUser, user, currentUserRole })
                 )}
               </div>
 
-              {/* Email */}
               <div>
                 <label className="exchange-form-label">
                   Email Address *
@@ -245,7 +228,6 @@ const EditUserModal = ({ isOpen, onClose, onUpdateUser, user, currentUserRole })
                 )}
               </div>
 
-              {/* Role - Only show if user has permission */}
               {canEditRole ? (
                 <div>
                   <label className="exchange-form-label">
@@ -280,7 +262,6 @@ const EditUserModal = ({ isOpen, onClose, onUpdateUser, user, currentUserRole })
                 </div>
               )}
 
-              {/* Status - Only show if user has permission */}
               {canEditStatus ? (
                 <div>
                   <label className="exchange-form-label">
@@ -325,7 +306,6 @@ const EditUserModal = ({ isOpen, onClose, onUpdateUser, user, currentUserRole })
                 </div>
               )}
 
-              {/* Team */}
               <div>
                 <label className="exchange-form-label">
                   Team
@@ -340,7 +320,6 @@ const EditUserModal = ({ isOpen, onClose, onUpdateUser, user, currentUserRole })
                 />
               </div>
 
-              {/* Mobile Number */}
               <div>
                 <label className="exchange-form-label">
                   Mobile Number
@@ -359,7 +338,6 @@ const EditUserModal = ({ isOpen, onClose, onUpdateUser, user, currentUserRole })
               </div>
             </div>
 
-            {/* Permission Notice */}
             {!canEditRole && !canEditStatus && (
               <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                 <p className="text-sm text-yellow-800">

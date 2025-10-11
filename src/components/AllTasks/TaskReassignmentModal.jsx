@@ -1,4 +1,3 @@
-// src/components/AllTasks/TaskReassignmentModal.jsx - Role-based assignment restrictions
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUserRole, selectCurrentUser } from '../../redux/slices/authSlice';
@@ -12,7 +11,6 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
   const currentUser = useSelector(selectCurrentUser);
   const userRole = useSelector(selectUserRole);
 
-  // Determine available assignment types based on user role
   const getAvailableAssignmentTypes = () => {
     switch (userRole) {
       case USER_ROLES.PRODUCT_ADMIN:
@@ -40,10 +38,8 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
   });
   const [error, setError] = useState('');
 
-  // Check if user has permission to reassign tasks
   const canReassign = hasPermission(userRole, PERMISSIONS.TASK_REASSIGN);
 
-  // Get assignment options based on type
   const {
     data: assignmentOptions,
     isLoading: isLoadingOptions,
@@ -53,10 +49,8 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
     { skip: !taskId || !assignmentData.assignType }
   );
 
-  // Reassignment mutation
   const [reassignTask, { isLoading: isReassigning }] = useReassignTaskMutation();
 
-  // Update default assignment type when available types change
   useEffect(() => {
     if (availableAssignmentTypes.length > 0 && !assignmentData.assignType) {
       setAssignmentData(prev => ({
@@ -66,7 +60,6 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
     }
   }, [availableAssignmentTypes, assignmentData.assignType]);
 
-  // Refetch options when assignment type changes
   useEffect(() => {
     if (taskId && assignmentData.assignType) {
       refetchOptions();
@@ -97,7 +90,6 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
         reason: assignmentData.reason
       }).unwrap();
 
-      // Success callback
       onSuccess(result);
     } catch (err) {
       setError(err.data?.message || 'Failed to reassign task. Please try again.');
@@ -114,7 +106,6 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
     onClose();
   };
 
-  // Don't render if user doesn't have permission
   if (!canReassign) {
     return (
       <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -147,7 +138,6 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
     );
   }
 
-  // Don't render if no assignment types are available
   if (availableAssignmentTypes.length === 0) {
     return (
       <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -175,15 +165,12 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
 
   return (
     <>
-      {/* Modal Overlay */}
       <div className="fixed inset-0 z-50 overflow-y-auto">
         <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
           <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={handleClose}></div>
 
-          {/* Modal Content */}
           <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
             
-            {/* Header */}
             <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900">
@@ -206,7 +193,6 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
                 Select a team member to reassign this task to.
               </p>
 
-              {/* Assignment Type Selection - Only show if multiple options available */}
               {availableAssignmentTypes.length > 1 && (
                 <div className="mb-4">
                   <label className="info-label">Assignment Type</label>
@@ -225,7 +211,6 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
                 </div>
               )}
 
-              {/* Show current assignment type if only one option */}
               {availableAssignmentTypes.length === 1 && (
                 <div className="mb-4">
                   <label className="info-label">Assignment Type</label>
@@ -237,7 +222,6 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
                 </div>
               )}
 
-              {/* User Selection */}
               <div className="mb-4">
                 <label className="info-label">
                   Assign to {assignmentData.assignType === 'COMPLIANCE' ? 'Compliance Officer' : 'Product User'}
@@ -265,7 +249,6 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
                   </select>
                 )}
 
-                {/* Show total available users */}
                 {assignmentOptions?.total && (
                   <div className="mt-1 text-xs text-gray-500">
                     {assignmentOptions.total} {assignmentData.assignType.toLowerCase()} users available
@@ -273,7 +256,6 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
                 )}
               </div>
 
-              {/* Reason Input */}
               <div className="mb-4">
                 <label className="info-label">Reason for Reassignment (Optional)</label>
                 <textarea
@@ -290,7 +272,6 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
                 </div>
               </div>
 
-              {/* Error Display */}
               {error && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <div className="flex">
@@ -302,7 +283,6 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
                 </div>
               )}
 
-              {/* Assignment Summary */}
               {assignmentData.userId && assignmentOptions?.users && (
                 <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                   <h4 className="text-sm font-medium text-gray-900 mb-2">Assignment Summary</h4>
@@ -330,7 +310,6 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
               )}
             </div>
 
-            {/* Footer */}
             <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
               <button
                 onClick={handleReassign}

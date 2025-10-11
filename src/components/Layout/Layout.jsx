@@ -10,19 +10,16 @@ const Layout = ({ children }) => {
 
   return (
     <div className="min-h-screen">
-      {/* Sidebar */}
       <Sidebar 
         isCollapsed={isSidebarCollapsed}
         onToggle={handleSidebarToggle}
       />
 
-      {/* Main Content */}
       <div className={`main-content transition-all duration-300 ${
         isSidebarCollapsed 
           ? 'main-content-with-collapsed-sidebar' 
           : 'main-content-with-sidebar'
       }`}>
-        {/* Mobile Header */}
         <div className="lg:hidden bg-white border-b border-gray-200 p-4">
           <div className="flex-center">
             <button 
@@ -37,11 +34,10 @@ const Layout = ({ children }) => {
               <div className="w-6 h-6 bg-blue-600 rounded"></div>
               <span className="font-semibold text-gray-900">AdTrack</span>
             </div>
-            <div className="w-8"></div> {/* Spacer for centering */}
+            <div className="w-8"></div>  
           </div>
         </div>
 
-        {/* Page Content */}
         <main className="min-h-screen">
           {children}
         </main>

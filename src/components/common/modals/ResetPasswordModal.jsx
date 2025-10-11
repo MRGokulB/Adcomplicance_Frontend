@@ -13,7 +13,6 @@ const ResetPasswordModal = ({ isOpen, onClose, onResetPassword, user }) => {
     confirmPassword: false
   });
 
-  // Reset form when modal closes
   useEffect(() => {
     if (!isOpen) {
       setFormData({
@@ -29,11 +28,9 @@ const ResetPasswordModal = ({ isOpen, onClose, onResetPassword, user }) => {
     }
   }, [isOpen]);
 
-  // Validation rules
   const validateForm = () => {
     const newErrors = {};
 
-    // New password validation
     if (!formData.newPassword) {
       newErrors.newPassword = 'New password is required';
     } else if (formData.newPassword.length < 8) {
@@ -44,7 +41,6 @@ const ResetPasswordModal = ({ isOpen, onClose, onResetPassword, user }) => {
       newErrors.newPassword = 'Password must contain at least one special character';
     }
 
-    // Confirm password validation
     if (!formData.confirmPassword) {
       newErrors.confirmPassword = 'Please confirm the password';
     } else if (formData.newPassword !== formData.confirmPassword) {
@@ -60,7 +56,6 @@ const ResetPasswordModal = ({ isOpen, onClose, onResetPassword, user }) => {
       [field]: value
     }));
     
-    // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({
         ...prev,
@@ -84,19 +79,16 @@ const ResetPasswordModal = ({ isOpen, onClose, onResetPassword, user }) => {
     
     let password = '';
     
-    // Ensure at least one character from each category
     password += uppercase[Math.floor(Math.random() * uppercase.length)];
     password += lowercase[Math.floor(Math.random() * lowercase.length)];
     password += numbers[Math.floor(Math.random() * numbers.length)];
     password += symbols[Math.floor(Math.random() * symbols.length)];
     
-    // Fill the rest randomly
     const allChars = uppercase + lowercase + numbers + symbols;
     for (let i = 4; i < 12; i++) {
       password += allChars[Math.floor(Math.random() * allChars.length)];
     }
     
-    // Shuffle the password
     const shuffled = password.split('').sort(() => Math.random() - 0.5).join('');
     
     setFormData(prev => ({
@@ -105,7 +97,6 @@ const ResetPasswordModal = ({ isOpen, onClose, onResetPassword, user }) => {
       confirmPassword: shuffled
     }));
     
-    // Clear any existing errors
     setErrors({});
   };
 
@@ -177,14 +168,12 @@ const ResetPasswordModal = ({ isOpen, onClose, onResetPassword, user }) => {
 
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            {/* Submit Error */}
             {errors.submit && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                 <p className="text-sm text-red-700">{errors.submit}</p>
               </div>
             )}
 
-            {/* User Info */}
             <div className="bg-gray-50 rounded-lg p-3 mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
@@ -199,7 +188,6 @@ const ResetPasswordModal = ({ isOpen, onClose, onResetPassword, user }) => {
               </div>
             </div>
 
-            {/* Warning Notice */}
             <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
               <div className="flex">
                 <svg className="w-5 h-5 text-yellow-600 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -217,7 +205,6 @@ const ResetPasswordModal = ({ isOpen, onClose, onResetPassword, user }) => {
             </div>
 
             <div className="space-y-4">
-              {/* New Password */}
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className="exchange-form-label">
@@ -260,7 +247,6 @@ const ResetPasswordModal = ({ isOpen, onClose, onResetPassword, user }) => {
                   </button>
                 </div>
                 
-                {/* Password Strength Indicator */}
                 {formData.newPassword && (
                   <div className="mt-2">
                     <div className="flex gap-1 mb-2">
@@ -301,7 +287,6 @@ const ResetPasswordModal = ({ isOpen, onClose, onResetPassword, user }) => {
                 )}
               </div>
 
-              {/* Confirm Password */}
               <div>
                 <label className="exchange-form-label">
                   Confirm New Password *
@@ -339,7 +324,6 @@ const ResetPasswordModal = ({ isOpen, onClose, onResetPassword, user }) => {
               </div>
             </div>
 
-            {/* Password Match Indicator */}
             {formData.newPassword && formData.confirmPassword && (
               <div className={`mt-3 p-2 rounded-md text-sm ${
                 formData.newPassword === formData.confirmPassword

@@ -1,4 +1,3 @@
-// src/redux/api/authApi.js
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 import { logout, setCredentials } from '../slices/authSlice'
 import { getCsrfTokenFromCookie } from '../../utils/csrf'
@@ -8,15 +7,13 @@ const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/a
 
 const baseQuery = fetchBaseQuery({
   baseUrl: apiUrl,
-  credentials: 'include', // Important for session cookies
+  credentials: 'include',  
   prepareHeaders: (headers, { getState }) => {
-    // Get token from auth state (for JWT-based auth if needed)
     const token = getState().auth.token;
     if (token) {
       headers.set('authorization', `Bearer ${token}`);
     }
     
-    // Add CSRF token from Redux state or cookie
     const csrfToken = getState().csrf.token || getCsrfTokenFromCookie();
     if (csrfToken) {
       headers.set('X-CSRF-Token', csrfToken);
@@ -34,7 +31,6 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
   }
   
   if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {    
-    console.log('🔄 CSRF token invalid in tasksApi, refreshing...');
     
     const success = await refreshCsrfToken(api);
     
@@ -60,7 +56,6 @@ export const authApi = createApi({
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled
-          console.log('Login successful:', data)
           dispatch(setCredentials({
             user: data.user,
             rememberMe: arg.rememberMe || false

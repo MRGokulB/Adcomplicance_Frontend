@@ -14,8 +14,7 @@ const CreateUserModal = ({ isOpen, onClose, onCreateUser, currentUserRole }) => 
   
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Get allowed roles based on current user's permissions
+ 
 const getAllowedRoles = () => {
   if (!currentUserRole) return [];
   
@@ -45,16 +44,14 @@ const getAllowedRoles = () => {
       { value: USER_ROLES.COMPLIANCE_ADMIN, label: 'Compliance Admin' }
     );
   }
-  
-  // Remove duplicates if user has multiple permissions
+ 
   return allowedRoles.filter((role, index, self) => 
     self.findIndex(r => r.value === role.value) === index
   );
 };
 
   const allowedRoles = getAllowedRoles();
-   
-  // Set default role when modal opens
+    
 useEffect(() => {
   if (isOpen && allowedRoles.length > 0) {
     setFormData(prev => ({
@@ -63,8 +60,7 @@ useEffect(() => {
     }));
   }
 }, [isOpen]);
-
-  // Reset form when modal closes
+ 
   useEffect(() => {
     if (!isOpen) {
       setFormData({
@@ -80,26 +76,22 @@ useEffect(() => {
       setIsSubmitting(false);
     }
   }, [isOpen]);
-
-  // Validation rules
+ 
   const validateForm = () => {
     const newErrors = {};
-
-    // Full Name validation
+ 
     if (!formData.fullName.trim()) {
       newErrors.fullName = 'Full name is required';
     } else if (formData.fullName.trim().length < 2) {
       newErrors.fullName = 'Full name must be at least 2 characters';
     }
-
-    // Email validation
+ 
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Please enter a valid email address';
     }
-
-    // Username validation
+ 
     if (!formData.username.trim()) {
       newErrors.username = 'Username is required';
     } else if (formData.username.trim().length < 3) {
@@ -107,8 +99,7 @@ useEffect(() => {
     } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
       newErrors.username = 'Username can only contain letters, numbers, and underscores';
     }
-
-    // Password validation
+ 
     if (!formData.password.trim()) {
       newErrors.password = 'Password is required';
     } else if (formData.password.length < 8) {
@@ -116,15 +107,13 @@ useEffect(() => {
     } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
       newErrors.password = 'Password must contain at least one uppercase letter, lowercase letter, and number';
     }
-
-    // Role validation
+ 
     if (!formData.role) {
       newErrors.role = 'Role is required';
     } else if (!allowedRoles.find(role => role.value === formData.role)) {
       newErrors.role = 'Invalid role selected';
     }
-
-    // Mobile number validation (optional but format check)
+ 
     if (formData.mobileNumber && !/^[0-9+\-\s()]+$/.test(formData.mobileNumber)) {
       newErrors.mobileNumber = 'Please enter a valid mobile number';
     }
@@ -137,8 +126,7 @@ useEffect(() => {
       ...prev,
       [field]: value
     }));
-    
-    // Clear error when user starts typing
+     
     if (errors[field]) {
       setErrors(prev => ({
         ...prev,
@@ -147,8 +135,7 @@ useEffect(() => {
     }
   };
 
-  const generateUsername = (fullName) => {
-    // Auto-generate username from full name
+  const generateUsername = (fullName) => { 
     return fullName
       .toLowerCase()
       .replace(/\s+/g, '')
@@ -158,8 +145,7 @@ useEffect(() => {
 
   const handleFullNameChange = (value) => {
     handleInputChange('fullName', value);
-    
-    // Auto-generate username if it's empty
+ 
     if (!formData.username && value.trim()) {
       const generatedUsername = generateUsername(value);
       handleInputChange('username', generatedUsername);
@@ -217,7 +203,6 @@ useEffect(() => {
 
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            {/* Submit Error */}
             {errors.submit && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                 <p className="text-sm text-red-700">{errors.submit}</p>
@@ -225,7 +210,6 @@ useEffect(() => {
             )}
 
             <div className="space-y-4">
-              {/* Full Name */}
               <div>
                 <label className="exchange-form-label">
                   Full Name *
@@ -242,8 +226,7 @@ useEffect(() => {
                   <p className="mt-1 text-sm text-red-600">{errors.fullName}</p>
                 )}
               </div>
-
-              {/* Email */}
+ 
               <div>
                 <label className="exchange-form-label">
                   Email ID *
@@ -260,8 +243,7 @@ useEffect(() => {
                   <p className="mt-1 text-sm text-red-600">{errors.email}</p>
                 )}
               </div>
-
-              {/* Username */}
+ 
               <div>
                 <label className="exchange-form-label">
                   Username *
@@ -278,8 +260,7 @@ useEffect(() => {
                   <p className="mt-1 text-sm text-red-600">{errors.username}</p>
                 )}
               </div>
-
-              {/* Password */}
+ 
               <div>
                 <label className="exchange-form-label">
                   Temporary Password *
@@ -299,8 +280,7 @@ useEffect(() => {
                   User will be required to change password on first login
                 </p>
               </div>
-
-              {/* Role */}
+ 
               <div>
                 <label className="exchange-form-label">
                   Role *
@@ -321,8 +301,7 @@ useEffect(() => {
                   <p className="mt-1 text-sm text-red-600">{errors.role}</p>
                 )}
               </div>
-
-              {/* Team */}
+ 
               <div>
                 <label className="exchange-form-label">
                   Team
@@ -336,8 +315,7 @@ useEffect(() => {
                   placeholder="Team name (optional)"
                 />
               </div>
-
-              {/* Mobile Number */}
+ 
               <div>
                 <label className="exchange-form-label">
                   Mobile Number

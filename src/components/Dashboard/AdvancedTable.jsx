@@ -1,4 +1,3 @@
-// src/components/Dashboard/AdvancedTable.jsx - Hybrid filtering (server-side + client-side priority)
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -17,11 +16,10 @@ export default function AdvancedTable() {
     const permissions = usePermissions();
     const tableRef = useRef(null);
 
-    // Consolidated filters state - ALL filters in one place
     const [filters, setFilters] = useState({
         taskType: '',
         status: '',
-        priority: '', // This will be applied CLIENT-SIDE only
+        priority: '',  
         createdBy: '',
         assignedTo: '',
         dateFrom: '',
@@ -32,7 +30,6 @@ export default function AdvancedTable() {
         limit: 10
     });
 
-    // Advanced search state
     const [advancedSearch, setAdvancedSearch] = useState({
         enabled: false,
         query: '',
@@ -41,19 +38,15 @@ export default function AdvancedTable() {
     
     const [activeView, setActiveView] = useState('all');
 
-    // Permission checks
     const canAdvancedSearch = permissions.canAdvancedSearch;
 
-    // EXCLUDED STATUSES
     const EXCLUDED_STATUSES = ['CLOSED_INTERNAL', 'CLOSED_EXCHANGE', 'PUBLISHED'];
 
-    // Prepare server-side filters (WITHOUT priority)
     const serverFilters = useMemo(() => {
         const { priority, ...restFilters } = filters;
         return restFilters;
     }, [filters]);
 
-    // API queries based on active view (using serverFilters without priority)
     const {
         data: tasksData,
         isLoading,
@@ -83,7 +76,6 @@ export default function AdvancedTable() {
         skip: activeView !== 'expiring-soon'
     });
 
-    // Advanced search query
     const {
         data: advancedSearchData,
         isLoading: isAdvancedSearchLoading,
@@ -100,19 +92,16 @@ export default function AdvancedTable() {
         }
     );
 
-    // Function to filter out excluded statuses (still needed for special views)
     const filterActiveTasks = (taskList) => {
         if (!Array.isArray(taskList)) return [];
         return taskList.filter(task => !EXCLUDED_STATUSES.includes(task.status));
     };
 
-    // Client-side priority filter function
     const applyPriorityFilter = (taskList) => {
         if (!filters.priority) return taskList;
         return taskList.filter(task => task.priority === filters.priority);
     };
 
-    // Get current data based on active view
     const getCurrentData = () => {
         if (advancedSearch.enabled && advancedSearchData) {
             const filteredResults = filterActiveTasks(advancedSearchData?.results || []);
@@ -157,7 +146,6 @@ export default function AdvancedTable() {
                     isLoading: isLoadingExpiring
                 };
             default:
-                // Server handles all filtering except priority
                 const allTasks = tasksData?.tasks || [];
                 const priorityFiltered = applyPriorityFilter(allTasks);
                 return {
@@ -171,7 +159,6 @@ export default function AdvancedTable() {
 
     const { tasks, totalBeforeClientFilter, pagination, isLoading: currentLoading } = getCurrentData();
 
-    // Add focus handling to refresh data when tab becomes active
     useEffect(() => {
         const handleFocus = () => {
             if (document.visibilityState === 'visible') {
@@ -192,17 +179,14 @@ export default function AdvancedTable() {
         return () => document.removeEventListener('visibilitychange', handleFocus);
     }, [activeView, refetch, refetchApproved, refetchExpiring]);
 
-    // Single filter handler - updates filters and resets to page 1
     const handleFilterChange = (field, value) => {
         setFilters(prev => ({ 
             ...prev, 
             [field]: value, 
-            // Reset to page 1 when any filter changes (except page/limit)
             ...(field !== 'page' && field !== 'limit' ? { page: 1 } : {})
         }));
     };
 
-    // Handle advanced search
     const handleAdvancedSearch = () => {
         if (advancedSearch.query.trim()) {
             setAdvancedSearch(prev => ({ ...prev, enabled: true }));
@@ -232,7 +216,6 @@ export default function AdvancedTable() {
         clearAdvancedSearch();
     };
 
-    // Page navigation handlers
     const handlePageChange = (newPage) => {
         setFilters(prev => ({ ...prev, page: newPage }));
         if (tableRef.current) {
@@ -265,7 +248,6 @@ export default function AdvancedTable() {
         });
     };
 
-    // Loading state
     if (currentLoading && !tasks.length) {
         return (
             <div className="container-lg section-md">
@@ -277,7 +259,6 @@ export default function AdvancedTable() {
         );
     }
 
-    // Error state
     if (isError) {
         return (
             <div className="container-lg section-md">
@@ -299,7 +280,6 @@ export default function AdvancedTable() {
 
     return (
         <div className="container-lg section-md">
-            {/* Page Header */}
             <div className="flex-between items-center mb-6">
                 <div>
                     <h1 className="text-heading-2">Tasks Overview</h1>
@@ -311,7 +291,6 @@ export default function AdvancedTable() {
                 </div>
             </div>
 
-            {/* Filter Panel */}
             <div className="filter-panel">
                 <div className="card-header">
                     <h3 className="card-title">Filter & Search</h3>
@@ -442,7 +421,6 @@ export default function AdvancedTable() {
                 </div>
             </div>
 
-            {/* Table */}
             <div className="table-container" ref={tableRef}>
                 <div className="table-toolbar">
                     <div className="table-toolbar-left">
@@ -531,7 +509,6 @@ export default function AdvancedTable() {
                     </tbody>
                 </table>
 
-                {/* Pagination Footer */}
                 <div className="card-footer">
                     <div className="flex-between">
                         <div className="text-sm text-gray-600">

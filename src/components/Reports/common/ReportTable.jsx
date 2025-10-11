@@ -20,7 +20,6 @@ const ReportTable = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(20);
 
-  // Handle sorting
   const handleSort = (key) => {
     let direction = 'asc';
     
@@ -31,7 +30,6 @@ const ReportTable = ({
     setSortConfig({ key, direction });
   };
 
-  // Get sorted data
   const sortedData = useMemo(() => {
     if (!sortConfig.key) return data;
     
@@ -39,12 +37,10 @@ const ReportTable = ({
       const aValue = a[sortConfig.key];
       const bValue = b[sortConfig.key];
       
-      // Handle null/undefined values
       if (aValue == null && bValue == null) return 0;
       if (aValue == null) return 1;
       if (bValue == null) return -1;
       
-      // Handle different data types
       if (typeof aValue === 'number' && typeof bValue === 'number') {
         return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
       }
@@ -55,7 +51,6 @@ const ReportTable = ({
           : bValue.getTime() - aValue.getTime();
       }
       
-      // String comparison
       const aStr = String(aValue).toLowerCase();
       const bStr = String(bValue).toLowerCase();
       
@@ -69,15 +64,13 @@ const ReportTable = ({
     });
   }, [data, sortConfig]);
 
-  // Handle pagination
   const paginatedData = useMemo(() => {
-    if (pagination) return sortedData; // External pagination
+    if (pagination) return sortedData;  
     
     const startIndex = (currentPage - 1) * rowsPerPage;
     return sortedData.slice(startIndex, startIndex + rowsPerPage);
   }, [sortedData, currentPage, rowsPerPage, pagination]);
 
-  // Handle row selection
   const handleRowSelect = (rowId) => {
     if (!selectable) return;
     
@@ -105,7 +98,6 @@ const ReportTable = ({
     }
   };
 
-  // Render sort icon
   const renderSortIcon = (columnId) => {
     if (sortConfig.key !== columnId) {
       return (
@@ -131,7 +123,6 @@ const ReportTable = ({
     );
   };
 
-  // Render cell content with formatting
   const renderCell = (row, column) => {
     const value = row[column.id];
     
@@ -139,7 +130,6 @@ const ReportTable = ({
       return column.render(value, row);
     }
     
-    // Auto-format based on column type or value
     if (column.type === 'status' || column.id === 'status' || column.id === 'approvalStatus' || column.id === 'taskStatus') {
       const statusClass = String(value).toLowerCase().replace(/[\s_]+/g, '');
       return (
@@ -182,22 +172,18 @@ const ReportTable = ({
       return <span className="text-sm text-gray-700">{value ? 'Yes' : 'No'}</span>;
     }
 
-    // Handle role display
     if (column.id === 'role' || column.id === 'userRole') {
       return <span className={getRoleBadgeClass(value)}>{String(value).replace('_', ' ')}</span>;
     }
 
-    // Handle UIN with clickable styling
     if (column.id === 'uin') {
       return <span className="font-medium text-gray-900">{value}</span>;
     }
 
-    // Handle names and titles
     if (column.id === 'fullName' || column.id === 'createdBy' || column.id === 'performedBy' || column.id === 'assignedTo' || column.id === 'updatedBy') {
       return <span className="font-medium text-gray-900">{value || '-'}</span>;
     }
 
-    // Handle titles with truncation
     if (column.id === 'title') {
       if (typeof value === 'string' && value.length > 50) {
         return (
@@ -209,11 +195,9 @@ const ReportTable = ({
       return <span className="text-gray-900">{value || '-'}</span>;
     }
     
-    // Default text formatting
     return <span className="text-sm text-gray-700">{value || '-'}</span>;
   };
 
-  // Get status badge class similar to AuditLog
   const getStatusBadgeClass = (status) => {
     switch (status) {
       case 'approved':
@@ -235,7 +219,6 @@ const ReportTable = ({
     }
   };
 
-  // Get role badge class similar to AuditLog
   const getRoleBadgeClass = (role) => {
     switch (role) {
       case 'PRODUCT_USER':
@@ -257,7 +240,6 @@ const ReportTable = ({
     }
   };
 
-  // Handle pagination
   const totalPages = pagination ? pagination.totalPages : Math.ceil(sortedData.length / rowsPerPage);
   const currentPageData = pagination ? pagination.page : currentPage;
 
@@ -298,7 +280,6 @@ const ReportTable = ({
 
   return (
     <div>
-      {/* Table Actions */}
       {(selectable || actions.length > 0) && (
         <div className="flex items-center justify-between mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
           {selectable && (
@@ -339,7 +320,6 @@ const ReportTable = ({
         </div>
       )}
 
-      {/* Table - Using same classes as AuditLog */}
       <div className="card">
         <div className="table-container">
           <table className="table table-modern">
@@ -397,7 +377,6 @@ const ReportTable = ({
           </table>
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between mt-6 p-4 border-t border-gray-200">
             <div className="text-sm text-gray-700">
@@ -415,7 +394,6 @@ const ReportTable = ({
                 Previous
               </button>
               
-              {/* Page numbers */}
               <div className="flex space-x-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum;
@@ -456,7 +434,6 @@ const ReportTable = ({
           </div>
         )}
 
-        {/* Table Footer Info */}
         <div className="p-3 text-xs text-gray-500 text-center border-t border-gray-100">
           {sortConfig.key && (
             <span>Sorted by {columns.find(c => c.id === sortConfig.key)?.label} ({sortConfig.direction === 'asc' ? 'ascending' : 'descending'})</span>

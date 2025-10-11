@@ -1,4 +1,3 @@
-// src/redux/slices/csrfSlice.js
 import { createSlice } from '@reduxjs/toolkit';
 
 const csrfSlice = createSlice({
@@ -39,7 +38,6 @@ export const {
 
 export default csrfSlice.reducer;
 
-// Selectors
 export const selectCsrfToken = (state) => state.csrf.token;
 export const selectCsrfLoading = (state) => state.csrf.isLoading;
 export const selectCsrfError = (state) => state.csrf.error;

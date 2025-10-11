@@ -4,7 +4,6 @@ import { Navigate } from 'react-router-dom'
 import { selectUserRole } from '../redux/slices/authSlice'
 import { hasPermission, hasAnyPermission, USER_ROLES } from '../utils/roles'
 
-// Component for role-based access control
 const RoleGuard = ({ 
   children, 
   requiredRoles = [],
@@ -15,13 +14,11 @@ const RoleGuard = ({
 }) => {
   const userRole = useSelector(selectUserRole)
 
-  // Check role access
   const hasRoleAccess = () => {
     if (!requiredRoles.length) return true
     return requiredRoles.includes(userRole)
   }
 
-  // Check permission access
   const hasPermissionAccess = () => {
     if (!requiredPermissions.length) return true
     
@@ -32,7 +29,6 @@ const RoleGuard = ({
     }
   }
 
-  // Check if user has access
   const hasAccess = hasRoleAccess() && hasPermissionAccess()
 
   if (!hasAccess) {
@@ -72,7 +68,6 @@ const RoleGuard = ({
   return children
 }
 
-// Higher-order component for role protection
 export const withRoleGuard = (Component, guardProps) => {
   return (props) => (
     <RoleGuard {...guardProps}>
@@ -81,7 +76,6 @@ export const withRoleGuard = (Component, guardProps) => {
   )
 }
 
-// Specific role guards for common use cases
 export const AdminOnly = ({ children, ...props }) => (
   <RoleGuard 
     requiredRoles={[USER_ROLES.ADMIN]} 
