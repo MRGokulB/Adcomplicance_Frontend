@@ -41,7 +41,7 @@ export default function AllTasksPage() {
     const navigate = useNavigate();
     const currentUserRole = useSelector(selectUserRole);
     const permissions = usePermissions();
-    const tableRef = useRef(null);  
+    const tableRef = useRef(null);
 
     const [filters, setFilters] = useState({
         taskType: '',
@@ -58,7 +58,6 @@ export default function AllTasksPage() {
     const [searchInput, setSearchInput] = useState('');
     const [createdByInput, setCreatedByInput] = useState('');
     const [assignedToInput, setAssignedToInput] = useState('');
-
     const debouncedSearch = useDebounce(searchInput, 500);
     const debouncedCreatedBy = useDebounce(createdByInput, 500);
     const debouncedAssignedTo = useDebounce(assignedToInput, 500);
@@ -105,19 +104,19 @@ export default function AllTasksPage() {
     const canAdvancedSearch = permissions.canAdvancedSearch;
 
     const buildQueryParams = (filterObj) => {
-    const params = {};
-    Object.keys(filterObj).forEach(key => {
-        if (key !== 'priority' && filterObj[key] !== '' && filterObj[key] != null) {
-            params[key] = filterObj[key];
-        }
-    });
-    return params;
-};
+        const params = {};
+        Object.keys(filterObj).forEach(key => {
+            if (key !== 'priority' && filterObj[key] !== '' && filterObj[key] != null) {
+                params[key] = filterObj[key];
+            }
+        });
+        return params;
+    };
 
-const applyPriorityFilter = useCallback((taskList) => {
-    if (!filters.priority) return taskList;
-    return taskList.filter(task => task.priority === filters.priority);
-}, [filters.priority]);
+    const applyPriorityFilter = useCallback((taskList) => {
+        if (!filters.priority) return taskList;
+        return taskList.filter(task => task.priority === filters.priority);
+    }, [filters.priority]);
 
     const {
         data: tasksData,
@@ -126,19 +125,19 @@ const applyPriorityFilter = useCallback((taskList) => {
         error,
         refetch,
         isFetching
-    } = useGetTasksQuery(buildQueryParams(filters), { 
+    } = useGetTasksQuery(buildQueryParams(filters), {
         skip: activeView !== 'all' || advancedSearch.enabled,
         pollingInterval: 30000,
         refetchOnFocus: true,
         refetchOnReconnect: true,
-        refetchOnMountOrArgChange: true 
+        refetchOnMountOrArgChange: true
     });
 
     const {
         data: approvedNotPublishedData,
         isLoading: isLoadingApproved,
         refetch: refetchApproved
-    } = useGetApprovedNotPublishedQuery(undefined, { 
+    } = useGetApprovedNotPublishedQuery(undefined, {
         skip: activeView !== 'approved-not-published',
         pollingInterval: 0
     });
@@ -173,70 +172,70 @@ const applyPriorityFilter = useCallback((taskList) => {
         pollingInterval: 300000
     });
 
-const getCurrentData = useCallback(() => {
-    if (advancedSearch.enabled && advancedSearchData) {
-        const results = advancedSearchData?.results || [];
-        const priorityFiltered = applyPriorityFilter(results);
-        return {
-            tasks: priorityFiltered,
-            pagination: advancedSearchData?.pagination || null,
-            totalCount: advancedSearchData?.pagination?.totalCount || 0,
-            isLoading: isAdvancedSearchLoading,
-            isError: false,
-            error: null
-        };
-    }
-
-    switch (activeView) {
-        case 'approved-not-published':
-            const approvedTasks = approvedNotPublishedData?.tasks || approvedNotPublishedData || [];
-            const approvedFiltered = applyPriorityFilter(approvedTasks);
-            return {
-                tasks: approvedFiltered,
-                pagination: { 
-                    page: 1, 
-                    totalCount: approvedFiltered.length,
-                    totalPages: 1,
-                    hasNext: false,
-                    hasPrev: false
-                },
-                totalCount: approvedFiltered.length,
-                isLoading: isLoadingApproved,
-                isError: false,
-                error: null
-            };
-            
-        case 'expiring-soon':
-            const expiringTasks = expiringSoonData?.tasks || expiringSoonData?.data || [];
-            const expiringFiltered = applyPriorityFilter(expiringTasks);
-            return {
-                tasks: expiringFiltered,
-                pagination: { 
-                    page: 1, 
-                    totalCount: expiringFiltered.length,
-                    totalPages: 1,
-                    hasNext: false,
-                    hasPrev: false
-                },
-                totalCount: expiringFiltered.length,
-                isLoading: isLoadingExpiring,
-                isError: false,
-                error: null
-            };
-            
-        default:
-            const allTasks = tasksData?.tasks || [];
-            const priorityFiltered = applyPriorityFilter(allTasks);
+    const getCurrentData = useCallback(() => {
+        if (advancedSearch.enabled && advancedSearchData) {
+            const results = advancedSearchData?.results || [];
+            const priorityFiltered = applyPriorityFilter(results);
             return {
                 tasks: priorityFiltered,
-                pagination: tasksData?.pagination || null,
-                totalCount: tasksData?.pagination?.totalCount || 0,
-                isLoading: isLoading || isFetching,
-                isError: isError,
-                error: error
+                pagination: advancedSearchData?.pagination || null,
+                totalCount: advancedSearchData?.pagination?.totalCount || 0,
+                isLoading: isAdvancedSearchLoading,
+                isError: false,
+                error: null
             };
-    }
-}, [advancedSearch, advancedSearchData, activeView, tasksData, approvedNotPublishedData, expiringSoonData, isLoading, isLoadingApproved, isLoadingExpiring, isAdvancedSearchLoading, isError, error, isFetching, applyPriorityFilter]);
+        }
+
+        switch (activeView) {
+            case 'approved-not-published':
+                const approvedTasks = approvedNotPublishedData?.tasks || approvedNotPublishedData || [];
+                const approvedFiltered = applyPriorityFilter(approvedTasks);
+                return {
+                    tasks: approvedFiltered,
+                    pagination: {
+                        page: 1,
+                        totalCount: approvedFiltered.length,
+                        totalPages: 1,
+                        hasNext: false,
+                        hasPrev: false
+                    },
+                    totalCount: approvedFiltered.length,
+                    isLoading: isLoadingApproved,
+                    isError: false,
+                    error: null
+                };
+
+            case 'expiring-soon':
+                const expiringTasks = expiringSoonData?.tasks || expiringSoonData?.data || [];
+                const expiringFiltered = applyPriorityFilter(expiringTasks);
+                return {
+                    tasks: expiringFiltered,
+                    pagination: {
+                        page: 1,
+                        totalCount: expiringFiltered.length,
+                        totalPages: 1,
+                        hasNext: false,
+                        hasPrev: false
+                    },
+                    totalCount: expiringFiltered.length,
+                    isLoading: isLoadingExpiring,
+                    isError: false,
+                    error: null
+                };
+
+            default:
+                const allTasks = tasksData?.tasks || [];
+                const priorityFiltered = applyPriorityFilter(allTasks);
+                return {
+                    tasks: priorityFiltered,
+                    pagination: tasksData?.pagination || null,
+                    totalCount: tasksData?.pagination?.totalCount || 0,
+                    isLoading: isLoading || isFetching,
+                    isError: isError,
+                    error: error
+                };
+        }
+    }, [advancedSearch, advancedSearchData, activeView, tasksData, approvedNotPublishedData, expiringSoonData, isLoading, isLoadingApproved, isLoadingExpiring, isAdvancedSearchLoading, isError, error, isFetching, applyPriorityFilter]);
     const { tasks, pagination, totalCount, isLoading: currentLoading, isError: currentError, error: currentErrorData } = getCurrentData();
 
     useEffect(() => {
@@ -259,13 +258,13 @@ const getCurrentData = useCallback(() => {
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [activeView, refetch, refetchApproved, refetchExpiring]);
 
-    const totalPages = pagination 
+    const totalPages = pagination
         ? Math.ceil(pagination.totalCount / filters.limit)
         : Math.ceil(totalCount / filters.limit);
 
     const handleFilterChange = useCallback((field, value) => {
-        setFilters(prev => ({ 
-            ...prev, 
+        setFilters(prev => ({
+            ...prev,
             [field]: value,
             ...(field !== 'page' && field !== 'limit' ? { page: 1 } : {})
         }));
@@ -273,8 +272,8 @@ const getCurrentData = useCallback(() => {
 
     const handlePageChange = useCallback((newPage) => {
         setFilters(prev => ({ ...prev, page: newPage }));
-        
-         if (tableRef.current) {
+
+        if (tableRef.current) {
             tableRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     }, []);
@@ -301,7 +300,7 @@ const getCurrentData = useCallback(() => {
 
     const handleRowSelect = useCallback((id, task) => {
         setSelectedRows(prev => {
-            const newSelection = prev.includes(id) 
+            const newSelection = prev.includes(id)
                 ? prev.filter(rowId => rowId !== id)
                 : [...prev, id];
 
@@ -483,7 +482,11 @@ const getCurrentData = useCallback(() => {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <button className="btn btn-outline" onClick={handleExportCSV}>Export CSV</button>
+                    <button className="report-export-btn btn-outline text-blue-600 hover:text-blue-700 border-blue-300 hover:border-blue-400 " onClick={handleExportCSV}>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Export CSV</button>
                 </div>
             </div>
 
@@ -498,14 +501,14 @@ const getCurrentData = useCallback(() => {
                             <p className="text-sm text-red-700 mt-1">
                                 {currentErrorData?.data?.message || currentErrorData?.message || 'An error occurred while fetching tasks'}
                             </p>
-                            <button 
-                                onClick={() => refetch()} 
+                            <button
+                                onClick={() => refetch()}
                                 className="mt-2 text-sm text-red-800 underline hover:no-underline"
                             >
                                 Try again
                             </button>
                         </div>
-                        <button 
+                        <button
                             onClick={handleReset}
                             className="ml-4 text-sm text-red-600 hover:text-red-800"
                         >
@@ -572,19 +575,19 @@ const getCurrentData = useCallback(() => {
                         </div>
 
                         <div>
-    <label className="info-label">Priority  </label>
-    <select
-        className="select"
-        value={filters.priority}
-        onChange={(e) => handleFilterChange('priority', e.target.value)}
-        disabled={currentLoading}
-    >
-        <option value="">All Priorities</option>
-        <option value="HIGH">High</option>
-        <option value="MEDIUM">Medium</option>
-        <option value="LOW">Low</option>
-    </select>
-</div>
+                            <label className="info-label">Priority  </label>
+                            <select
+                                className="select"
+                                value={filters.priority}
+                                onChange={(e) => handleFilterChange('priority', e.target.value)}
+                                disabled={currentLoading}
+                            >
+                                <option value="">All Priorities</option>
+                                <option value="HIGH">High</option>
+                                <option value="MEDIUM">Medium</option>
+                                <option value="LOW">Low</option>
+                            </select>
+                        </div>
 
                         <div>
                             <label className="info-label">Created By</label>
@@ -594,7 +597,6 @@ const getCurrentData = useCallback(() => {
                                 placeholder="Search by creator name"
                                 value={createdByInput}
                                 onChange={(e) => setCreatedByInput(e.target.value)}
-                                disabled={currentLoading}
                             />
                         </div>
 
@@ -606,7 +608,6 @@ const getCurrentData = useCallback(() => {
                                 placeholder="Search by assignee name"
                                 value={assignedToInput}
                                 onChange={(e) => setAssignedToInput(e.target.value)}
-                                disabled={currentLoading}
                             />
                         </div>
 
@@ -617,7 +618,6 @@ const getCurrentData = useCallback(() => {
                                 className="input"
                                 value={filters.dateFrom}
                                 onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-                                disabled={currentLoading}
                             />
                         </div>
 
@@ -628,7 +628,6 @@ const getCurrentData = useCallback(() => {
                                 className="input"
                                 value={filters.dateTo}
                                 onChange={(e) => handleFilterChange('dateTo', e.target.value)}
-                                disabled={currentLoading}
                             />
                         </div>
 
@@ -639,24 +638,39 @@ const getCurrentData = useCallback(() => {
                                 className="input"
                                 placeholder="Search everything..."
                                 value={searchInput}
-                                onChange={(e) => setSearchInput(e.target.value)}
-                                disabled={currentLoading}
-                            />
+                                onChange={(e) => setSearchInput(e.target.value)} />
                         </div>
                     </div>
 
-                    <div className="filter-actions"> 
-                        <div className="filter-buttons">
-                            <button 
-                                className="btn btn-secondary" 
+                    <div className="flex justify-between items-center  pt-4 border-t border-gray-100">
+                        <div></div>
+                        <div className="flex gap-3">
+                            <button
+                                className="btn btn-secondary"
                                 onClick={handleReset}
                                 disabled={currentLoading}
                             >
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
                                 Reset
                             </button>
+                            {/*<button
+                                className="btn btn-primary"
+                            >
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
+                                </svg>
+                                Apply Filters
+                            </button>*/}
                         </div>
                     </div>
                 </div>
+            </div>
+            <div className="flex-between mb-4">
+                <div></div>
+
+
             </div>
 
             <div className="table-container" ref={tableRef}>
@@ -787,10 +801,9 @@ const getCurrentData = useCallback(() => {
                                 </td>
                                 <td>
                                     {task.priority && (
-                                        <span className={`badge ${
-                                            task.priority === 'HIGH' ? 'badge-error' :
+                                        <span className={`badge ${task.priority === 'HIGH' ? 'badge-error' :
                                             task.priority === 'MEDIUM' ? 'badge-warning' : 'badge-success'
-                                        }`}>
+                                            }`}>
                                             {task.priority}
                                         </span>
                                     )}
@@ -824,15 +837,15 @@ const getCurrentData = useCallback(() => {
                                         </svg>
                                         <h3 className="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
                                         <p className="text-gray-500 mb-4">
-                                            {currentError ? 
+                                            {currentError ?
                                                 'Unable to load tasks. Please check your filters or try again.' :
                                                 activeView === 'all' ?
-                                                'No tasks match your current filters. Try adjusting your search criteria.' :
-                                                `No ${activeView.replace('-', ' ')} tasks found.`
+                                                    'No tasks match your current filters. Try adjusting your search criteria.' :
+                                                    `No ${activeView.replace('-', ' ')} tasks found.`
                                             }
                                         </p>
                                         {!currentError && (
-                                            <button 
+                                            <button
                                                 onClick={handleReset}
                                                 className="btn btn-secondary"
                                             >

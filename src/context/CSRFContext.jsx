@@ -1,4 +1,3 @@
-// src/context/CSRFContext.jsx
 import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { setCsrfToken, clearCsrfToken, setCsrfLoading, setCsrfError } from '../redux/slices/csrfSlice';

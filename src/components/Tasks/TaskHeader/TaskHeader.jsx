@@ -586,55 +586,63 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
                   ))}
 
                   {closureActions.canClose && !task.status?.includes('CLOSED') && task.status !== 'PUBLISHED' && (
-                    <details className="mt-2">
-                      <summary className="text-sm text-red-600 cursor-pointer">
-                        Close Task ({closureActions.reason})
-                      </summary>
-                      <div className="flex gap-2 mt-2">
-                        <button
-                          className="btn btn-error btn-sm flex-1"
-                          onClick={() => { setClosureType('CLOSED_INTERNAL'); toggleModal('closure', true); }}
-                          disabled={isClosing}
-                        >
-                          Close Internal
-                        </button>
-                        <button
-                          className="btn btn-error btn-sm flex-1"
-                          onClick={() => { setClosureType('CLOSED_EXCHANGE'); toggleModal('closure', true); }}
-                          disabled={isClosing}
-                        >
-                          Close Exchange
-                        </button>
-                      </div>
-                    </details>
-                  )}
+  <details className="mt-2">
+    <summary className="text-sm text-red-600 cursor-pointer">
+      Close Task ({closureActions.reason})
+    </summary>
+    <div className="flex gap-2 mt-2">
+      {task.taskType === 'INTERNAL' && (
+        <button
+          className="btn btn-error btn-sm flex-1"
+          onClick={() => { setClosureType('CLOSED_INTERNAL'); toggleModal('closure', true); }}
+          disabled={isClosing}
+        >
+          Close Internal
+        </button>
+      )}
+      {task.taskType === 'EXCHANGE' && (
+        <button
+          className="btn btn-error btn-sm flex-1"
+          onClick={() => { setClosureType('CLOSED_EXCHANGE'); toggleModal('closure', true); }}
+          disabled={isClosing}
+        >
+          Close Exchange
+        </button>
+      )}
+    </div>
+  </details>
+)}
 
                   {!closureActions.canClose && permissions.isAdmin && !task.status?.includes('CLOSED') && task.status !== 'PUBLISHED' && (
-                    <details className="mt-2">
-                      <summary className="text-sm text-red-600 cursor-pointer">Admin: Close Task</summary>
-                      <div className="flex gap-2 mt-2">
-                        <button
-                          className="btn btn-error btn-sm flex-1"
-                          onClick={() => { setClosureType('CLOSED_INTERNAL'); toggleModal('closure', true); }}
-                          disabled={isClosing}
-                        >
-                          Close Internal
-                        </button>
-                        <button
-                          className="btn btn-error btn-sm flex-1"
-                          onClick={() => { setClosureType('CLOSED_EXCHANGE'); toggleModal('closure', true); }}
-                          disabled={isClosing}
-                        >
-                          Close Exchange
-                        </button>
-                      </div>
-                    </details>
-                  )}
+  <details className="mt-2">
+    <summary className="text-sm text-red-600 cursor-pointer">Admin: Close Task</summary>
+    <div className="flex gap-2 mt-2">
+      {task.taskType === 'INTERNAL' && (
+        <button
+          className="btn btn-error btn-sm flex-1"
+          onClick={() => { setClosureType('CLOSED_INTERNAL'); toggleModal('closure', true); }}
+          disabled={isClosing}
+        >
+          Close Internal
+        </button>
+      )}
+      {task.taskType === 'EXCHANGE' && (
+        <button
+          className="btn btn-error btn-sm flex-1"
+          onClick={() => { setClosureType('CLOSED_EXCHANGE'); toggleModal('closure', true); }}
+          disabled={isClosing}
+        >
+          Close Exchange
+        </button>
+      )}
+    </div>
+  </details>
+)}
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 mb-2">
+            <div className="grid grid-cols-1 md:grid-cols-2  mb-2">
               <div>
                 <label className="exchange-form-label">Platform</label>
                 <div className="bg-gray-50 rounded-lg">
@@ -644,8 +652,8 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
                 </div>
               </div>
 
-              <div>
-                <label className="exchange-form-label">Category</label>
+              <div className="ml-2">
+                <label className="exchange-form-label ">Category</label>
                 <div className="bg-gray-50 rounded-lg">
                   <span className="text-sm text-gray-700">
                     {task.category || 'Not specified'}

@@ -19,12 +19,11 @@ export default function AdvancedTable() {
     const [filters, setFilters] = useState({
         taskType: '',
         status: '',
-        priority: '',  
+        priority: '',
         createdBy: '',
         assignedTo: '',
         dateFrom: '',
         dateTo: '',
-        refNo: '',
         searchQuery: '',
         page: 1,
         limit: 10
@@ -35,7 +34,7 @@ export default function AdvancedTable() {
         query: '',
         type: 'all'
     });
-    
+
     const [activeView, setActiveView] = useState('all');
 
     const canAdvancedSearch = permissions.canAdvancedSearch;
@@ -64,8 +63,8 @@ export default function AdvancedTable() {
         data: approvedNotPublishedData,
         isLoading: isLoadingApproved,
         refetch: refetchApproved
-    } = useGetApprovedNotPublishedQuery(undefined, { 
-        skip: activeView !== 'approved-not-published' 
+    } = useGetApprovedNotPublishedQuery(undefined, {
+        skip: activeView !== 'approved-not-published'
     });
 
     const {
@@ -121,8 +120,8 @@ export default function AdvancedTable() {
                 return {
                     tasks: approvedFiltered,
                     totalBeforeClientFilter: approvedTasks.length,
-                    pagination: { 
-                        page: 1, 
+                    pagination: {
+                        page: 1,
                         totalCount: approvedFiltered.length,
                         totalPages: 1,
                         hasNext: false,
@@ -136,8 +135,8 @@ export default function AdvancedTable() {
                 return {
                     tasks: expiringFiltered,
                     totalBeforeClientFilter: expiringTasks.length,
-                    pagination: { 
-                        page: 1, 
+                    pagination: {
+                        page: 1,
                         totalCount: expiringFiltered.length,
                         totalPages: 1,
                         hasNext: false,
@@ -180,9 +179,9 @@ export default function AdvancedTable() {
     }, [activeView, refetch, refetchApproved, refetchExpiring]);
 
     const handleFilterChange = (field, value) => {
-        setFilters(prev => ({ 
-            ...prev, 
-            [field]: value, 
+        setFilters(prev => ({
+            ...prev,
+            [field]: value,
             ...(field !== 'page' && field !== 'limit' ? { page: 1 } : {})
         }));
     };
@@ -208,7 +207,6 @@ export default function AdvancedTable() {
             assignedTo: '',
             dateFrom: '',
             dateTo: '',
-            refNo: '',
             searchQuery: '',
             page: 1,
             limit: 10
@@ -286,7 +284,7 @@ export default function AdvancedTable() {
                     <p className="text-caption mt-2">
                         {advancedSearch.enabled && (
                             <span className="ml-2 text-green-600">• Advanced search active</span>
-                        )} 
+                        )}
                     </p>
                 </div>
             </div>
@@ -327,7 +325,7 @@ export default function AdvancedTable() {
 
                         <div>
                             <label className="info-label">
-                                Priority  
+                                Priority
                             </label>
                             <select
                                 className="select"
@@ -363,16 +361,6 @@ export default function AdvancedTable() {
                             />
                         </div>
 
-                        <div>
-                            <label className="info-label">Reference No (UIN)</label>
-                            <input
-                                type="text"
-                                className="input"
-                                placeholder="Search by UIN"
-                                value={filters.refNo}
-                                onChange={(e) => handleFilterChange('refNo', e.target.value)}
-                            />
-                        </div>
 
                         <div>
                             <label className="info-label">Date From</label>
@@ -406,16 +394,26 @@ export default function AdvancedTable() {
                         </div>
                     </div>
 
-                    <div className="filter-actions">
-                        <div className="filter-summary">
-                            Showing {tasks.length} of {pagination?.totalCount || 0} active tasks 
-                            {activeView !== 'all' && ` (${activeView.replace('-', ' ')})`}
-                            {advancedSearch.enabled && ` • Advanced search: "${advancedSearch.query}"`}
-                        </div>
-                        <div className="filter-buttons">
-                            <button className="btn btn-secondary" onClick={handleReset}>
-                                Reset All
+                    <div className="flex justify-between items-center  pt-4 border-t border-gray-100">
+                        <div></div>
+                        <div className="flex gap-3">
+                            <button
+                                className="btn btn-secondary"
+                                onClick={handleReset} 
+                            >
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                Reset
                             </button>
+                            {/*<button
+                                className="btn btn-primary"
+                            >
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
+                                </svg>
+                                Apply Filters
+                            </button>*/}
                         </div>
                     </div>
                 </div>
@@ -458,10 +456,9 @@ export default function AdvancedTable() {
                                 </td>
                                 <td>
                                     {task.priority && (
-                                        <span className={`badge ${
-                                            task.priority === 'HIGH' ? 'badge-error' :
-                                            task.priority === 'MEDIUM' ? 'badge-warning' : 'badge-success'
-                                        }`}>
+                                        <span className={`badge ${task.priority === 'HIGH' ? 'badge-error' :
+                                                task.priority === 'MEDIUM' ? 'badge-warning' : 'badge-success'
+                                            }`}>
                                             {task.priority}
                                         </span>
                                     )}
@@ -495,11 +492,11 @@ export default function AdvancedTable() {
                                         </svg>
                                         <h3 className="text-lg font-medium text-gray-900 mb-2">No active tasks found</h3>
                                         <p className="text-gray-500">
-                                            {filters.priority ? 
+                                            {filters.priority ?
                                                 `No tasks found with priority: ${filters.priority}` :
                                                 activeView === 'all' ?
-                                                'No active tasks match your current filters. Try adjusting your search criteria.' :
-                                                `No active ${activeView.replace('-', ' ')} tasks found.`
+                                                    'No active tasks match your current filters. Try adjusting your search criteria.' :
+                                                    `No active ${activeView.replace('-', ' ')} tasks found.`
                                             }
                                         </p>
                                     </div>

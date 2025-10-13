@@ -121,6 +121,7 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
         </svg>
       ),
       badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : null,  
+      show: true
     });
 
     if (canManageUsers(userRole)) {

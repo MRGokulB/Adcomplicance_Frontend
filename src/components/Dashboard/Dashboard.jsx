@@ -376,23 +376,8 @@ const Dashboard = () => {
           <div className="mt-8">
             <div className="flex-between items-center mb-4">
               <h2 className="text-heading-3">
-                Recent Activity
-                {[USER_ROLES.COMPLIANCE_USER, USER_ROLES.PRODUCT_USER].includes(userRole) && (
-                  <span className="ml-2 text-sm font-normal text-gray-500">
-                    (Your assigned tasks only)
-                  </span>
-                )}
+                Recent Activity 
               </h2>
-              <button 
-                className="btn btn-ghost btn-sm text-blue-600"
-                onClick={refetchActivity}
-                title="Refresh activity feed"
-              >
-                View All
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
             </div>
             
             <div className="card">
@@ -411,7 +396,7 @@ const Dashboard = () => {
                       return (
                         <div 
                           key={index} 
-                          className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                          className="flex items-start gap-3 p-2 rounded-lg shadow-sm hover:bg-gray-50 transition-colors duration-200"
                         >
                           <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex-center ${activityType.bgColor} ${activityType.textColor}`}>
                             {activityType.icon}

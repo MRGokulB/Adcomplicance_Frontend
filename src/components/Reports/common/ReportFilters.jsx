@@ -214,19 +214,20 @@ const ReportFilters = ({ filters, onFilterChange, filterFields, options = {} }) 
   };
 
   return (
-    <div className="card mb-6">
-      <div className="card-body">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <h3 className="text-sm font-medium text-gray-700">Filters</h3> 
-          </div>
-          <button
+    <div className="filter-panel mb-6">
+    <div className="card-header">
+    <div className="flex items-center justify-between  gap-3">
+            <h3 className="card-title">Filters</h3> 
+            <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="text-sm text-gray-500 hover:text-gray-700"
           >
             {isCollapsed ? 'Show Filters' : 'Hide Filters'}
-          </button>
-        </div>
+          </button>  
+    </div>
+     
+    </div>
+      <div className="card-body">
 
         {!isCollapsed && (
           <>
