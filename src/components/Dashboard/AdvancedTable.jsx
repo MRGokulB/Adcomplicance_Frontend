@@ -49,6 +49,7 @@ export default function AdvancedTable() {
     const {
         data: tasksData,
         isLoading,
+        isFetching,
         isError,
         error,
         refetch
@@ -62,6 +63,7 @@ export default function AdvancedTable() {
     const {
         data: approvedNotPublishedData,
         isLoading: isLoadingApproved,
+        isFetching: isFetchingApproved,
         refetch: refetchApproved
     } = useGetApprovedNotPublishedQuery(undefined, {
         skip: activeView !== 'approved-not-published'
@@ -70,6 +72,7 @@ export default function AdvancedTable() {
     const {
         data: expiringSoonData,
         isLoading: isLoadingExpiring,
+        isFetching: isFetchingExpiring,
         refetch: refetchExpiring
     } = useGetExpiringSoonQuery({ days: 15 }, {
         skip: activeView !== 'expiring-soon'
@@ -78,6 +81,7 @@ export default function AdvancedTable() {
     const {
         data: advancedSearchData,
         isLoading: isAdvancedSearchLoading,
+        isFetching: isFetchingAdvancedSearch,
         refetch: refetchAdvancedSearch
     } = useAdvancedTaskSearchQuery(
         {
@@ -109,7 +113,8 @@ export default function AdvancedTable() {
                 tasks: priorityFiltered,
                 totalBeforeClientFilter: filteredResults.length,
                 pagination: advancedSearchData?.pagination || null,
-                isLoading: isAdvancedSearchLoading
+                isLoading: isAdvancedSearchLoading,
+                isFetching: isFetchingAdvancedSearch
             };
         }
 
@@ -127,7 +132,8 @@ export default function AdvancedTable() {
                         hasNext: false,
                         hasPrev: false
                     },
-                    isLoading: isLoadingApproved
+                    isLoading: isLoadingApproved,
+                    isFetching: isFetchingApproved
                 };
             case 'expiring-soon':
                 const expiringTasks = filterActiveTasks(expiringSoonData?.tasks || expiringSoonData?.data || []);
@@ -142,7 +148,8 @@ export default function AdvancedTable() {
                         hasNext: false,
                         hasPrev: false
                     },
-                    isLoading: isLoadingExpiring
+                    isLoading: isLoadingExpiring,
+                    isFetching: isFetchingExpiring
                 };
             default:
                 const allTasks = tasksData?.tasks || [];
@@ -151,12 +158,13 @@ export default function AdvancedTable() {
                     tasks: priorityFiltered,
                     totalBeforeClientFilter: allTasks.length,
                     pagination: tasksData?.pagination || null,
-                    isLoading: isLoading
+                    isLoading: isLoading,
+                    isFetching: isFetching
                 };
         }
     };
 
-    const { tasks, totalBeforeClientFilter, pagination, isLoading: currentLoading } = getCurrentData();
+    const { tasks, totalBeforeClientFilter, pagination, isLoading: currentLoading, isFetching: currentFetching } = getCurrentData();
 
     useEffect(() => {
         const handleFocus = () => {
@@ -406,14 +414,6 @@ export default function AdvancedTable() {
                                 </svg>
                                 Reset
                             </button>
-                            {/*<button
-                                className="btn btn-primary"
-                            >
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
-                                </svg>
-                                Apply Filters
-                            </button>*/}
                         </div>
                     </div>
                 </div>
@@ -426,141 +426,150 @@ export default function AdvancedTable() {
                     </div>
                 </div>
 
-                <table className="table">
-                    <thead className="table-header">
-                        <tr>
-                            <th className="table-sortable">UIN</th>
-                            <th className="table-sortable">Title</th>
-                            <th>Task Type</th>
-                            <th>Status</th>
-                            <th>Priority</th>
-                            <th>Created By</th>
-                            <th>Last Updated</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="table-body">
-                        {tasks.length > 0 ? tasks.map((task) => (
-                            <tr key={task.id} className="group">
-                                <td className="font-medium">{task.uin}</td>
-                                <td className="max-w-xs truncate">{task.title}</td>
-                                <td>
-                                    <span className={`badge ${task.taskType === 'EXCHANGE' ? 'badge-warning' : 'badge-info'}`}>
-                                        {getTaskTypeLabel(task.taskType)}
-                                    </span>
-                                </td>
-                                <td>
-                                    <span className={getStatusBadge(task.status)}>
-                                        {task.status?.replace('_', ' ')}
-                                    </span>
-                                </td>
-                                <td>
-                                    {task.priority && (
-                                        <span className={`badge ${task.priority === 'HIGH' ? 'badge-error' :
-                                                task.priority === 'MEDIUM' ? 'badge-warning' : 'badge-success'
-                                            }`}>
-                                            {task.priority}
-                                        </span>
-                                    )}
-                                </td>
-                                <td className="text-sm text-gray-600">
-                                    {task.createdBy?.fullName || task.createdBy}
-                                </td>
-                                <td className="text-sm text-gray-600">
-                                    {formatDateTime(task.updatedAt || task.createdAt)}
-                                </td>
-                                <td>
-                                    <div className="table-row-actions">
-                                        <button
-                                            className="btn btn-ghost btn-icon-sm"
-                                            onClick={() => navigate('/tasks/' + task.id)}
-                                            title="Open full task view"
+                {currentFetching && tasks.length > 0 ? (
+                    <div className="flex-col-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+                        <p className="text-caption">Loading...</p>
+                    </div>
+                ) : (
+                    <>
+                        <table className="table">
+                            <thead className="table-header">
+                                <tr>
+                                    <th className="table-sortable">UIN</th>
+                                    <th className="table-sortable">Title</th>
+                                    <th>Task Type</th>
+                                    <th>Status</th>
+                                    <th>Priority</th>
+                                    <th>Created By</th>
+                                    <th>Last Updated</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="table-body">
+                                {tasks.length > 0 ? tasks.map((task) => (
+                                    <tr key={task.id} className="group">
+                                        <td className="font-medium">{task.uin}</td>
+                                        <td className="max-w-xs truncate">{task.title}</td>
+                                        <td>
+                                            <span className={`badge ${task.taskType === 'EXCHANGE' ? 'badge-warning' : 'badge-info'}`}>
+                                                {getTaskTypeLabel(task.taskType)}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span className={getStatusBadge(task.status)}>
+                                                {task.status?.replace('_', ' ')}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {task.priority && (
+                                                <span className={`badge ${task.priority === 'HIGH' ? 'badge-error' :
+                                                        task.priority === 'MEDIUM' ? 'badge-warning' : 'badge-success'
+                                                    }`}>
+                                                    {task.priority}
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="text-sm text-gray-600">
+                                            {task.createdBy?.fullName || task.createdBy}
+                                        </td>
+                                        <td className="text-sm text-gray-600">
+                                            {formatDateTime(task.updatedAt || task.createdAt)}
+                                        </td>
+                                        <td>
+                                            <div className="table-row-actions">
+                                                <button
+                                                    className="btn btn-ghost btn-icon-sm"
+                                                    onClick={() => navigate('/tasks/' + task.id)}
+                                                    title="Open full task view"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )) : (
+                                    <tr>
+                                        <td colSpan="8" className="text-center py-12">
+                                            <div className="text-gray-500">
+                                                <svg className="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                <h3 className="text-lg font-medium text-gray-900 mb-2">No active tasks found</h3>
+                                                <p className="text-gray-500">
+                                                    {filters.priority ?
+                                                        `No tasks found with priority: ${filters.priority}` :
+                                                        activeView === 'all' ?
+                                                            'No active tasks match your current filters. Try adjusting your search criteria.' :
+                                                            `No active ${activeView.replace('-', ' ')} tasks found.`
+                                                    }
+                                                </p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+
+                        <div className="card-footer">
+                            <div className="flex-between">
+                                <div className="text-sm text-gray-600">
+                                    Showing {tasks.length} of {pagination?.totalCount || 0} tasks
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                    <div className="flex items-center gap-2 mr-4">
+                                        <span className="text-sm text-gray-600">Rows per page:</span>
+                                        <select
+                                            value={filters.limit}
+                                            onChange={(e) => handleFilterChange('limit', Number(e.target.value))}
+                                            className="select"
                                         >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                            </svg>
+                                            <option value={5}>5</option>
+                                            <option value={10}>10</option>
+                                            <option value={25}>25</option>
+                                            <option value={50}>50</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm text-gray-600">
+                                            Page {pagination?.page || 1} of {pagination?.totalPages || 1}
+                                        </span>
+                                        <button
+                                            className="btn btn-secondary btn-sm"
+                                            disabled={!pagination?.hasPrev}
+                                            onClick={() => handlePageChange(1)}
+                                        >
+                                            ⟨⟨
+                                        </button>
+                                        <button
+                                            className="btn btn-secondary btn-sm"
+                                            disabled={!pagination?.hasPrev}
+                                            onClick={() => handlePageChange(filters.page - 1)}
+                                        >
+                                            ⟨
+                                        </button>
+                                        <button
+                                            className="btn btn-secondary btn-sm"
+                                            disabled={!pagination?.hasNext}
+                                            onClick={() => handlePageChange(filters.page + 1)}
+                                        >
+                                            ⟩
+                                        </button>
+                                        <button
+                                            className="btn btn-secondary btn-sm"
+                                            disabled={!pagination?.hasNext}
+                                            onClick={() => handlePageChange(pagination?.totalPages || 1)}
+                                        >
+                                            ⟩⟩
                                         </button>
                                     </div>
-                                </td>
-                            </tr>
-                        )) : (
-                            <tr>
-                                <td colSpan="8" className="text-center py-12">
-                                    <div className="text-gray-500">
-                                        <svg className="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
-                                        <h3 className="text-lg font-medium text-gray-900 mb-2">No active tasks found</h3>
-                                        <p className="text-gray-500">
-                                            {filters.priority ?
-                                                `No tasks found with priority: ${filters.priority}` :
-                                                activeView === 'all' ?
-                                                    'No active tasks match your current filters. Try adjusting your search criteria.' :
-                                                    `No active ${activeView.replace('-', ' ')} tasks found.`
-                                            }
-                                        </p>
-                                    </div>
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-
-                <div className="card-footer">
-                    <div className="flex-between">
-                        <div className="text-sm text-gray-600">
-                            Showing {tasks.length} of {pagination?.totalCount || 0} tasks
-                        </div>
-                        <div className="flex gap-2 items-center">
-                            <div className="flex items-center gap-2 mr-4">
-                                <span className="text-sm text-gray-600">Rows per page:</span>
-                                <select
-                                    value={filters.limit}
-                                    onChange={(e) => handleFilterChange('limit', Number(e.target.value))}
-                                    className="select"
-                                >
-                                    <option value={5}>5</option>
-                                    <option value={10}>10</option>
-                                    <option value={25}>25</option>
-                                    <option value={50}>50</option>
-                                </select>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm text-gray-600">
-                                    Page {pagination?.page || 1} of {pagination?.totalPages || 1}
-                                </span>
-                                <button
-                                    className="btn btn-secondary btn-sm"
-                                    disabled={!pagination?.hasPrev}
-                                    onClick={() => handlePageChange(1)}
-                                >
-                                    ⟨⟨
-                                </button>
-                                <button
-                                    className="btn btn-secondary btn-sm"
-                                    disabled={!pagination?.hasPrev}
-                                    onClick={() => handlePageChange(filters.page - 1)}
-                                >
-                                    ⟨
-                                </button>
-                                <button
-                                    className="btn btn-secondary btn-sm"
-                                    disabled={!pagination?.hasNext}
-                                    onClick={() => handlePageChange(filters.page + 1)}
-                                >
-                                    ⟩
-                                </button>
-                                <button
-                                    className="btn btn-secondary btn-sm"
-                                    disabled={!pagination?.hasNext}
-                                    onClick={() => handlePageChange(pagination?.totalPages || 1)}
-                                >
-                                    ⟩⟩
-                                </button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </>
+                )}
             </div>
         </div>
     );

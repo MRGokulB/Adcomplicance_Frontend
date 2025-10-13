@@ -35,7 +35,6 @@ const AbsenceTracker = () => {
     error,
     refetch
   } = useGetAbsencesQuery(absenceParams, {
-    pollingInterval: isPageVisible ? 60000 : 0,  
     refetchOnMountOrArgChange: 60,  
     skip: !hasPermission(currentUserRole, PERMISSIONS.ABSENCE_READ_ALL) && 
           !hasPermission(currentUserRole, PERMISSIONS.ABSENCE_MANAGE),
@@ -204,7 +203,7 @@ const AbsenceTracker = () => {
         </div>
 
         {pagination && (
-          <div className="card-body border-b border-gray-100">
+          <div className="card-body pt-4 border-b border-gray-100">
             <div className="text-sm text-gray-600">
               Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.totalCount)} of {pagination.totalCount} absence records
             </div>

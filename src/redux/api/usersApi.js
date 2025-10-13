@@ -14,6 +14,7 @@ const baseQuery = fetchBaseQuery({
     if (csrfToken) {
       headers.set('X-CSRF-Token', csrfToken);
     }
+ 
 
     return headers;
   }
@@ -27,7 +28,6 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
   }
   
   if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {    
-    
     const success = await refreshCsrfToken(api);
     
     if (success) {
@@ -43,15 +43,17 @@ export const usersApi = createApi({
   baseQuery: baseQueryWithReauth,
   tagTypes: ['User', 'Absence', 'Profile', 'Promotion'],
 
-  keepUnusedDataFor: 300,  
-  refetchOnMountOrArgChange: 300,
+  keepUnusedDataFor: 10,   
+  refetchOnMountOrArgChange: true,   
+  refetchOnReconnect: true,
+  refetchOnFocus: true,
 
   endpoints: (builder) => ({
     getCurrentUserProfile: builder.query({
       query: () => 'profile/me',
       providesTags: [{ type: 'Profile', id: 'CURRENT' }],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 600,  
+      keepUnusedDataFor: 30,
     }),
 
     updateCurrentUserProfile: builder.mutation({
@@ -93,28 +95,30 @@ export const usersApi = createApi({
         if (params.role && params.role.trim()) searchParams.append('role', params.role.trim());
         if (params.isActive !== undefined && params.isActive !== '') searchParams.append('isActive', params.isActive);
         if (params.team && params.team.trim()) searchParams.append('team', params.team.trim());
+        
+        searchParams.append('_t', Date.now().toString());
 
         return `?${searchParams.toString()}`;
       },
       providesTags: (result) =>
         result?.users
           ? [
-            ...result.users.map(({ id }) => ({ type: 'User', id })),
-            { type: 'User', id: 'LIST' }
-          ]
+              ...result.users.map(({ id }) => ({ type: 'User', id })),
+              { type: 'User', id: 'LIST' }
+            ]
           : [{ type: 'User', id: 'LIST' }],
       transformResponse: (response) => ({
         users: response.users || [],
         pagination: response.pagination || {}
       }),
-      keepUnusedDataFor: 300,  
+      keepUnusedDataFor: 10,   
     }),
 
     getUserById: builder.query({
-      query: (id) => id,
+      query: (id) => `${id}?_t=${Date.now()}`,   
       providesTags: (result, error, id) => [{ type: 'User', id }],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 600, 
+      keepUnusedDataFor: 30,
     }),
 
     createUser: builder.mutation({
@@ -141,24 +145,22 @@ export const usersApi = createApi({
       invalidatesTags: (result, error, { id }) => [
         { type: 'User', id },
         { type: 'User', id: 'LIST' },
-        { type: 'Promotion', id: 'ELIGIBLE' }
+        { type: 'Promotion', id: 'ELIGIBLE' },
+        { type: 'Profile', id: 'CURRENT' }   
       ],
       transformResponse: (response) => ({
         user: response.user,
         changes: response.changes || null
       }),
-      async onQueryStarted({ id, ...patch }, { dispatch, queryFulfilled }) {
-        const patchDetail = dispatch(
-          usersApi.util.updateQueryData('getUserById', id, (draft) => {
-            Object.assign(draft, patch);
-          })
-        );
+      async onQueryStarted({ id, ...patch }, { dispatch, queryFulfilled, getState }) {
+        const state = getState();
+        const currentFilters = state.usersApi?.queries?.['getUsers(undefined)']?.originalArgs || {};
 
-        const patchList = dispatch(
-          usersApi.util.updateQueryData('getUsers', undefined, (draft) => {
-            const userIndex = draft.users?.findIndex(u => u.id === id);
-            if (userIndex !== -1 && draft.users) {
-              Object.assign(draft.users[userIndex], patch);
+        const patchResult = dispatch(
+          usersApi.util.updateQueryData('getUsers', currentFilters, (draft) => {
+            const user = draft.users.find(u => u.id === id);
+            if (user) {
+              Object.assign(user, patch);
             }
           })
         );
@@ -166,8 +168,7 @@ export const usersApi = createApi({
         try {
           await queryFulfilled;
         } catch {
-          patchDetail.undo();
-          patchList.undo();
+          patchResult.undo();
         }
       }
     }),
@@ -181,35 +182,31 @@ export const usersApi = createApi({
       invalidatesTags: (result, error, { id }) => [
         { type: 'User', id },
         { type: 'User', id: 'LIST' },
-        { type: 'Promotion', id: 'ELIGIBLE' }
+        { type: 'Promotion', id: 'ELIGIBLE' },
+        { type: 'Profile', id: 'CURRENT' }
       ],
       transformResponse: (response) => ({
         user: response.user,
         changes: response.changes
       }),
-      async onQueryStarted({ id, newRole }, { dispatch, queryFulfilled }) {
-        const patchDetail = dispatch(
-          usersApi.util.updateQueryData('getUserById', id, (draft) => {
-            draft.role = newRole;
-            draft.updatedAt = new Date().toISOString();
-          })
-        );
+      async onQueryStarted({ id, newRole }, { dispatch, queryFulfilled, getState }) {
+        const state = getState();
+        const currentFilters = state.usersApi?.queries?.['getUsers(undefined)']?.originalArgs || {};
 
-        const patchList = dispatch(
-          usersApi.util.updateQueryData('getUsers', undefined, (draft) => {
-            const userIndex = draft.users?.findIndex(u => u.id === id);
-            if (userIndex !== -1 && draft.users) {
-              draft.users[userIndex].role = newRole;
-              draft.users[userIndex].updatedAt = new Date().toISOString();
+        const patchResult = dispatch(
+          usersApi.util.updateQueryData('getUsers', currentFilters, (draft) => {
+            const user = draft.users.find(u => u.id === id);
+            if (user) {
+              user.role = newRole;
             }
           })
         );
 
         try {
           await queryFulfilled;
+          dispatch(usersApi.util.invalidateTags([{ type: 'User', id: 'LIST' }]));
         } catch {
-          patchDetail.undo();
-          patchList.undo();
+          patchResult.undo();
         }
       }
     }),
@@ -225,13 +222,13 @@ export const usersApi = createApi({
     }),
 
     getPromotionEligibleUsers: builder.query({
-      query: () => 'promotion/eligible',
+      query: () => `promotion/eligible?_t=${Date.now()}`,   
       providesTags: [{ type: 'Promotion', id: 'ELIGIBLE' }],
       transformResponse: (response) => ({
         eligibleUsers: response.eligibleUsers || [],
         summary: response.summary || {}
       }),
-      keepUnusedDataFor: 600,  
+      keepUnusedDataFor: 30,
     }),
 
     getAbsences: builder.query({
@@ -242,18 +239,19 @@ export const usersApi = createApi({
         if (params.userId) searchParams.append('userId', params.userId);
         if (params.dateFrom) searchParams.append('dateFrom', params.dateFrom);
         if (params.dateTo) searchParams.append('dateTo', params.dateTo);
+        searchParams.append('_t', Date.now().toString());   
 
         return `absences?${searchParams.toString()}`;
       },
       providesTags: (result) =>
         result && Array.isArray(result)
           ? [
-            ...result.map(({ id }) => ({ type: 'Absence', id })),
-            { type: 'Absence', id: 'LIST' }
-          ]
+              ...result.map(({ id }) => ({ type: 'Absence', id })),
+              { type: 'Absence', id: 'LIST' }
+            ]
           : [{ type: 'Absence', id: 'LIST' }],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 300,  
+      keepUnusedDataFor: 30,
     }),
 
     createAbsence: builder.mutation({
@@ -301,7 +299,6 @@ export const usersApi = createApi({
       ],
       transformResponse: (response) => response.message,
       async onQueryStarted(id, { dispatch, queryFulfilled }) {
-        // Optimistic removal
         const patchResult = dispatch(
           usersApi.util.updateQueryData('getAbsences', undefined, (draft) => {
             if (Array.isArray(draft)) {

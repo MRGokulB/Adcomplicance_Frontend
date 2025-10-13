@@ -136,6 +136,7 @@ export default function AllTasksPage() {
     const {
         data: approvedNotPublishedData,
         isLoading: isLoadingApproved,
+        isFetching: isFetchingApproved,
         refetch: refetchApproved
     } = useGetApprovedNotPublishedQuery(undefined, {
         skip: activeView !== 'approved-not-published',
@@ -145,6 +146,7 @@ export default function AllTasksPage() {
     const {
         data: expiringSoonData,
         isLoading: isLoadingExpiring,
+        isFetching: isFetchingExpiring,
         refetch: refetchExpiring
     } = useGetExpiringSoonQuery({ days: 15 }, {
         skip: activeView !== 'expiring-soon',
@@ -154,6 +156,7 @@ export default function AllTasksPage() {
     const {
         data: advancedSearchData,
         isLoading: isAdvancedSearchLoading,
+        isFetching: isFetchingAdvancedSearch,
         refetch: refetchAdvancedSearch
     } = useAdvancedTaskSearchQuery(
         {
@@ -181,6 +184,7 @@ export default function AllTasksPage() {
                 pagination: advancedSearchData?.pagination || null,
                 totalCount: advancedSearchData?.pagination?.totalCount || 0,
                 isLoading: isAdvancedSearchLoading,
+                isFetching: isFetchingAdvancedSearch,
                 isError: false,
                 error: null
             };
@@ -201,6 +205,7 @@ export default function AllTasksPage() {
                     },
                     totalCount: approvedFiltered.length,
                     isLoading: isLoadingApproved,
+                    isFetching: isFetchingApproved,
                     isError: false,
                     error: null
                 };
@@ -219,6 +224,7 @@ export default function AllTasksPage() {
                     },
                     totalCount: expiringFiltered.length,
                     isLoading: isLoadingExpiring,
+                    isFetching: isFetchingExpiring,
                     isError: false,
                     error: null
                 };
@@ -231,12 +237,14 @@ export default function AllTasksPage() {
                     pagination: tasksData?.pagination || null,
                     totalCount: tasksData?.pagination?.totalCount || 0,
                     isLoading: isLoading || isFetching,
+                    isFetching: isFetching,
                     isError: isError,
                     error: error
                 };
         }
-    }, [advancedSearch, advancedSearchData, activeView, tasksData, approvedNotPublishedData, expiringSoonData, isLoading, isLoadingApproved, isLoadingExpiring, isAdvancedSearchLoading, isError, error, isFetching, applyPriorityFilter]);
-    const { tasks, pagination, totalCount, isLoading: currentLoading, isError: currentError, error: currentErrorData } = getCurrentData();
+    }, [advancedSearch, advancedSearchData, activeView, tasksData, approvedNotPublishedData, expiringSoonData, isLoading, isLoadingApproved, isLoadingExpiring, isAdvancedSearchLoading, isFetchingAdvancedSearch, isFetchingApproved, isFetchingExpiring, isError, error, isFetching, applyPriorityFilter]);
+    
+    const { tasks, pagination, totalCount, isLoading: currentLoading, isFetching: currentFetching, isError: currentError, error: currentErrorData } = getCurrentData();
 
     useEffect(() => {
         const handleVisibilityChange = () => {
@@ -655,14 +663,6 @@ export default function AllTasksPage() {
                                 </svg>
                                 Reset
                             </button>
-                            {/*<button
-                                className="btn btn-primary"
-                            >
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
-                                </svg>
-                                Apply Filters
-                            </button>*/}
                         </div>
                     </div>
                 </div>
@@ -752,169 +752,178 @@ export default function AllTasksPage() {
                     </div>
                 )}
 
-                <table className="table">
-                    <thead className="table-header">
-                        <tr>
-                            <th>
-                                <input
-                                    type="checkbox"
-                                    checked={selectedRows.length === tasks.length && tasks.length > 0}
-                                    onChange={handleSelectAll}
-                                    className="w-4 h-4 accent-blue-600"
-                                />
-                            </th>
-                            <th className="table-sortable">UIN</th>
-                            <th className="table-sortable">Title</th>
-                            <th>Task Type</th>
-                            <th>Status</th>
-                            <th>Priority</th>
-                            <th>Created By</th>
-                            <th>Last Updated</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="table-body">
-                        {tasks.length > 0 ? tasks.map((task) => (
-                            <tr
-                                key={task.id}
-                                className={`group ${selectedRows.includes(task.id) ? 'bg-blue-50' : ''}`}
-                            >
-                                <td>
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedRows.includes(task.id)}
-                                        onChange={() => handleRowSelect(task.id, task)}
-                                        className="w-4 h-4 accent-blue-600"
-                                    />
-                                </td>
-                                <td className="font-medium">{task.uin}</td>
-                                <td className="max-w-xs truncate">{task.title}</td>
-                                <td>
-                                    <span className={`badge ${task.taskType === 'EXCHANGE' ? 'badge-warning' : 'badge-info'}`}>
-                                        {getTaskTypeLabel(task.taskType)}
-                                    </span>
-                                </td>
-                                <td>
-                                    <span className={getStatusBadge(task.status)}>
-                                        {task.status?.replace('_', ' ')}
-                                    </span>
-                                </td>
-                                <td>
-                                    {task.priority && (
-                                        <span className={`badge ${task.priority === 'HIGH' ? 'badge-error' :
-                                            task.priority === 'MEDIUM' ? 'badge-warning' : 'badge-success'
-                                            }`}>
-                                            {task.priority}
-                                        </span>
-                                    )}
-                                </td>
-                                <td className="text-sm text-gray-600">
-                                    {task.createdBy?.fullName || task.createdBy}
-                                </td>
-                                <td className="text-sm text-gray-600">
-                                    {formatDateTime(task.updatedAt || task.createdAt)}
-                                </td>
-                                <td>
-                                    <div className="table-row-actions">
-                                        <button
-                                            className="btn btn-ghost btn-icon-sm"
-                                            onClick={() => navigate('/tasks/' + task.id)}
-                                            title="Open full task view"
+                {currentFetching && tasks.length > 0 ? (
+                    <div className="flex-col-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+                        <p className="text-caption">Loading...</p>
+                    </div>
+                ) : (
+                    <>
+                        <table className="table">
+                            <thead className="table-header">
+                                <tr>
+                                    <th>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedRows.length === tasks.length && tasks.length > 0}
+                                            onChange={handleSelectAll}
+                                            className="w-4 h-4 accent-blue-600"
+                                        />
+                                    </th>
+                                    <th className="table-sortable">UIN</th>
+                                    <th className="table-sortable">Title</th>
+                                    <th>Task Type</th>
+                                    <th>Status</th>
+                                    <th>Priority</th>
+                                    <th>Created By</th>
+                                    <th>Last Updated</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="table-body">
+                                {tasks.length > 0 ? tasks.map((task) => (
+                                    <tr
+                                        key={task.id}
+                                        className={`group ${selectedRows.includes(task.id) ? 'bg-blue-50' : ''}`}
+                                    >
+                                        <td>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedRows.includes(task.id)}
+                                                onChange={() => handleRowSelect(task.id, task)}
+                                                className="w-4 h-4 accent-blue-600"
+                                            />
+                                        </td>
+                                        <td className="font-medium">{task.uin}</td>
+                                        <td className="max-w-xs truncate">{task.title}</td>
+                                        <td>
+                                            <span className={`badge ${task.taskType === 'EXCHANGE' ? 'badge-warning' : 'badge-info'}`}>
+                                                {getTaskTypeLabel(task.taskType)}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span className={getStatusBadge(task.status)}>
+                                                {task.status?.replace('_', ' ')}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {task.priority && (
+                                                <span className={`badge ${task.priority === 'HIGH' ? 'badge-error' :
+                                                    task.priority === 'MEDIUM' ? 'badge-warning' : 'badge-success'
+                                                    }`}>
+                                                    {task.priority}
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="text-sm text-gray-600">
+                                            {task.createdBy?.fullName || task.createdBy}
+                                        </td>
+                                        <td className="text-sm text-gray-600">
+                                            {formatDateTime(task.updatedAt || task.createdAt)}
+                                        </td>
+                                        <td>
+                                            <div className="table-row-actions">
+                                                <button
+                                                    className="btn btn-ghost btn-icon-sm"
+                                                    onClick={() => navigate('/tasks/' + task.id)}
+                                                    title="Open full task view"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )) : (
+                                    <tr>
+                                        <td colSpan="9" className="text-center py-12">
+                                            <div className="text-gray-500">
+                                                <svg className="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                <h3 className="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
+                                                <p className="text-gray-500 mb-4">
+                                                    {currentError ?
+                                                        'Unable to load tasks. Please check your filters or try again.' :
+                                                        activeView === 'all' ?
+                                                            'No tasks match your current filters. Try adjusting your search criteria.' :
+                                                            `No ${activeView.replace('-', ' ')} tasks found.`
+                                                    }
+                                                </p>
+                                                {!currentError && (
+                                                    <button
+                                                        onClick={handleReset}
+                                                        className="btn btn-secondary"
+                                                    >
+                                                        Reset Filters
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+
+                        <div className="card-footer">
+                            <div className="flex-between">
+                                <div className="text-sm text-gray-600">
+                                    {selectedRows.length} of {totalCount} row(s) selected.
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                    <div className="flex items-center gap-2 mr-4">
+                                        <span className="text-sm text-gray-600">Rows per page:</span>
+                                        <select
+                                            value={filters.limit}
+                                            onChange={(e) => handleFilterChange('limit', Number(e.target.value))}
+                                            className="select"
+                                            disabled={currentLoading}
                                         >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                            </svg>
+                                            <option value={5}>5</option>
+                                            <option value={10}>10</option>
+                                            <option value={25}>25</option>
+                                            <option value={50}>50</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm text-gray-600">
+                                            Page {filters.page} of {Math.max(1, totalPages)}
+                                        </span>
+                                        <button
+                                            className="btn btn-secondary btn-sm"
+                                            disabled={filters.page === 1 || currentLoading}
+                                            onClick={() => handlePageChange(1)}
+                                        >
+                                            ⟨⟨
+                                        </button>
+                                        <button
+                                            className="btn btn-secondary btn-sm"
+                                            disabled={filters.page === 1 || currentLoading}
+                                            onClick={() => handlePageChange(filters.page - 1)}
+                                        >
+                                            ⟨
+                                        </button>
+                                        <button
+                                            className="btn btn-secondary btn-sm"
+                                            disabled={filters.page >= totalPages || currentLoading}
+                                            onClick={() => handlePageChange(filters.page + 1)}
+                                        >
+                                            ⟩
+                                        </button>
+                                        <button
+                                            className="btn btn-secondary btn-sm"
+                                            disabled={filters.page >= totalPages || currentLoading}
+                                            onClick={() => handlePageChange(totalPages)}
+                                        >
+                                            ⟩⟩
                                         </button>
                                     </div>
-                                </td>
-                            </tr>
-                        )) : (
-                            <tr>
-                                <td colSpan="9" className="text-center py-12">
-                                    <div className="text-gray-500">
-                                        <svg className="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
-                                        <h3 className="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
-                                        <p className="text-gray-500 mb-4">
-                                            {currentError ?
-                                                'Unable to load tasks. Please check your filters or try again.' :
-                                                activeView === 'all' ?
-                                                    'No tasks match your current filters. Try adjusting your search criteria.' :
-                                                    `No ${activeView.replace('-', ' ')} tasks found.`
-                                            }
-                                        </p>
-                                        {!currentError && (
-                                            <button
-                                                onClick={handleReset}
-                                                className="btn btn-secondary"
-                                            >
-                                                Reset Filters
-                                            </button>
-                                        )}
-                                    </div>
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-
-                <div className="card-footer">
-                    <div className="flex-between">
-                        <div className="text-sm text-gray-600">
-                            {selectedRows.length} of {totalCount} row(s) selected.
-                        </div>
-                        <div className="flex gap-2 items-center">
-                            <div className="flex items-center gap-2 mr-4">
-                                <span className="text-sm text-gray-600">Rows per page:</span>
-                                <select
-                                    value={filters.limit}
-                                    onChange={(e) => handleFilterChange('limit', Number(e.target.value))}
-                                    className="select"
-                                    disabled={currentLoading}
-                                >
-                                    <option value={5}>5</option>
-                                    <option value={10}>10</option>
-                                    <option value={25}>25</option>
-                                    <option value={50}>50</option>
-                                </select>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm text-gray-600">
-                                    Page {filters.page} of {Math.max(1, totalPages)}
-                                </span>
-                                <button
-                                    className="btn btn-secondary btn-sm"
-                                    disabled={filters.page === 1 || currentLoading}
-                                    onClick={() => handlePageChange(1)}
-                                >
-                                    ⟨⟨
-                                </button>
-                                <button
-                                    className="btn btn-secondary btn-sm"
-                                    disabled={filters.page === 1 || currentLoading}
-                                    onClick={() => handlePageChange(filters.page - 1)}
-                                >
-                                    ⟨
-                                </button>
-                                <button
-                                    className="btn btn-secondary btn-sm"
-                                    disabled={filters.page >= totalPages || currentLoading}
-                                    onClick={() => handlePageChange(filters.page + 1)}
-                                >
-                                    ⟩
-                                </button>
-                                <button
-                                    className="btn btn-secondary btn-sm"
-                                    disabled={filters.page >= totalPages || currentLoading}
-                                    onClick={() => handlePageChange(totalPages)}
-                                >
-                                    ⟩⟩
-                                </button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </>
+                )}
             </div>
 
             {showTaskDetail && selectedTaskForDetail && selectedRows.length === 1 && (

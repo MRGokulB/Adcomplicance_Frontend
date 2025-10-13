@@ -41,8 +41,11 @@ export const notificationsApi = createApi({
   reducerPath: 'notificationsApi',
   baseQuery: baseQueryWithReauth,
   tagTypes: ['Notification', 'NotificationCount'],
-  keepUnusedDataFor: 180,
-  refetchOnMountOrArgChange: 180,
+  
+  keepUnusedDataFor: 10,
+  refetchOnMountOrArgChange: true,
+  refetchOnReconnect: true,
+  refetchOnFocus: true,
 
   endpoints: (builder) => ({
     getNotifications: builder.query({
@@ -51,6 +54,9 @@ export const notificationsApi = createApi({
         if (params.page) searchParams.append('page', params.page);
         if (params.limit) searchParams.append('limit', params.limit);
         if (params.isRead !== undefined) searchParams.append('isRead', params.isRead);
+        
+         searchParams.append('_t', Date.now().toString());
+        
         return `?${searchParams.toString()}`;
       },
       providesTags: (result) =>
@@ -61,21 +67,21 @@ export const notificationsApi = createApi({
           ]
           : [{ type: 'Notification', id: 'LIST' }],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 120,
+      keepUnusedDataFor: 10,  
     }),
 
     getUnreadCount: builder.query({
-      query: () => 'unread-count',
+      query: () => `unread-count?_t=${Date.now()}`,  
       providesTags: ['NotificationCount'],
       transformResponse: (response) => response.unreadCount,
-      keepUnusedDataFor: 60,
+      keepUnusedDataFor: 10,  
     }),
 
     getCounts: builder.query({
-      query: () => 'counts',
+      query: () => `counts?_t=${Date.now()}`,  
       providesTags: ['NotificationCount'],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 120,
+      keepUnusedDataFor: 10,  
     }),
 
     markAsRead: builder.mutation({
@@ -85,17 +91,37 @@ export const notificationsApi = createApi({
       }),
       invalidatesTags: (result, error, id) => [
         { type: 'Notification', id },
+        { type: 'Notification', id: 'LIST' },  
         'NotificationCount'
       ],
-      async onQueryStarted(id, { dispatch, queryFulfilled }) {
-        const patchResult = dispatch(
-          notificationsApi.util.updateQueryData('getNotifications', undefined, (draft) => {
-            const notification = draft.notifications?.find(n => n.id === id);
-            if (notification) {
-              notification.isRead = true;
+      async onQueryStarted(id, { dispatch, queryFulfilled, getState }) {
+        const state = getState();
+        
+        const patches = [];
+        
+        Object.keys(state.notificationsApi?.queries || {}).forEach(queryKey => {
+          if (queryKey.startsWith('getNotifications')) {
+            const query = state.notificationsApi.queries[queryKey];
+            if (query?.data?.notifications) {
+              const patchResult = dispatch(
+                notificationsApi.util.updateQueryData(
+                  'getNotifications', 
+                  query.originalArgs, 
+                  (draft) => {
+                    const notification = draft.notifications?.find(n => n.id === id);
+                    if (notification) {
+                      notification.isRead = true;
+                    }
+                    if (draft.unreadCount > 0) {
+                      draft.unreadCount -= 1;
+                    }
+                  }
+                )
+              );
+              patches.push(patchResult);
             }
-          })
-        );
+          }
+        });
 
         const countPatch = dispatch(
           notificationsApi.util.updateQueryData('getCounts', undefined, (draft) => {
@@ -104,12 +130,19 @@ export const notificationsApi = createApi({
             }
           })
         );
+        patches.push(countPatch);
+
+        const unreadCountPatch = dispatch(
+          notificationsApi.util.updateQueryData('getUnreadCount', undefined, (draft) => {
+            return Math.max(0, draft - 1);
+          })
+        );
+        patches.push(unreadCountPatch);
 
         try {
           await queryFulfilled;
         } catch {
-          patchResult.undo();
-          countPatch.undo();
+          patches.forEach(patch => patch.undo());
         }
       },
       transformResponse: (response) => response
@@ -122,29 +155,55 @@ export const notificationsApi = createApi({
       }),
       invalidatesTags: (result, error, id) => [
         { type: 'Notification', id },
+        { type: 'Notification', id: 'LIST' },
         'NotificationCount'
       ],
-      async onQueryStarted(id, { dispatch, queryFulfilled }) {
-        const patchResult = dispatch(
-          notificationsApi.util.updateQueryData('getNotifications', undefined, (draft) => {
-            const notification = draft.notifications?.find(n => n.id === id);
-            if (notification) {
-              notification.isRead = false;
+      async onQueryStarted(id, { dispatch, queryFulfilled, getState }) {
+        const state = getState();
+        const patches = [];
+
+        Object.keys(state.notificationsApi?.queries || {}).forEach(queryKey => {
+          if (queryKey.startsWith('getNotifications')) {
+            const query = state.notificationsApi.queries[queryKey];
+            if (query?.data?.notifications) {
+              const patchResult = dispatch(
+                notificationsApi.util.updateQueryData(
+                  'getNotifications', 
+                  query.originalArgs, 
+                  (draft) => {
+                    const notification = draft.notifications?.find(n => n.id === id);
+                    if (notification) {
+                      notification.isRead = false;
+                    }
+                    if (draft.unreadCount !== undefined) {
+                      draft.unreadCount += 1;
+                    }
+                  }
+                )
+              );
+              patches.push(patchResult);
             }
-          })
-        );
+          }
+        });
 
         const countPatch = dispatch(
           notificationsApi.util.updateQueryData('getCounts', undefined, (draft) => {
             draft.unread += 1;
           })
         );
+        patches.push(countPatch);
+
+        const unreadCountPatch = dispatch(
+          notificationsApi.util.updateQueryData('getUnreadCount', undefined, (draft) => {
+            return draft + 1;
+          })
+        );
+        patches.push(unreadCountPatch);
 
         try {
           await queryFulfilled;
         } catch {
-          patchResult.undo();
-          countPatch.undo();
+          patches.forEach(patch => patch.undo());
         }
       },
       transformResponse: (response) => response
@@ -159,28 +218,49 @@ export const notificationsApi = createApi({
         { type: 'Notification', id: 'LIST' },
         'NotificationCount'
       ],
-      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
-        const patchResult = dispatch(
-          notificationsApi.util.updateQueryData('getNotifications', undefined, (draft) => {
-            if (draft.notifications) {
-              draft.notifications.forEach(notification => {
-                notification.isRead = true;
-              });
+      async onQueryStarted(arg, { dispatch, queryFulfilled, getState }) {
+        const state = getState();
+        const patches = [];
+
+        Object.keys(state.notificationsApi?.queries || {}).forEach(queryKey => {
+          if (queryKey.startsWith('getNotifications')) {
+            const query = state.notificationsApi.queries[queryKey];
+            if (query?.data?.notifications) {
+              const patchResult = dispatch(
+                notificationsApi.util.updateQueryData(
+                  'getNotifications', 
+                  query.originalArgs, 
+                  (draft) => {
+                    if (draft.notifications) {
+                      draft.notifications.forEach(notification => {
+                        notification.isRead = true;
+                      });
+                      draft.unreadCount = 0;
+                    }
+                  }
+                )
+              );
+              patches.push(patchResult);
             }
-          })
-        );
+          }
+        });
 
         const countPatch = dispatch(
           notificationsApi.util.updateQueryData('getCounts', undefined, (draft) => {
             draft.unread = 0;
           })
         );
+        patches.push(countPatch);
+
+        const unreadCountPatch = dispatch(
+          notificationsApi.util.updateQueryData('getUnreadCount', undefined, () => 0)
+        );
+        patches.push(unreadCountPatch);
 
         try {
           await queryFulfilled;
         } catch {
-          patchResult.undo();
-          countPatch.undo();
+          patches.forEach(patch => patch.undo());
         }
       },
       transformResponse: (response) => response
@@ -196,22 +276,63 @@ export const notificationsApi = createApi({
         { type: 'Notification', id: 'LIST' },
         'NotificationCount'
       ],
-      async onQueryStarted(id, { dispatch, queryFulfilled }) {
-        const patchResult = dispatch(
-          notificationsApi.util.updateQueryData('getNotifications', undefined, (draft) => {
-            if (draft.notifications) {
-              draft.notifications = draft.notifications.filter(n => n.id !== id);
-              if (draft.pagination?.totalCount) {
-                draft.pagination.totalCount -= 1;
-              }
+      async onQueryStarted(id, { dispatch, queryFulfilled, getState }) {
+        const state = getState();
+        const patches = [];
+        
+        let wasUnread = false;
+
+        Object.keys(state.notificationsApi?.queries || {}).forEach(queryKey => {
+          if (queryKey.startsWith('getNotifications')) {
+            const query = state.notificationsApi.queries[queryKey];
+            if (query?.data?.notifications) {
+              const patchResult = dispatch(
+                notificationsApi.util.updateQueryData(
+                  'getNotifications', 
+                  query.originalArgs, 
+                  (draft) => {
+                    if (draft.notifications) {
+                      const notification = draft.notifications.find(n => n.id === id);
+                      if (notification && !notification.isRead) {
+                        wasUnread = true;
+                      }
+                      draft.notifications = draft.notifications.filter(n => n.id !== id);
+                      if (draft.pagination?.totalCount) {
+                        draft.pagination.totalCount -= 1;
+                      }
+                      if (wasUnread && draft.unreadCount > 0) {
+                        draft.unreadCount -= 1;
+                      }
+                    }
+                  }
+                )
+              );
+              patches.push(patchResult);
             }
-          })
-        );
+          }
+        });
+
+        if (wasUnread) {
+          const countPatch = dispatch(
+            notificationsApi.util.updateQueryData('getCounts', undefined, (draft) => {
+              if (draft.unread > 0) draft.unread -= 1;
+              if (draft.total > 0) draft.total -= 1;
+            })
+          );
+          patches.push(countPatch);
+
+          const unreadCountPatch = dispatch(
+            notificationsApi.util.updateQueryData('getUnreadCount', undefined, (draft) => {
+              return Math.max(0, draft - 1);
+            })
+          );
+          patches.push(unreadCountPatch);
+        }
 
         try {
           await queryFulfilled;
         } catch {
-          patchResult.undo();
+          patches.forEach(patch => patch.undo());
         }
       },
       transformResponse: (response) => response
