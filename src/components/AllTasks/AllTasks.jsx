@@ -87,7 +87,6 @@ export default function AllTasksPage() {
     const [selectedTaskForDetail, setSelectedTaskForDetail] = useState(null);
     const [showTaskDetail, setShowTaskDetail] = useState(false);
 
-    const [showFileValidation, setShowFileValidation] = useState(false);
     const [showReassignment, setShowReassignment] = useState(false);
     const [showBulkOperations, setShowBulkOperations] = useState(false);
     const [bulkOperationType, setBulkOperationType] = useState('');
@@ -99,7 +98,6 @@ export default function AllTasksPage() {
     const canViewTaskBuckets = permissions.canViewTaskBuckets;
     const canPerformBulkOps = permissions.canPerformBulkOperations;
     const canReassignTasks = permissions.canReassignTask;
-    const canValidateFiles = permissions.canValidateFiles;
     const canViewHealthCheck = permissions.canViewHealthCheck;
     const canAdvancedSearch = permissions.canAdvancedSearch;
 
@@ -243,7 +241,7 @@ export default function AllTasksPage() {
                 };
         }
     }, [advancedSearch, advancedSearchData, activeView, tasksData, approvedNotPublishedData, expiringSoonData, isLoading, isLoadingApproved, isLoadingExpiring, isAdvancedSearchLoading, isFetchingAdvancedSearch, isFetchingApproved, isFetchingExpiring, isError, error, isFetching, applyPriorityFilter]);
-    
+
     const { tasks, pagination, totalCount, isLoading: currentLoading, isFetching: currentFetching, isError: currentError, error: currentErrorData } = getCurrentData();
 
     useEffect(() => {
@@ -489,13 +487,6 @@ export default function AllTasksPage() {
                         )}
                     </p>
                 </div>
-                <div className="flex gap-2">
-                    <button className="report-export-btn btn-outline text-blue-600 hover:text-blue-700 border-blue-300 hover:border-blue-400 " onClick={handleExportCSV}>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        Export CSV</button>
-                </div>
             </div>
 
             {currentError && (
@@ -679,18 +670,17 @@ export default function AllTasksPage() {
                         <h3 className="text-heading-4">Task Management</h3>
                     </div>
                     <div className="table-toolbar-right">
-                        <CanValidateFiles>
-                            <button
-                                className="btn btn-outline btn-sm"
-                                onClick={() => setShowFileValidation(true)}
-                            >
-                                Validate Files
-                            </button>
-                        </CanValidateFiles>
+                        <div className="flex gap-2">
+                            <button className="report-export-btn btn-outline text-blue-600 hover:text-blue-700 border-blue-300 hover:border-blue-400 " onClick={handleExportCSV}>
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                Export CSV</button>
+                        </div>
 
                         {canCreateTasks && (
                             <button
-                                className="btn btn-primary btn-sm"
+                                className="report-export-btn "
                                 onClick={() => setShowCreateModal(true)}
                             >
                                 + Add Task
@@ -937,13 +927,6 @@ export default function AllTasksPage() {
                 <CreateNewAdTask onClose={() => setShowCreateModal(false)} />
             )}
 
-            {showFileValidation && (
-                <FileValidationModal
-                    onClose={() => setShowFileValidation(false)}
-                    onValidate={handleFileValidation}
-                    isValidating={isValidating}
-                />
-            )}
 
             {showReassignment && selectedRows.length === 1 && (
                 <TaskReassignmentModal

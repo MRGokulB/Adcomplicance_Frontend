@@ -40,12 +40,12 @@ const validateFormField = (field, value, allValues) => {
 export default function CreateNewAdTask({ onClose, onSuccess }) {
   const currentUser = useSelector(selectCurrentUser);
   const currentUserRole = useSelector(selectUserRole);
-  
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     category: '',
-    platform: '', 
+    platform: '',
     assignedProductIds: [],
     selectedFiles: [],
     remarks: ''
@@ -56,10 +56,11 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [taskCreationStatus, setTaskCreationStatus] = useState(null);
   const [uploadedFiles, setUploadedFiles] = useState([]);
-
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState('');
   const [createTask] = useCreateTaskMutation();
   const [uploadFiles, { isLoading: isUploading }] = useUploadFilesMutation();
-  
+
   const userQueryParams = useMemo(() => ({
     isActive: true,
     limit: 100
@@ -71,21 +72,21 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
 
   const productUsers = useMemo(() => {
     if (!allUsersData?.users) return [];
-    return allUsersData.users.filter(user => 
+    return allUsersData.users.filter(user =>
       user.role === USER_ROLES.PRODUCT_USER || user.role === USER_ROLES.PRODUCT_ADMIN
     );
   }, [allUsersData]);
 
   useEffect(() => {
-    if (currentUser && 
-        (currentUser.role === USER_ROLES.PRODUCT_USER || currentUser.role === USER_ROLES.PRODUCT_ADMIN) &&
-        formData.assignedProductIds.length === 0) {
+    if (currentUser &&
+      (currentUser.role === USER_ROLES.PRODUCT_USER || currentUser.role === USER_ROLES.PRODUCT_ADMIN) &&
+      formData.assignedProductIds.length === 0) {
       setFormData(prev => ({
         ...prev,
         assignedProductIds: [currentUser.id]
       }));
     }
-  }, []);  
+  }, []);
 
   useEffect(() => {
     if (!canCreateTasks) {
@@ -95,9 +96,9 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
 
   const validateForm = useCallback(() => {
     const newErrors = {};
-    
+
     Object.keys(formData).forEach(field => {
-      if (field === 'remarks') return;  
+      if (field === 'remarks') return;
       const error = validateFormField(field, formData[field], formData);
       if (error) newErrors[field] = error;
     });
@@ -107,7 +108,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
 
   const handleInputChange = useCallback((field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    
+
     if (errors[field]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -128,7 +129,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
       };
     });
     setShowUserDropdown(false);
-    
+
     if (errors.assignedProductIds) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -147,26 +148,26 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
 
   const handleFileChange = useCallback((e) => {
     const files = Array.from(e.target.files);
-    
+
     const validTypes = [
-  'image/',
-  'video/',
-  'video/mp4',
-  'audio/mpeg',
-  'audio/mp3',
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/csv'
-];
-    
+      'image/',
+      'video/',
+      'video/mp4',
+      'audio/mpeg',
+      'audio/mp3',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv'
+    ];
+
     const validFiles = files.filter(file => {
       const isValidType = validTypes.some(type => file.type.startsWith(type));
-      const isValidSize = file.size <= 200 * 1024 * 1024;  
+      const isValidSize = file.size <= 200 * 1024 * 1024;
       return isValidType && isValidSize;
     });
 
@@ -203,95 +204,114 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
   }, [onClose]);
 
   const handleCreateTask = useCallback(async () => {
-    const validationErrors = validateForm();
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      return;
-    }
+  const validationErrors = validateForm();
+  if (Object.keys(validationErrors).length > 0) {
+    setErrors(validationErrors);
+    return;
+  }
 
-    setIsSubmitting(true);
-    setTaskCreationStatus({ status: 'uploading', message: 'Preparing task creation...' });
+  setIsSubmitting(true);
+  setTaskCreationStatus({ status: 'uploading', message: 'Preparing task creation...' });
 
-    try {
-      let fileUrls = [];
-      let uploadedFileDetails = [];
+  try {
+    let fileUrls = [];
+    let uploadedFileDetails = [];
+    
+    if (formData.selectedFiles.length > 0) {
+      setUploadStatus('uploading');
+      setUploadProgress(10);
+      setTaskCreationStatus({ status: 'uploading', message: 'Uploading files...' });
       
-      if (formData.selectedFiles.length > 0) {
-        setTaskCreationStatus({ status: 'uploading', message: 'Uploading files...' });
-        
-        const fileFormData = new FormData();
-        formData.selectedFiles.forEach(file => {
-          fileFormData.append('files', file);
-        });
-
-        const uploadResult = await uploadFiles(fileFormData).unwrap();
-        
-        if (uploadResult.files && uploadResult.files.length > 0) {
-          fileUrls = uploadResult.files.map(file => file.url);
-          uploadedFileDetails = uploadResult.files;
-          setUploadedFiles(uploadResult.files);
-        }
-      }
-
-      setTaskCreationStatus({ status: 'creating', message: 'Creating task...' });
-
-      const taskData = {
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        assignedProductIds: formData.assignedProductIds,
-        platform: formData.platform.trim(),
-        category: formData.category.trim(),
-        remarks: formData.remarks.trim(),
-        priority: 'LOW',
-        files: fileUrls
-      };
-
-      const result = await createTask(taskData).unwrap();
-      
-      setTaskCreationStatus({ 
-        status: 'success', 
-        message: result.message || 'Task created successfully!',
-        data: result.data,
-        nextSteps: result.nextSteps,
-        fileCount: fileUrls.length
+      const fileFormData = new FormData();
+      formData.selectedFiles.forEach(file => {
+        fileFormData.append('files', file);
       });
 
-      if (onSuccess) {
-        onSuccess({
-          ...result,
-          uploadedFiles: uploadedFileDetails
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev < 70) return prev + 5;
+          return prev;
         });
+      }, 500);
+
+      const uploadResult = await uploadFiles(fileFormData).unwrap();
+      
+      clearInterval(progressInterval);
+      setUploadProgress(90);
+      
+      if (uploadResult.files && uploadResult.files.length > 0) {
+        fileUrls = uploadResult.files.map(file => file.url);
+        uploadedFileDetails = uploadResult.files;
+        setUploadedFiles(uploadResult.files);
       }
 
+      setUploadProgress(100);
       setTimeout(() => {
-        onClose();
-      }, 3000);
-      
-    } catch (error) {
-      console.error('Failed to create task:', error);
-      setTaskCreationStatus(null);
-      
-      let errorMessage = 'Failed to create task. Please try again.';
-      if (error?.data?.message) {
-        errorMessage = error.data.message;
-      } else if (error?.data?.errors) {
-        const backendErrors = error.data.errors;
-        if (Array.isArray(backendErrors)) {
-          errorMessage = backendErrors.map(err => err.message).join(', ');
-        } else if (typeof backendErrors === 'object') {
-          setErrors(backendErrors);
-          return;
-        }
-      } else if (error?.error) {
-        errorMessage = 'Network error occurred. Please check your connection.';
-      }
-      
-      setErrors({ submit: errorMessage });
-    } finally {
-      setIsSubmitting(false);
+        setUploadStatus('');
+        setUploadProgress(0);
+      }, 500);
     }
-  }, [formData, validateForm, uploadFiles, createTask, onSuccess, onClose]);
 
+    setTaskCreationStatus({ status: 'creating', message: 'Creating task...' });
+
+    const taskData = {
+      title: formData.title.trim(),
+      description: formData.description.trim(),
+      assignedProductIds: formData.assignedProductIds,
+      platform: formData.platform.trim(),
+      category: formData.category.trim(),
+      remarks: formData.remarks.trim(),
+      priority: 'LOW',
+      files: fileUrls
+    };
+
+    const result = await createTask(taskData).unwrap();
+    
+    setTaskCreationStatus({ 
+      status: 'success', 
+      message: result.message || 'Task created successfully!',
+      data: result.data,
+      nextSteps: result.nextSteps,
+      fileCount: fileUrls.length
+    });
+
+    if (onSuccess) {
+      onSuccess({
+        ...result,
+        uploadedFiles: uploadedFileDetails
+      });
+    }
+
+    setTimeout(() => {
+      onClose();
+    }, 3000);
+    
+  } catch (error) {
+    console.error('Failed to create task:', error);
+    setTaskCreationStatus(null);
+    setUploadStatus('');
+    setUploadProgress(0);
+    
+    let errorMessage = 'Failed to create task. Please try again.';
+    if (error?.data?.message) {
+      errorMessage = error.data.message;
+    } else if (error?.data?.errors) {
+      const backendErrors = error.data.errors;
+      if (Array.isArray(backendErrors)) {
+        errorMessage = backendErrors.map(err => err.message).join(', ');
+      } else if (typeof backendErrors === 'object') {
+        setErrors(backendErrors);
+        return;
+      }
+    } else if (error?.error) {
+      errorMessage = 'Network error occurred. Please check your connection.';
+    }
+    
+    setErrors({ submit: errorMessage });
+  } finally {
+    setIsSubmitting(false);
+  }
+}, [formData, validateForm, uploadFiles, createTask, onSuccess, onClose]);
   const getUserName = useCallback((userId) => {
     const user = productUsers.find(u => u.id === userId);
     return user ? user.fullName : 'Unknown User';
@@ -314,7 +334,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
       <div className="modal max-w-4xl">
         <div className="modal-header">
           <h2 className="text-heading-3">Create New Ad Task</h2>
-          <button 
+          <button
             className="text-gray-400 hover:text-gray-600"
             onClick={handleCancel}
             disabled={isSubmitting}
@@ -324,12 +344,11 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
             </svg>
           </button>
         </div>
-        
+
         <div className="modal-body">
           {taskCreationStatus && (
-            <div className={`mb-4 p-4 rounded-md ${
-              taskCreationStatus.status === 'success' ? 'bg-green-50 border border-green-200' : 'bg-blue-50 border border-blue-200'
-            }`}>
+            <div className={`mb-4 p-4 rounded-md ${taskCreationStatus.status === 'success' ? 'bg-green-50 border border-green-200' : 'bg-blue-50 border border-blue-200'
+              }`}>
               <div className="flex items-start">
                 {taskCreationStatus.status === 'success' ? (
                   <svg className="w-5 h-5 text-green-400 mr-3 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -342,14 +361,12 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
                   </svg>
                 )}
                 <div className="flex-1">
-                  <h4 className={`text-sm font-medium ${
-                    taskCreationStatus.status === 'success' ? 'text-green-800' : 'text-blue-800'
-                  }`}>
+                  <h4 className={`text-sm font-medium ${taskCreationStatus.status === 'success' ? 'text-green-800' : 'text-blue-800'
+                    }`}>
                     {taskCreationStatus.status === 'success' ? 'Task Created Successfully!' : 'Processing...'}
                   </h4>
-                  <p className={`text-sm mt-1 ${
-                    taskCreationStatus.status === 'success' ? 'text-green-700' : 'text-blue-700'
-                  }`}>
+                  <p className={`text-sm mt-1 ${taskCreationStatus.status === 'success' ? 'text-green-700' : 'text-blue-700'
+                    }`}>
                     {taskCreationStatus.message}
                   </p>
                   {taskCreationStatus.data?.uin && (
@@ -381,7 +398,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Task Information</h3>
-              
+
               <div>
                 <label className="exchange-form-label">Task Title *</label>
                 <input
@@ -405,7 +422,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
 
               <div>
                 <label className="exchange-form-label">
-                  Description * 
+                  Description *
                 </label>
                 <textarea
                   className={`input resize-none font-mono ${errors.description ? 'border-red-300 focus:border-red-500' : ''}`}
@@ -416,7 +433,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
                   disabled={isSubmitting}
                   maxLength={1000}
                 />
-                
+
                 {formData.description && (
                   <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <div className="text-xs font-medium text-gray-600 mb-2">Preview:</div>
@@ -449,7 +466,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
                     </div>
                   </div>
                 )}
-                
+
                 <div className="flex justify-between items-center mt-1">
                   {errors.description && (
                     <p className="text-sm text-red-600">{errors.description}</p>
@@ -509,7 +526,7 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
 
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Assignments & Files</h3>
-              
+
               <div>
                 <label className="exchange-form-label">
                   Assign Product Users *
@@ -543,16 +560,15 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
                 <div className="relative">
                   <button
                     type="button"
-                    className={`input text-left flex-between cursor-pointer ${
-                      errors.assignedProductIds ? 'border-red-300' : ''
-                    }`}
+                    className={`input text-left flex-between cursor-pointer ${errors.assignedProductIds ? 'border-red-300' : ''
+                      }`}
                     onClick={() => setShowUserDropdown(!showUserDropdown)}
                     disabled={isSubmitting}
                   >
                     <span className="text-gray-500">Select product users...</span>
                     <span className="text-gray-400">▼</span>
                   </button>
-                  
+
                   {showUserDropdown && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
                       {availableUsers.map((user) => (
@@ -591,14 +607,54 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
                 )}
               </div>
 
-              <div>
-                <label className="exchange-form-label">
-                  Upload Files (Optional - Max 5 files, 50MB each)
-                </label>
+              <div className="relative">
+  {uploadStatus && (
+    <div className="absolute inset-0 bg-white bg-opacity-98 flex flex-col items-center justify-center z-20 rounded-lg">
+      <div className="relative mb-4">
+        <svg className="w-16 h-16 animate-spin text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-lg font-bold text-blue-600">{uploadProgress}%</span>
+        </div>
+      </div>
+      
+      <div className="text-center max-w-sm px-4">
+        <p className="text-lg font-semibold text-gray-800 mb-2">Uploading Files</p>
+        <p className="text-sm text-gray-600 mb-3">
+          This may take a few minutes for large files. Please do not close this window.
+        </p>
+        
+        <div className="w-64 bg-gray-200 rounded-full h-2.5 overflow-hidden shadow-inner">
+          <div 
+            className="bg-gradient-to-r from-blue-400 to-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out"
+            style={{ width: `${uploadProgress}%` }}
+          ></div>
+        </div>
+        
+        {formData.selectedFiles.length > 0 && (
+          <div className="mt-3 text-xs text-gray-500">
+            <p>Uploading {formData.selectedFiles.length} file{formData.selectedFiles.length !== 1 ? 's' : ''}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 flex items-center gap-2 text-blue-600">
+        <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+        <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+        <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+      </div>
+    </div>
+  )}
+  
+  <label className="exchange-form-label">
+    Upload Files (Optional - Max 5 files, 50MB each)
+  </label>
                 <input
                   type="file"
                   multiple
-                  accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.text"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.bmp,.svg,.mp3,.mp4,.avi,.mov,.webm,.mkv,.csv,.txt,.eml,.msg,.excel,.csv"
                   onChange={handleFileChange}
                   className={`input ${errors.selectedFiles ? 'border-red-300 focus:border-red-500' : ''}`}
                   style={{ padding: '8px' }}
@@ -669,14 +725,14 @@ export default function CreateNewAdTask({ onClose, onSuccess }) {
         </div>
 
         <div className="modal-footer">
-          <button 
+          <button
             className="btn btn-secondary"
             onClick={handleCancel}
             disabled={isSubmitting}
           >
             Cancel
           </button>
-          <button 
+          <button
             className="btn btn-primary"
             onClick={handleCreateTask}
             disabled={isSubmitting || taskCreationStatus?.status === 'success'}

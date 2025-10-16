@@ -183,7 +183,7 @@ const AbsenceTracker = () => {
 
   return (
     <div className="container-lg section-md">
-      <div className="card">
+      <div className="filter-panel mb-5">
         <div className="card-header">
           <div className="flex-between">
             <h2 className="card-title">Compliance User Absence Tracker</h2>

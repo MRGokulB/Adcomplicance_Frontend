@@ -53,8 +53,7 @@ const AuditLog = () => {
     );
   }
 
-  // API Queries - Using applied filters (not UI filters)
-  const { 
+   const { 
     data: auditData, 
     isLoading: isAuditLoading, 
     error: auditError,
@@ -72,14 +71,13 @@ const AuditLog = () => {
     dateFrom: appliedFilters.dateFrom,
     dateTo: appliedFilters.dateTo,
   }, {
-    pollingInterval: 300000, // Refresh every 5 minutes
+    pollingInterval: 300000,  
   });
 
   const { data: usersData } = useGetUsersQuery({ limit: 100 });
   const [exportAuditData] = useLazyExportAuditDataQuery();
 
-  // Handle UI filter changes (doesn't trigger API immediately)
-  const handleFilterChange = (field, value) => {
+   const handleFilterChange = (field, value) => {
     setUiFilters(prev => ({
       ...prev,
       [field]: value,

@@ -13,6 +13,7 @@ import {
 } from '../../../redux/api/tasksApi';
 import { usePermissions } from '../../../components/PermissionWrapper';
 import { CanReassignTask } from '../../../components/PermissionWrapper';
+import { useUploadFilesMutation } from '../../../redux/api/uploadApi';
 import {
   USER_ROLES,
   canClassifyOrReclassifyTask,
@@ -48,6 +49,8 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
   const [selectedNewStatus, setSelectedNewStatus] = useState('');
   const [statusReason, setStatusReason] = useState('');
   const [closureType, setClosureType] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
+const [uploadStatus, setUploadStatus] = useState('');
 
   const [formData, setFormData] = useState({
     approvalDate: new Date().toISOString().split('T')[0],
@@ -55,6 +58,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
     approvalProofUrl: '',
     publishDate: new Date().toISOString().split('T')[0],
     publishedCopyUrl: '',
+    publishedFilesRaw: [],
     closureComments: ''
   });
 
@@ -66,6 +70,7 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
   const [publishTask, { isLoading: isPublishing }] = usePublishTaskMutation();
   const [closeTask, { isLoading: isClosing }] = useCloseTaskMutation();
   const [updateTaskName, { isLoading: isUpdatingName }] = useUpdateTaskNameMutation();
+  const [uploadFiles, { isLoading: isUploadingPublishFiles }] = useUploadFilesMutation();
 
   useEffect(() => {
     if (task) {
@@ -101,6 +106,103 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
       'EXPIRED': 'bg-red-100 text-red-800'
     };
     return statusStyles[status] || 'bg-gray-100 text-gray-800';
+  }, []);
+
+  const getFileTypeIcon = useCallback((fileName) => {
+    const extension = fileName?.split('.').pop()?.toLowerCase();
+    switch (extension) {
+      case 'pdf':
+        return (
+          <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M4 18h12V6l-4-4H4v16zm8-14v4h4l-4-4z" />
+          </svg>
+        );
+      case 'doc':
+      case 'docx':
+        return (
+          <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M4 2h8l4 4v10a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2zm2 3v2h8V5H6zm0 4v2h8V9H6zm0 4v2h5v-2H6z" />
+          </svg>
+        );
+      case 'xls':
+      case 'xlsx':
+      case 'csv':
+        return (
+          <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M4 2h12a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2zm1 3v2h2V5H5zm4 0v2h2V5H9zm4 0v2h2V5h-2zM5 9v2h2V9H5zm4 0v2h2V9H9zm4 0v2h2V9h-2zM5 13v2h2v-2H5zm4 0v2h2v-2H9zm4 0v2h2v-2h-2z" />
+          </svg>
+        );
+      case 'ppt':
+      case 'pptx':
+        return (
+          <svg className="w-4 h-4 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M4 2h12a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2zm2 3v10h8V5H6zm2 2h4v2H8V7zm0 3h4v2H8v-2z" />
+          </svg>
+        );
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+      case 'bmp':
+      case 'svg':
+        return (
+          <svg className="w-4 h-4 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" />
+          </svg>
+        );
+      case 'mp4':
+      case 'avi':
+      case 'mov':
+      case 'webm':
+      case 'mkv':
+        return (
+          <svg className="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M2 6a2 2 0 012-2h6l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM8 9a1 1 0 100-2 1 1 0 000 2z" />
+          </svg>
+        );
+      case 'txt':
+        return (
+          <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm1 3h10v2H5V7zm0 4h10v2H5v-2z" />
+          </svg>
+        );
+      default:
+        return (
+          <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4z" />
+          </svg>
+        );
+    }
+  }, []);
+
+  const handleViewFile = useCallback((fileUrl, fileName = '') => {
+    const extension = fileName ?
+      fileName.split('.').pop().toLowerCase() :
+      fileUrl.split('.').pop().toLowerCase();
+
+    if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(extension)) {
+      const viewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(fileUrl)}`;
+      const viewerWindow = window.open(viewerUrl, '_blank');
+
+      if (!viewerWindow) {
+        alert('Popup blocked. Please allow popups to view Office files or use the download button.');
+        window.location.href = fileUrl;
+      }
+    }
+    else if (['pdf', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg'].includes(extension)) {
+      window.open(fileUrl, '_blank');
+    }
+    else if (['mp4', 'avi', 'mov', 'webm', 'mkv'].includes(extension)) {
+      window.open(fileUrl, '_blank');
+    }
+    else {
+      const link = document.createElement('a');
+      link.href = fileUrl;
+      link.download = fileName || fileUrl.split('/').pop();
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   }, []);
 
   const canUserActOnThisTask = useMemo(() => {
@@ -236,13 +338,11 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
     return buttons;
   }, [canUserActOnThisTask, task, isUpdatingStatus, isApproving, isPublishing, permissions.isComplianceUser, permissions.isProductUser, permissions.isAdmin]);
 
-  //  Toggle modal helper
-  const toggleModal = useCallback((modalName, value) => {
+   const toggleModal = useCallback((modalName, value) => {
     setModals(prev => ({ ...prev, [modalName]: value }));
   }, []);
 
-  //  All handlers with useCallback
-  const handleTaskTypeSelection = useCallback((taskType) => {
+   const handleTaskTypeSelection = useCallback((taskType) => {
     setSelectedTaskType(taskType);
     setShowClassificationSubmit(taskType && taskType !== task?.taskType);
   }, [task?.taskType]);
@@ -337,27 +437,62 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
     }
   }, [formData, task?.id, approveTask, toggleModal]);
 
-  const handlePublishSubmit = useCallback(async () => {
-    if (!formData.publishDate || !formData.publishedCopyUrl) {
-      alert('Publish date and published copy URL are required');
-      return;
+ const handlePublishSubmit = useCallback(async () => {
+  if (!formData.publishDate || !formData.publishedCopyUrl) {
+    alert('Publish date and published copy URL are required');
+    return;
+  }
+
+  try {
+    let publishedFilesUrls = [];
+
+    if (formData.publishedFilesRaw && formData.publishedFilesRaw.length > 0) {
+      setUploadStatus('uploading');
+      setUploadProgress(10);
+
+      const filesFormData = new FormData();
+      formData.publishedFilesRaw.forEach((file) => {
+        filesFormData.append('files', file);
+      });
+
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev < 70) return prev + 5;
+          return prev;
+        });
+      }, 500);
+
+      const uploadResult = await uploadFiles(filesFormData).unwrap();
+      
+      clearInterval(progressInterval);
+      setUploadProgress(90);
+      
+      publishedFilesUrls = uploadResult.files?.map(f => f.url) || [];
+
+      setUploadProgress(100);
+      setTimeout(() => {
+        setUploadStatus('');
+        setUploadProgress(0);
+      }, 500);
     }
 
-    try {
-      await publishTask({
-        id: task.id,
-        publishDate: formData.publishDate,
-        publishedCopyUrl: formData.publishedCopyUrl
-      }).unwrap();
+    await publishTask({
+      id: task.id,
+      publishDate: formData.publishDate,
+      publishedCopyUrl: formData.publishedCopyUrl,
+      publishedFiles: publishedFilesUrls
+    }).unwrap();
 
-      toggleModal('publish', false);
-      onRefresh?.();
-    } catch (error) {
-      console.error('Failed to publish task:', error);
-      alert(error?.data?.message || 'Failed to publish task');
-    }
-  }, [formData, task?.id, publishTask, toggleModal, onRefresh]);
-
+    toggleModal('publish', false);
+    setFormData(prev => ({ ...prev, publishedFilesRaw: [] }));
+    onRefresh?.();
+  } catch (error) {
+    console.error('Failed to publish task:', error);
+    setUploadStatus('');
+    setUploadProgress(0);
+    alert(error?.data?.message || 'Failed to publish task');
+  }
+}, [formData, task?.id, publishTask, toggleModal, onRefresh, uploadFiles]);
   const handleManualStatusChange = useCallback(async () => {
     if (!selectedNewStatus || !statusReason.trim()) {
       alert('Please select a status and provide a reason');
@@ -697,6 +832,65 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
   </div>
 )}
 
+{task.status === 'PUBLISHED' && (task.publishedCopyUrl || (task.publishedFiles && task.publishedFiles.length > 0)) && (
+  <div className="mb-4">
+    <label className="exchange-form-label">Published Materials</label>
+    <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+      
+      {task.publishedCopyUrl && (
+        <div className="mb-2">
+          <div className="text-sm font-medium text-green-800 mb-1">Published Copy URL:</div>
+          <a 
+            href={task.publishedCopyUrl} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-blue-800 underline text-sm break-all"
+          >
+            {task.publishedCopyUrl}
+          </a>
+        </div>
+      )}
+      
+      {task.publishedFiles && task.publishedFiles.length > 0 && (
+        <div>
+          <div className="text-sm font-medium text-green-800 mb-2">
+            Published Files ({task.publishedFiles.length}):
+          </div>
+          <div className="space-y-1">
+            {task.publishedFiles.map((fileUrl, index) => {
+              const fileName = fileUrl.split('/').pop();
+              return (
+                <div key={index} className="flex items-center justify-between bg-white rounded p-2">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {getFileTypeIcon(fileName)}
+                    <span className="text-sm text-gray-700 truncate">{fileName}</span>
+                  </div>
+                  <div className="flex gap-1 ml-2 flex-shrink-0">
+                    <button
+                      onClick={() => handleViewFile(fileUrl, fileName)}
+                      className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
+                      title="View file"
+                    >
+                      View
+                    </button>
+                    <a
+                      href={fileUrl}
+                      download={fileName}
+                      className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200"
+                      title="Download file"
+                    >
+                      Download
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+)}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
@@ -813,50 +1007,144 @@ const TaskHeader = ({ task, refetch, comment, setComment, onRefresh }) => {
       )}
 
       {modals.publish && (
-        <div className="modal-overlay" onClick={() => toggleModal('publish', false)}>
-          <div className="modal max-w-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="text-lg font-semibold text-gray-900">Publish Task</h3>
-              <button onClick={() => toggleModal('publish', false)}>×</button>
-            </div>
-            <div className="modal-body">
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="exchange-form-label">Publish Date *</label>
-                  <input
-                    type="date"
-                    className="input"
-                    value={formData.publishDate}
-                    onChange={(e) => setFormData(prev => ({ ...prev, publishDate: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="exchange-form-label">Published Copy URL *</label>
-                  <input
-                    type="url"
-                    className="input"
-                    value={formData.publishedCopyUrl}
-                    onChange={(e) => setFormData(prev => ({...prev, publishedCopyUrl: e.target.value}))}
-                    placeholder="https://..."
-                    required
-                  />
+  <div className="modal-overlay" onClick={() => toggleModal('publish', false)}>
+    <div className="modal max-w-lg" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-header">
+        <h3 className="text-lg font-semibold text-gray-900">Publish Task</h3>
+        <button onClick={() => toggleModal('publish', false)}>×</button>
+      </div>
+      <div className="modal-body">
+        <div className="relative">
+          {uploadStatus && (
+            <div className="absolute inset-0 bg-white bg-opacity-98 flex flex-col items-center justify-center z-20 rounded-lg">
+              <div className="relative mb-4">
+                <svg className="w-16 h-16 animate-spin text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-lg font-bold text-blue-600">{uploadProgress}%</span>
                 </div>
               </div>
+              
+              <div className="text-center max-w-sm px-4">
+                <p className="text-lg font-semibold text-gray-800 mb-2">Uploading Files</p>
+                <p className="text-sm text-gray-600 mb-3">
+                  This may take a few minutes for large files. Please do not close this window.
+                </p>
+                
+                <div className="w-64 bg-gray-200 rounded-full h-2.5 overflow-hidden shadow-inner">
+                  <div 
+                    className="bg-gradient-to-r from-blue-400 to-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${uploadProgress}%` }}
+                  ></div>
+                </div>
+                
+                {formData.publishedFilesRaw && formData.publishedFilesRaw.length > 0 && (
+                  <div className="mt-3 text-xs text-gray-500">
+                    <p>Uploading {formData.publishedFilesRaw.length} file{formData.publishedFilesRaw.length !== 1 ? 's' : ''}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4 flex items-center gap-2 text-blue-600">
+                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
             </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => toggleModal('publish', false)}>Cancel</button>
-              <button
-                className="btn btn-primary"
-                onClick={handlePublishSubmit}
-                disabled={isPublishing || !formData.publishDate || !formData.publishedCopyUrl}
-              >
-                {isPublishing ? 'Publishing...' : 'Publish Task'}
-              </button>
+          )}
+          
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <label className="exchange-form-label">Publish Date *</label>
+              <input
+                type="date"
+                className="input"
+                value={formData.publishDate}
+                onChange={(e) => setFormData(prev => ({ ...prev, publishDate: e.target.value }))}
+                required
+              />
             </div>
+            <div>
+              <label className="exchange-form-label">Published Copy URL *</label>
+              <input
+                type="url"
+                className="input"
+                value={formData.publishedCopyUrl}
+                onChange={(e) => setFormData(prev => ({...prev, publishedCopyUrl: e.target.value}))}
+                placeholder="https://..."
+                required
+              />
+            </div>
+            <div>
+  <label className="exchange-form-label">
+    Published Files (Optional)
+    <span className="text-xs text-gray-500 ml-2">Max 5 files</span>
+  </label>
+  <input
+    type="file"
+    className="input"
+    multiple
+    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.bmp,.svg,.mp3,.mp4,.avi,image/*,video/*,.mov,.webm,.mkv,.csv,.txt,.eml,.msg,.excel,.csv"
+    onChange={(e) => setFormData(prev => ({
+      ...prev,
+      publishedFilesRaw: Array.from(e.target.files)
+    }))}
+    disabled={isPublishing || isUploadingPublishFiles}
+  />
+  {formData.publishedFilesRaw && formData.publishedFilesRaw.length > 0 && (
+    <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+      <div className="text-sm text-gray-600 mb-2">
+        {formData.publishedFilesRaw.length} file(s) selected:
+      </div>
+      <div className="space-y-2 max-h-32 overflow-y-auto">
+        {formData.publishedFilesRaw.map((file, index) => (
+          <div key={index} className="flex items-center gap-2 text-xs bg-white p-2 rounded border">
+            <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-gray-900 truncate">{file.name}</div>
+              <div className="text-gray-500">
+                {(file.size / 1024 / 1024).toFixed(2)} MB • {file.type || 'Unknown type'}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const newFiles = formData.publishedFilesRaw.filter((_, i) => i !== index);
+                setFormData(prev => ({ ...prev, publishedFilesRaw: newFiles }));
+              }}
+              className="text-red-500 hover:text-red-700 p-1"
+              disabled={isPublishing || isUploadingPublishFiles}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+</div>
           </div>
         </div>
-      )}
+      </div>
+      <div className="modal-footer">
+        <button className="btn btn-secondary" onClick={() => toggleModal('publish', false)}>Cancel</button>
+        <button
+          className="btn btn-primary"
+          onClick={handlePublishSubmit}
+          disabled={isPublishing || isUploadingPublishFiles || !formData.publishDate || !formData.publishedCopyUrl}
+        >
+          {isPublishing ? 'Publishing...' : 'Publish Task'}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {modals.status && (
         <div className="modal-overlay" onClick={() => toggleModal('status', false)}>

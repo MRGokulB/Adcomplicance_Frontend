@@ -10,8 +10,7 @@ const baseQuery = fetchBaseQuery({
       headers.set('authorization', `Bearer ${token}`);
     }
 
-    // FIXED: Read CSRF token from Redux state instead of window
-    const csrfToken = getState().csrf?.token;
+     const csrfToken = getState().csrf?.token;
     if (csrfToken) {
       headers.set('X-CSRF-Token', csrfToken);
     }
@@ -289,35 +288,36 @@ export const tasksApi = createApi({
     }),
 
     publishTask: builder.mutation({
-      query: ({ id, publishDate, publishedCopyUrl }) => ({
-        url: `${id}/publish`,
-        method: 'POST',
-        body: { publishDate, publishedCopyUrl }
-      }),
-      invalidatesTags: (result, error, { id }) => [
-        { type: 'Task', id },
-        { type: 'TaskBucket', id: 'APPROVED_NOT_PUBLISHED' },
-        { type: 'Task', id: 'LIST' }
-      ],
-      async onQueryStarted({ id, publishDate, publishedCopyUrl }, { dispatch, queryFulfilled }) {
-        const patchResult = dispatch(
-          tasksApi.util.updateQueryData('getTaskById', id, (draft) => {
-            if (draft) {
-              draft.status = 'PUBLISHED';
-              draft.publishDate = publishDate;
-              draft.publishedCopyUrl = publishedCopyUrl;
-              draft.updatedAt = new Date().toISOString();
-            }
-          })
-        );
-        try {
-          await queryFulfilled;
-        } catch {
-          patchResult.undo();
+  query: ({ id, publishDate, publishedCopyUrl, publishedFiles }) => ({
+    url: `${id}/publish`,
+    method: 'POST',
+    body: { publishDate, publishedCopyUrl, publishedFiles }
+  }),
+  invalidatesTags: (result, error, { id }) => [
+    { type: 'Task', id },
+    { type: 'TaskBucket', id: 'APPROVED_NOT_PUBLISHED' },
+    { type: 'Task', id: 'LIST' }
+  ],
+  async onQueryStarted({ id, publishDate, publishedCopyUrl, publishedFiles }, { dispatch, queryFulfilled }) {
+    const patchResult = dispatch(
+      tasksApi.util.updateQueryData('getTaskById', id, (draft) => {
+        if (draft) {
+          draft.status = 'PUBLISHED';
+          draft.publishDate = publishDate;
+          draft.publishedCopyUrl = publishedCopyUrl;
+          draft.publishedFiles = publishedFiles;
+          draft.updatedAt = new Date().toISOString();
         }
-      },
-      transformResponse: (response) => response,
-    }),
+      })
+    );
+    try {
+      await queryFulfilled;
+    } catch {
+      patchResult.undo();
+    }
+  },
+  transformResponse: (response) => response,
+}),
 
     closeTask: builder.mutation({
       query: ({ id, closureType, closureComments }) => ({

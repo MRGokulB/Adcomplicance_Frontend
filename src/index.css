@@ -1387,7 +1387,7 @@
   }
 
   .sidebar-collapsed {
-    @apply w-16;
+    @apply w-20;
   }
 
   .sidebar-expanded {
@@ -1440,6 +1440,10 @@
     @apply hidden;
   }
 
+  .sidebar-collapsed .sidebar-nav-list {
+  @apply space-y-2;
+}
+
   .sidebar-nav-list {
     @apply space-y-1;
   }
@@ -1469,9 +1473,13 @@
     @apply hidden;
   }
 
-  .sidebar-collapsed .sidebar-nav-item {
-    @apply justify-center mx-3 px-3;
-  }
+  .sidebar-collapsed .sidebar-nav-item.active {
+  @apply bg-blue-100 relative;
+}
+.sidebar-collapsed .sidebar-nav-item.active::before {
+  content: '';
+  @apply absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-blue-600 rounded-r;
+}
 
   /* Sidebar Footer */
   .sidebar-footer {
@@ -1503,7 +1511,7 @@
   }
 
   .sidebar-collapsed .sidebar-profile {
-    @apply justify-center;
+    @apply justify-center p-3;
   }
 
   /* Profile Dropdown */
@@ -1553,20 +1561,23 @@
   /* Sidebar Badge */
   .sidebar-nav-badge {
     @apply ml-auto bg-gray-200 text-gray-700 text-xs font-medium px-2 py-1 rounded-full min-w-[20px] text-center;
-  }
+}
 
-  .sidebar-collapsed .sidebar-nav-badge {
-    @apply absolute -top-1 -right-1;
-  }
+  .sidebar-collapsed .sidebar-nav-item {
+  @apply justify-center mx-2 px-2 relative;
+}
 
   /* Sidebar Tooltip for Collapsed State */
   .sidebar-tooltip {
-    @apply absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 pointer-events-none transition-opacity duration-200 whitespace-nowrap z-50;
-  }
+  @apply absolute left-full ml-3 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 pointer-events-none transition-opacity duration-200 whitespace-nowrap z-50 shadow-lg;
+}
 
   .sidebar-collapsed .sidebar-nav-item:hover .sidebar-tooltip {
     @apply opacity-100;
   }
+  .sidebar-collapsed .group:hover .sidebar-tooltip {
+  @apply opacity-100;
+}
 
   /* Sidebar Animation Classes */
   .sidebar-slide-in {

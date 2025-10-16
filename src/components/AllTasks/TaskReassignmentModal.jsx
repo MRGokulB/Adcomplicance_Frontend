@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUserRole, selectCurrentUser } from '../../redux/slices/authSlice';
-import { 
-  useReassignTaskMutation, 
-  useGetAssignmentOptionsQuery 
+import {
+  useReassignTaskMutation,
+  useGetAssignmentOptionsQuery
 } from '../../redux/api/tasksApi';
 import { USER_ROLES, hasPermission, PERMISSIONS } from '../../utils/roles';
 
@@ -97,10 +97,10 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
   };
 
   const handleClose = () => {
-    setAssignmentData({ 
-      assignType: defaultAssignmentType, 
-      userId: '', 
-      reason: '' 
+    setAssignmentData({
+      assignType: defaultAssignmentType,
+      userId: '',
+      reason: ''
     });
     setError('');
     onClose();
@@ -170,7 +170,7 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
           <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={handleClose}></div>
 
           <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-            
+
             <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900">
@@ -187,7 +187,7 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
                 </button>
               </div>
 
-               
+
 
               <p className="text-sm text-gray-600 mb-4">
                 Select a team member to reassign this task to.
@@ -241,10 +241,8 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
                     <option value="">Select a user...</option>
                     {assignmentOptions?.users?.map((user) => (
                       <option key={user.id || user._id} value={user.id || user._id}>
-                        {user.fullName || user.name} 
-                        {user.email && ` (${user.email})`}
-                        {user.workload && ` - ${user.workload.total || user.workload} active tasks`}
-                      </option>
+                        {user.fullName || user.name}
+                        {` - ${typeof user.workload === 'number' ? user.workload : (user.workload?.total ?? 0)} active tasks`}                      </option>
                     ))}
                   </select>
                 )}
@@ -292,8 +290,8 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
                     </div>
                     <div>
                       <span className="font-medium">Assignee:</span> {
-                        assignmentOptions.users.find(u => (u.id || u._id) === assignmentData.userId)?.fullName || 
-                        assignmentOptions.users.find(u => (u.id || u._id) === assignmentData.userId)?.name || 
+                        assignmentOptions.users.find(u => (u.id || u._id) === assignmentData.userId)?.fullName ||
+                        assignmentOptions.users.find(u => (u.id || u._id) === assignmentData.userId)?.name ||
                         'Selected user'
                       }
                     </div>
@@ -314,9 +312,8 @@ const TaskReassignmentModal = ({ taskId, onClose, onSuccess }) => {
               <button
                 onClick={handleReassign}
                 disabled={isReassigning || !assignmentData.userId}
-                className={`btn sm:ml-3 sm:w-auto w-full ${
-                  !assignmentData.userId ? 'btn-secondary' : 'btn-primary'
-                }`}
+                className={`btn sm:ml-3 sm:w-auto w-full ${!assignmentData.userId ? 'btn-secondary' : 'btn-primary'
+                  }`}
               >
                 {isReassigning ? (
                   <>

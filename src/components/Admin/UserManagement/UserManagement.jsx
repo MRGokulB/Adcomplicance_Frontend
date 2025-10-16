@@ -355,7 +355,7 @@ const handlePromoteUser = useCallback(async (promotionData) => {
 
   return (
     <div className="container-lg section-md">
-      <div className="card">
+      <div className="filter-panel">
         <div className="card-header">
           <div className="flex-between">
             <div>

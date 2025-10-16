@@ -38,7 +38,6 @@ const ExchangeApproval = ({ task, onRefresh }) => {
         expiryDate: approval.expiryDate || '',
         referenceNumber: approval.referenceNumber || '',
         approvalEmailUrl: approval.approvalEmailUrl || '',
-        emailFileName: approval.emailFileName || ''
       };
     });
     setEditingData(initialData);
@@ -129,64 +128,71 @@ const ExchangeApproval = ({ task, onRefresh }) => {
     handleLocalFieldChange(approvalId, 'emailFileName', file.name);
   };
 
-  const handleSubmitApproval = async (approvalId) => {
-    if (!canUserManageThisTask()) {
-      alert('You do not have permission to update exchange approvals.');
+  const getCurrentVersionId = () => {
+  return task?.currentVersion?.id || task?.versions?.[0]?.id || null;
+};
+
+const handleSubmitApproval = async (approvalId) => {
+  if (!canUserManageThisTask()) {
+    alert('You do not have permission to update exchange approvals.');
+    return;
+  }
+
+  const data = editingData[approvalId];
+  
+  if (data.approvalStatus === 'APPROVED') {
+    if (!data.approvalDate || !data.expiryDate || !data.referenceNumber) {
+      alert('Approval date, expiry date, and reference number are required when status is Approved');
       return;
     }
 
-    const data = editingData[approvalId];
+    if (new Date(data.expiryDate) <= new Date(data.approvalDate)) {
+      alert('Expiry date must be after approval date');
+      return;
+    }
+  }
+
+  try {
+    let fileUrl = data.approvalEmailUrl;
+    let fileName = data.emailFileName;
     
-    if (data.approvalStatus === 'APPROVED') {
-      if (!data.approvalDate || !data.expiryDate || !data.referenceNumber) {
-        alert('Approval date, expiry date, and reference number are required when status is Approved');
-        return;
-      }
-
-      if (new Date(data.expiryDate) <= new Date(data.approvalDate)) {
-        alert('Expiry date must be after approval date');
-        return;
-      }
-    }
-
-    try {
-      let fileUrl = data.approvalEmailUrl;
-      let fileName = data.emailFileName;
+    if (pendingFiles[approvalId]) {
+      const formData = new FormData();
+      formData.append('file', pendingFiles[approvalId]);
       
-      if (pendingFiles[approvalId]) {
-        
-        const formData = new FormData();
-        formData.append('file', pendingFiles[approvalId]);
-        
-        const uploadResult = await uploadFile(formData).unwrap();
-        
-        fileUrl = uploadResult.file?.url || uploadResult.url;
-        fileName = pendingFiles[approvalId].name;
-      }
- 
-
-      await updateExchangeApproval({
-        taskId: task.id,
-        approvalId: approvalId,
-        ...data,
-        approvalEmailUrl: fileUrl || data.approvalEmailUrl,
-        emailFileName: fileName || data.emailFileName
-      }).unwrap();
-
-      setPendingFiles(prev => {
-        const newState = { ...prev };
-        delete newState[approvalId];
-        return newState;
-      });
-
-      alert('Exchange approval submitted successfully!');
-      onRefresh();
-
-    } catch (error) {
-      console.error('Failed to submit approval:', error);
-      alert(error?.data?.message || 'Failed to submit. Please try again.');
+      const uploadResult = await uploadFile(formData).unwrap();
+      
+      fileUrl = uploadResult.file?.url || uploadResult.url;
+      fileName = pendingFiles[approvalId].name;
     }
-  };
+
+    const currentVersionId = getCurrentVersionId();   
+
+    await updateExchangeApproval({
+      taskId: task.id,
+      approvalId: approvalId,
+      ...data,
+      approvalEmailUrl: fileUrl || data.approvalEmailUrl,
+      emailFileName: fileName || data.emailFileName,
+      versionId: currentVersionId  
+    }).unwrap();
+
+    setPendingFiles(prev => {
+      const newState = { ...prev };
+      delete newState[approvalId];
+      return newState;
+    });
+
+    alert('Exchange approval submitted successfully!');
+    onRefresh();
+
+  } catch (error) {
+    console.error('Failed to submit approval:', error);
+    alert(error?.data?.message || 'Failed to submit. Please try again.');
+  }
+};
+
+
 
   const handleDeleteApproval = async (approvalId) => {
     if (!canUserManageThisTask()) {
@@ -425,8 +431,7 @@ const ExchangeApproval = ({ task, onRefresh }) => {
                   <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
                 </svg>
                 <span className="truncate">{pendingFiles[approval.id].name}</span>
-                <span className="text-xs">(not saved yet)</span>
-              </div>
+               </div>
             )}
             
             {canManage && (
@@ -437,7 +442,7 @@ const ExchangeApproval = ({ task, onRefresh }) => {
                     type="file"
                     className="hidden"
                     onChange={(e) => handleFileSelect(approval.id, e.target.files[0])}
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.eml,.msg,.excel,.csv,.xls,.xlsx,.txt"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.bmp,.svg,.mp3,.mp4,.avi,image/*,video/*,.mov,.webm,.mkv,.csv,.txt,.eml,.msg,.excel,.csv"
                     disabled={isUpdating || isUploading}
                   />
                 </label>

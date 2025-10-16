@@ -164,6 +164,7 @@ const Notifications = () => {
   const getNotificationTypeLabel = useCallback((type) => {
     const labels = {
       TASK_ASSIGNED: 'Task Assigned',
+      TASK_REASSIGNED: 'Task Reassigned',
       TASK_APPROVED: 'Task Approved',
       TASK_REJECTED: 'Task Rejected',
       VERSION_UPLOADED: 'Version Uploaded',

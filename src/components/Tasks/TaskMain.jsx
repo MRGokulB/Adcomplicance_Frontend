@@ -273,8 +273,7 @@ const TaskMain = () => {
         comment={comment} 
         setComment={setComment} 
         onRefresh={handleRefresh}
-        // Pass additional props for integrated actions
-        isConnected={isConnected}
+         isConnected={isConnected}
         isFetching={isFetching}
         lastSyncTime={lastSyncTime}
       />

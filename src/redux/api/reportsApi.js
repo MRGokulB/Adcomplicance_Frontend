@@ -10,8 +10,7 @@ const baseQuery = fetchBaseQuery({
       headers.set('authorization', `Bearer ${token}`);
     }
 
-    // FIXED: Read CSRF token from Redux state instead of window
-    const csrfToken = getState().csrf?.token;
+     const csrfToken = getState().csrf?.token;
     if (csrfToken) {
       headers.set('X-CSRF-Token', csrfToken);
     }
