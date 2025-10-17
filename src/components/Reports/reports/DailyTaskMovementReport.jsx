@@ -20,15 +20,15 @@ const DailyTaskMovementReport = () => {
   });
 
   const columns = [
-    { id: 'timestamp', label: 'Time', sortable: true },
-    { id: 'action', label: 'Action', sortable: true },
+    { id: 'timestamp', label: 'Time' },
+    { id: 'action', label: 'Action' },
     { id: 'details', label: 'Details', sortable: false },
-    { id: 'performedBy', label: 'Performed By', sortable: true },
-    { id: 'userRole', label: 'User Role', sortable: true },
-    { id: 'uin', label: 'Task UIN', sortable: true },
+    { id: 'performedBy', label: 'Performed By' },
+    { id: 'userRole', label: 'User Role' },
+    { id: 'uin', label: 'Task UIN' },
     { id: 'title', label: 'Task Title', sortable: false },
-    { id: 'taskStatus', label: 'Current Status', sortable: true },
-    { id: 'taskType', label: 'Task Type', sortable: true }
+    { id: 'taskStatus', label: 'Current Status' },
+    { id: 'taskType', label: 'Task Type' }
   ];
 
   const handleFilterChange = (newFilters) => {

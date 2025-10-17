@@ -355,14 +355,21 @@ const handlePromoteUser = useCallback(async (promotionData) => {
 
   return (
     <div className="container-lg section-md">
+      <div className="flex-between items-center mb-6">
+                <div>
+                    <h1 className="text-heading-2">User Management</h1>
+                    <p className="text-caption mt-2">
+                Create and manage user accounts with role-based permissions
+                         
+                    </p>
+                </div>
+            </div>
+
       <div className="filter-panel">
         <div className="card-header">
           <div className="flex-between">
-            <div>
-              <h2 className="card-title">User Management</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                Create and manage user accounts with role-based permissions
-              </p>
+            <div> 
+              <h3 className="card-title">Filters</h3>
             </div>
             {canCreateUsers && (
               <button
@@ -468,7 +475,49 @@ const handlePromoteUser = useCallback(async (promotionData) => {
           </div>
         </div>
 
-        <div className="table-container ">
+        
+
+        {pagination.totalPages > 1 && (
+          <div className="card-body border-t border-gray-100">
+            <div className="flex-between">
+              <div className="text-sm text-gray-600">
+                Page {pagination.page} of {pagination.totalPages}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={!pagination.hasPrev}
+                >
+                  Previous
+                </button>
+                <div className="flex gap-1">
+                  {[...Array(Math.min(5, pagination.totalPages))].map((_, i) => {
+                    const pageNum = i + 1;
+                    return (
+                      <button
+                        key={pageNum}
+                        className={`btn btn-sm ${pageNum === pagination.page ? 'btn-primary' : 'btn-ghost'}`}
+                        onClick={() => handlePageChange(pageNum)}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={!pagination.hasNext}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="table-container ">
           <table className="table table-modern">
             <thead className="table-header">
               <tr>
@@ -577,47 +626,6 @@ const handlePromoteUser = useCallback(async (promotionData) => {
             </tbody>
           </table>
         </div>
-
-        {pagination.totalPages > 1 && (
-          <div className="card-body border-t border-gray-100">
-            <div className="flex-between">
-              <div className="text-sm text-gray-600">
-                Page {pagination.page} of {pagination.totalPages}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => handlePageChange(pagination.page - 1)}
-                  disabled={!pagination.hasPrev}
-                >
-                  Previous
-                </button>
-                <div className="flex gap-1">
-                  {[...Array(Math.min(5, pagination.totalPages))].map((_, i) => {
-                    const pageNum = i + 1;
-                    return (
-                      <button
-                        key={pageNum}
-                        className={`btn btn-sm ${pageNum === pagination.page ? 'btn-primary' : 'btn-ghost'}`}
-                        onClick={() => handlePageChange(pageNum)}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-                <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => handlePageChange(pagination.page + 1)}
-                  disabled={!pagination.hasNext}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
 
       <CreateUserModal
         isOpen={modals.createUser}

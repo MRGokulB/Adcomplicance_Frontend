@@ -58,17 +58,17 @@ const RejectedTasksReport = () => {
   }, [reportData, filters.closureType]);
 
   const columns = [
-    { id: 'uin', label: 'UIN', sortable: true },
-    { id: 'title', label: 'Title', sortable: true },
-    { id: 'taskType', label: 'Task Type', sortable: true },
-    { id: 'createdBy', label: 'Created By', sortable: true },
-    { id: 'rejectedDate', label: 'Rejected Date', sortable: true },
-    { id: 'rejectedBy', label: 'Rejected By', sortable: true },
-    { id: 'rejectionReason', label: 'Rejection Reason', sortable: false },
-    { id: 'closureType', label: 'Closure Type', sortable: true },
-    { id: 'reopened', label: 'Reopened', sortable: true },
-    { id: 'currentStatus', label: 'Current Status', sortable: true },
-    { id: 'daysSinceRejection', label: 'Days Since Rejection', sortable: true }
+    { id: 'uin', label: 'UIN' },
+    { id: 'title', label: 'Title' },
+    { id: 'taskType', label: 'Task Type' },
+    { id: 'createdBy', label: 'Created By' },
+    { id: 'rejectedDate', label: 'Rejected Date' },
+    { id: 'rejectedBy', label: 'Rejected By' },
+    { id: 'rejectionReason', label: 'Rejection Reason' },
+    { id: 'closureType', label: 'Closure Type' },
+    { id: 'reopened', label: 'Reopened' },
+    { id: 'currentStatus', label: 'Current Status' },
+    { id: 'daysSinceRejection', label: 'Days Since Rejection' }
   ];
 
   const getUserFilterOptions = () => {

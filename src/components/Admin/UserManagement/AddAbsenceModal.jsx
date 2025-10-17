@@ -17,7 +17,7 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
     role: USER_ROLES.COMPLIANCE_USER,
     isActive: true,
     limit: 100,
-      includeWorkload: true
+    includeWorkload: true
   }), []);
 
   const {
@@ -28,13 +28,22 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
     refetchOnMountOrArgChange: 600,
   });
 
+  const absencesQueryParams = useMemo(() => {
+    if (!formData.user) return null;
+    return {
+      userId: formData.user,
+      limit: 100
+    };
+  }, [formData.user]);
+
   const {
     data: absencesData,
-    isLoading: isLoadingAbsences
+    isLoading: isLoadingAbsences,
+    refetch: refetchAbsences
   } = useGetAbsencesQuery(
-    { userId: formData.user, limit: 100 },
+    absencesQueryParams,
     {
-      skip: !formData.user || !isOpen,
+      skip: !absencesQueryParams || !isOpen,
       refetchOnMountOrArgChange: 60,
     }
   );
@@ -44,10 +53,18 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
     [usersData?.users]
   );
 
+  // Filter absences for the selected user only
   const userAbsences = useMemo(() => {
-    if (!absencesData) return [];
-    return Array.isArray(absencesData) ? absencesData : (absencesData.absences || []);
-  }, [absencesData]);
+    if (!absencesData || !formData.user) return [];
+    const allAbsences = Array.isArray(absencesData) ? absencesData : (absencesData.absences || []);
+    
+    // Filter to show only absences for the selected user
+    return allAbsences.filter(absence => {
+      const absenceUserId = typeof absence.userId === 'string' ? absence.userId : String(absence.userId);
+      const selectedUserId = typeof formData.user === 'string' ? formData.user : String(formData.user);
+      return absenceUserId === selectedUserId;
+    });
+  }, [absencesData, formData.user]);
 
   const activeAbsences = useMemo(() => {
     const today = new Date();
@@ -242,6 +259,11 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
         toDate: formData.toDate,
         reason: formData.reason.trim() || 'No reason provided'
       });
+
+      // Refetch absences to update the cache
+      if (refetchAbsences) {
+        await refetchAbsences();
+      }
     } catch (error) {
       console.error('Failed to add absence:', error);
       setErrors({
@@ -250,7 +272,7 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [formData, validateForm, onAddAbsence]);
+  }, [formData, validateForm, onAddAbsence, refetchAbsences]);
 
   const handleClose = useCallback(() => {
     if (!isSubmitting) {
@@ -566,6 +588,6 @@ const AddAbsenceModal = ({ isOpen, onClose, onAddAbsence }) => {
       </div>
     </div>
   );
-};
+}
 
 export default AddAbsenceModal;

@@ -20,17 +20,17 @@ const ExpiringTasksReport = () => {
   });
 
   const columns = [
-    { id: 'uin', label: 'UIN', sortable: true },
-    { id: 'title', label: 'Title', sortable: true },
-    { id: 'taskType', label: 'Task Type', sortable: true },
-    { id: 'exchangeName', label: 'Exchange', sortable: true },
-    { id: 'referenceNumber', label: 'Exchange Ref No.', sortable: true },
-    { id: 'approvalDate', label: 'Approval Date', sortable: true },
-    { id: 'expiryDate', label: 'Expiry Date', sortable: true },
-    { id: 'daysRemaining', label: 'Days Remaining', sortable: true },
-    { id: 'urgencyLevel', label: 'Urgency Level', sortable: true },
-    { id: 'renewalStatus', label: 'Renewal Status', sortable: true },
-    { id: 'assignedTo', label: 'Assigned To', sortable: true }
+    { id: 'uin', label: 'UIN' },
+    { id: 'title', label: 'Title' },
+    { id: 'taskType', label: 'Task Type' },
+    { id: 'exchangeName', label: 'Exchange' },
+    { id: 'referenceNumber', label: 'Exchange Ref No.' },
+    { id: 'approvalDate', label: 'Approval Date' },
+    { id: 'expiryDate', label: 'Expiry Date' },
+    { id: 'daysRemaining', label: 'Days Remaining' },
+    { id: 'urgencyLevel', label: 'Urgency Level' },
+    { id: 'renewalStatus', label: 'Renewal Status' },
+    { id: 'assignedTo', label: 'Assigned To' }
   ];
 
   const filterOptions = {

@@ -32,19 +32,19 @@ const ExchangeTasksReport = () => {
   });
 
   const columns = [
-    { id: 'uin', label: 'UIN', sortable: true },
-    { id: 'title', label: 'Title', sortable: true },
-    { id: 'createdBy', label: 'Created By', sortable: true },
-    { id: 'taskStatus', label: 'Task Status', sortable: true },
-    { id: 'exchangeName', label: 'Exchange', sortable: true },
-    { id: 'typeOfContent', label: 'Content Type', sortable: true },
-    { id: 'approvalStatus', label: 'Approval Status', sortable: true },
-    { id: 'referenceNumber', label: 'Exchange Ref No.', sortable: true },
-    { id: 'createdAt', label: 'Created Date', sortable: true },
-    { id: 'approvalDate', label: 'Approval Date', sortable: true },
-    { id: 'expiryDate', label: 'Expiry Date', sortable: true },
-    { id: 'updatedBy', label: 'Updated By', sortable: true },
-    { id: 'isExpiringSoon', label: 'Expiring Soon', sortable: true }
+    { id: 'uin', label: 'UIN' },
+    { id: 'title', label: 'Title' },
+    { id: 'createdBy', label: 'Created By' },
+    { id: 'taskStatus', label: 'Task Status' },
+    { id: 'exchangeName', label: 'Exchange' },
+    { id: 'typeOfContent', label: 'Content Type' },
+    { id: 'approvalStatus', label: 'Approval Status' },
+    { id: 'referenceNumber', label: 'Exchange Ref No.' },
+    { id: 'createdAt', label: 'Created Date' },
+    { id: 'approvalDate', label: 'Approval Date' },
+    { id: 'expiryDate', label: 'Expiry Date' },
+    { id: 'updatedBy', label: 'Updated By' },
+    { id: 'isExpiringSoon', label: 'Expiring Soon' }
   ];
 
   const filterOptions = {

@@ -29,19 +29,19 @@ const InternalTasksReport = () => {
   const { data: usersData } = useGetUsersQuery({ limit: 100 });
 
   const columns = [
-    { id: 'uin', label: 'UIN', sortable: true },
-    { id: 'title', label: 'Title', sortable: true },
-    { id: 'createdBy', label: 'Created By', sortable: true },
-    { id: 'status', label: 'Status', sortable: true },
-    { id: 'assignedProducts', label: 'Assigned Products', sortable: false },
-    { id: 'assignedCompliance', label: 'Assigned Compliance', sortable: false },
-    { id: 'createdAt', label: 'Created Date', sortable: true },
-    { id: 'approvalDate', label: 'Approval Date', sortable: true },
-    { id: 'publishDate', label: 'Publish Date', sortable: true },
-    { id: 'daysToApproval', label: 'Days to Approval', sortable: true },
-    { id: 'daysToPublish', label: 'Days to Publish', sortable: true },
-    { id: 'versionCount', label: 'Versions', sortable: true },
-    { id: 'commentCount', label: 'Comments', sortable: true }
+    { id: 'uin', label: 'UIN',   },
+    { id: 'title', label: 'Title',   },
+    { id: 'createdBy', label: 'Created By' },
+    { id: 'status', label: 'Status' },
+    { id: 'assignedProducts', label: 'Assigned Products' },
+    { id: 'assignedCompliance', label: 'Assigned Compliance' },
+    { id: 'createdAt', label: 'Created Date' },
+    { id: 'approvalDate', label: 'Approval Date' },
+    { id: 'publishDate', label: 'Publish Date' },
+    { id: 'daysToApproval', label: 'Days to Approval' },
+    { id: 'daysToPublish', label: 'Days to Publish' },
+    { id: 'versionCount', label: 'Versions' },
+    { id: 'commentCount', label: 'Comments' }
   ];
 
   const getUserFilterOptions = () => {

@@ -144,30 +144,30 @@ const UserWiseReport = ({ type, onTypeChange }) => {
   const refetch = type === 'compliance' ? refetchCompliance : refetchProduct;
 
   const complianceColumns = [
-    { id: 'fullName', label: 'Name', sortable: true },
-    { id: 'username', label: 'Username', sortable: true },
-    { id: 'role', label: 'Role', sortable: true },
-    { id: 'totalAssigned', label: 'Tasks Assigned', sortable: true },
-    { id: 'pending', label: 'Pending Review', sortable: true },
-    { id: 'approved', label: 'Approved', sortable: true },
-    { id: 'rejected', label: 'Rejected', sortable: true },
-    { id: 'avgApprovalTimeDays', label: 'Avg Approval Time (days)', sortable: true },
-    { id: 'absenceDays', label: 'Absent Days', sortable: true },
-    { id: 'productivityScore', label: 'Productivity Score', sortable: true }
+    { id: 'fullName', label: 'Name' },
+    { id: 'username', label: 'Username' },
+    { id: 'role', label: 'Role' },
+    { id: 'totalAssigned', label: 'Tasks Assigned' },
+    { id: 'pending', label: 'Pending Review' },
+    { id: 'approved', label: 'Approved' },
+    { id: 'rejected', label: 'Rejected' },
+    { id: 'avgApprovalTimeDays', label: 'Avg Approval Time (days)' },
+    { id: 'absenceDays', label: 'Absent Days' },
+    { id: 'productivityScore', label: 'Productivity Score' }
   ];
 
   const productColumns = [
-    { id: 'fullName', label: 'Name', sortable: true },
-    { id: 'username', label: 'Username', sortable: true },
-    { id: 'role', label: 'Role', sortable: true },
-    { id: 'team', label: 'Team', sortable: true },
-    { id: 'tasksCreated', label: 'Tasks Created', sortable: true },
-    { id: 'tasksAssigned', label: 'Tasks Assigned', sortable: true },
-    { id: 'versionsUploaded', label: 'Versions Uploaded', sortable: true },
-    { id: 'commentsAdded', label: 'Comments Added', sortable: true },
-    { id: 'publishedTasks', label: 'Published Tasks', sortable: true },
-    { id: 'reopenedTasks', label: 'Reopened Tasks', sortable: true },
-    { id: 'activityScore', label: 'Activity Score', sortable: true }
+    { id: 'fullName', label: 'Name' },
+    { id: 'username', label: 'Username' },
+    { id: 'role', label: 'Role' },
+    { id: 'team', label: 'Team' },
+    { id: 'tasksCreated', label: 'Tasks Created' },
+    { id: 'tasksAssigned', label: 'Tasks Assigned' },
+    { id: 'versionsUploaded', label: 'Versions Uploaded' },
+    { id: 'commentsAdded', label: 'Comments Added' },
+    { id: 'publishedTasks', label: 'Published Tasks' },
+    { id: 'reopenedTasks', label: 'Reopened Tasks' },
+    { id: 'activityScore', label: 'Activity Score' }
   ];
 
   const currentColumns = type === 'compliance' ? complianceColumns : productColumns;
