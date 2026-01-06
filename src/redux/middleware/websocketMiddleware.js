@@ -7,12 +7,12 @@ let initialized = false
 
 const connect = (store) => {
   if (socket) return
-  
+
   const wsUrl = import.meta.env.VITE_WS_URL || (import.meta.env.VITE_API_URL || 'http://localhost:5000')
-  
+
   socket = io(wsUrl, {
     transports: ['websocket', 'polling'],
-    withCredentials: true,  
+    withCredentials: true,
     reconnection: true,
     reconnectionAttempts: 10,
     reconnectionDelay: 1000,
@@ -32,15 +32,41 @@ const connect = (store) => {
   }
 
   socket.on('notification:new', (data) => {
-    invalidate()
+    // 1. Optimistically add to 'getNotifications' list
+    store.dispatch(
+      notificationsApi.util.updateQueryData('getNotifications', { page: 1, limit: 20 }, (draft) => {
+        if (draft.notifications) {
+          draft.notifications.unshift(data);
+          draft.notifications.pop(); // Keep list size constant
+        }
+      })
+    );
+    // 2. Update stats
+    store.dispatch(
+      notificationsApi.util.updateQueryData('getCounts', undefined, (draft) => {
+        draft.unread += 1;
+        draft.total += 1;
+      })
+    );
+    // 3. Invalidate only if we couldn't optimistic update (fallback)
+    invalidate();
   })
-  
+
   socket.on('notification:update', (data) => {
-    invalidate()
+    store.dispatch(
+      notificationsApi.util.updateQueryData('getNotifications', { page: 1, limit: 20 }, (draft) => {
+        const index = draft.notifications?.findIndex(n => n.id === data.id);
+        if (index !== -1) {
+          draft.notifications[index] = { ...draft.notifications[index], ...data };
+        }
+      })
+    );
   })
-  
+
   socket.on('notification:unreadCount', (data) => {
-    invalidate()
+    store.dispatch(
+      notificationsApi.util.updateQueryData('getUnreadCount', undefined, () => data.count)
+    );
   })
 
   socket.on('disconnect', (reason) => {
@@ -48,11 +74,11 @@ const connect = (store) => {
 
   socket.on('connect_error', (error) => {
     console.error('WebSocket connection error:', error.message)
-    
+
     if (error.message === 'Authentication required' || error.message === 'Invalid token') {
       console.warn('Session expired - WebSocket authentication failed')
     }
-    
+
     if (!reconnectTimer) {
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null
@@ -82,12 +108,12 @@ export const websocketMiddleware = (store) => (next) => (action) => {
     initialized = true
     const isAuthenticated = store.getState()?.auth?.isAuthenticated
     if (isAuthenticated) {
-      setTimeout(() => connect(store), 1000)  
+      setTimeout(() => connect(store), 1000)
     }
   }
 
   if (action.type === 'auth/setCredentials') {
-    setTimeout(() => connect(store), 500)  
+    setTimeout(() => connect(store), 500)
   }
 
   if (action.type === 'auth/logout') {

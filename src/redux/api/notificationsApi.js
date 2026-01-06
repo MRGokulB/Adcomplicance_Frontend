@@ -8,7 +8,7 @@ export const notificationsApi = createApi({
   baseQuery: baseQueryWithReauth,
   tagTypes: ['Notification', 'NotificationCount'],
 
-  keepUnusedDataFor: 10,
+  keepUnusedDataFor: 300, // Increased to 5 minutes since WebSockets handle updates
   refetchOnMountOrArgChange: true,
   refetchOnReconnect: true,
   refetchOnFocus: true,

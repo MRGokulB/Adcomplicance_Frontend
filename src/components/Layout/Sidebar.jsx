@@ -3,13 +3,13 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { selectCurrentUser, selectUserRole } from '../../redux/slices/authSlice';
 import { useLogoutUserMutation } from '../../redux/api/authApi';
-import { 
-  useGetCountsQuery, 
-  useGetNotificationsQuery 
+import {
+  useGetCountsQuery,
+  useGetNotificationsQuery
 } from '../../redux/api/notificationsApi';
-import { 
-  hasPermission, 
-  canAccessReports, 
+import {
+  hasPermission,
+  canAccessReports,
   canManageUsers,
   PERMISSIONS,
   USER_ROLES
@@ -19,13 +19,13 @@ function toggleTheme() {
   const html = document.documentElement;
   const currentTheme = html.classList.contains('dark') ? 'dark' : 'light';
   const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-  
+
   if (newTheme === 'dark') {
     html.classList.add('dark');
   } else {
     html.classList.remove('dark');
   }
-  
+
   localStorage.setItem('theme', newTheme);
 }
 
@@ -43,28 +43,26 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
 
   const currentUser = useSelector(selectCurrentUser);
   const userRole = useSelector(selectUserRole);
-  
+
   const [logoutUser] = useLogoutUserMutation();
-  
-  const { 
-    data: counts, 
+
+  const {
+    data: counts,
     isLoading: isCountsLoading,
-    error: countsError 
+    error: countsError
   } = useGetCountsQuery(undefined, {
-    pollingInterval: 30000,  
-    refetchOnFocus: true,     
-    refetchOnReconnect: true, 
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
     refetchOnMountOrArgChange: true,
   });
 
-  const { 
-    data: notificationsData 
+  const {
+    data: notificationsData
   } = useGetNotificationsQuery({
     page: 1,
     limit: 20,
-    isRead: undefined  
+    isRead: undefined
   }, {
-    pollingInterval: 30000,  
     refetchOnMountOrArgChange: true,
   });
 
@@ -92,10 +90,10 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
     });
 
     const canViewTasks = hasPermission(userRole, PERMISSIONS.TASK_READ_ALL) ||
-                         hasPermission(userRole, PERMISSIONS.TASK_READ_TEAM) ||
-                         hasPermission(userRole, PERMISSIONS.TASK_READ_OWN) ||
-                         hasPermission(userRole, PERMISSIONS.TASK_READ_ASSIGNED);
-    
+      hasPermission(userRole, PERMISSIONS.TASK_READ_TEAM) ||
+      hasPermission(userRole, PERMISSIONS.TASK_READ_OWN) ||
+      hasPermission(userRole, PERMISSIONS.TASK_READ_ASSIGNED);
+
     if (canViewTasks) {
       items.push({
         id: 'tasks',
@@ -106,7 +104,7 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
             <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
           </svg>
         ),
-        badge: null,  
+        badge: null,
         show: true
       });
     }
@@ -120,7 +118,7 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
           <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
         </svg>
       ),
-      badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : null,  
+      badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : null,
       show: true
     });
 
@@ -138,8 +136,8 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
       });
     }
 
-    if (hasPermission(userRole, PERMISSIONS.ABSENCE_MANAGE) || 
-        hasPermission(userRole, PERMISSIONS.ABSENCE_READ_ALL)) {
+    if (hasPermission(userRole, PERMISSIONS.ABSENCE_MANAGE) ||
+      hasPermission(userRole, PERMISSIONS.ABSENCE_READ_ALL)) {
       items.push({
         id: 'absence-tracker',
         label: 'Absence Tracker',
@@ -153,8 +151,8 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
       });
     }
 
-    if (hasPermission(userRole, PERMISSIONS.AUDIT_READ_ALL) || 
-        hasPermission(userRole, PERMISSIONS.AUDIT_READ_LIMITED)) {
+    if (hasPermission(userRole, PERMISSIONS.AUDIT_READ_ALL) ||
+      hasPermission(userRole, PERMISSIONS.AUDIT_READ_LIMITED)) {
       items.push({
         id: 'audit-log',
         label: 'Audit Log',
@@ -214,16 +212,16 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
 
   const handleProfileMenuItemClick = async (itemId) => {
     setShowProfileDropdown(false);
-    
+
     if (itemId === 'logout') {
       try {
-      await logoutUser().unwrap();
-      navigate("/login", { replace: true });   
-    } catch (error) {
-      console.error('Logout failed:', error);
-      navigate("/login", { replace: true });
-    }
-    } else if (itemId === 'settings') { 
+        await logoutUser().unwrap();
+        navigate("/login", { replace: true });
+      } catch (error) {
+        console.error('Logout failed:', error);
+        navigate("/login", { replace: true });
+      }
+    } else if (itemId === 'settings') {
     } else if (itemId === 'profile') {
       navigate('/profile');
     } else if (itemId === 'theme') {
