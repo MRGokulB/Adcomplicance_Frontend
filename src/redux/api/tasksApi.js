@@ -1,41 +1,7 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { refreshCsrfToken } from './csrfRefreshHandler';
+import { createApi } from '@reduxjs/toolkit/query/react';
+import { createBaseQuery } from './baseApi';
 
-const baseQuery = fetchBaseQuery({
-  baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/tasks/`,
-  credentials: 'include',
-  prepareHeaders: (headers, { getState }) => {
-    const token = getState().auth.token;
-    if (token) {
-      headers.set('authorization', `Bearer ${token}`);
-    }
-
-     const csrfToken = getState().csrf?.token;
-    if (csrfToken) {
-      headers.set('X-CSRF-Token', csrfToken);
-    }
-
-    return headers;
-  }
-});
-
-const baseQueryWithReauth = async (args, api, extraOptions) => {
-  let result = await baseQuery(args, api, extraOptions);
-  
-  if (result?.error?.status === 401) {
-    api.dispatch({ type: 'auth/logout' });
-  }
-  
-  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {        
-    const success = await refreshCsrfToken(api);
-    
-    if (success) {
-      result = await baseQuery(args, api, extraOptions);
-    }
-  }
-  
-  return result;
-};
+const baseQueryWithReauth = createBaseQuery(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/tasks/`);
 
 export const tasksApi = createApi({
   reducerPath: 'tasksApi',
@@ -288,36 +254,36 @@ export const tasksApi = createApi({
     }),
 
     publishTask: builder.mutation({
-  query: ({ id, publishDate, publishedCopyUrl, publishedFiles }) => ({
-    url: `${id}/publish`,
-    method: 'POST',
-    body: { publishDate, publishedCopyUrl, publishedFiles }
-  }),
-  invalidatesTags: (result, error, { id }) => [
-    { type: 'Task', id },
-    { type: 'TaskBucket', id: 'APPROVED_NOT_PUBLISHED' },
-    { type: 'Task', id: 'LIST' }
-  ],
-  async onQueryStarted({ id, publishDate, publishedCopyUrl, publishedFiles }, { dispatch, queryFulfilled }) {
-    const patchResult = dispatch(
-      tasksApi.util.updateQueryData('getTaskById', id, (draft) => {
-        if (draft) {
-          draft.status = 'PUBLISHED';
-          draft.publishDate = publishDate;
-          draft.publishedCopyUrl = publishedCopyUrl;
-          draft.publishedFiles = publishedFiles;
-          draft.updatedAt = new Date().toISOString();
+      query: ({ id, publishDate, publishedCopyUrl, publishedFiles }) => ({
+        url: `${id}/publish`,
+        method: 'POST',
+        body: { publishDate, publishedCopyUrl, publishedFiles }
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: 'Task', id },
+        { type: 'TaskBucket', id: 'APPROVED_NOT_PUBLISHED' },
+        { type: 'Task', id: 'LIST' }
+      ],
+      async onQueryStarted({ id, publishDate, publishedCopyUrl, publishedFiles }, { dispatch, queryFulfilled }) {
+        const patchResult = dispatch(
+          tasksApi.util.updateQueryData('getTaskById', id, (draft) => {
+            if (draft) {
+              draft.status = 'PUBLISHED';
+              draft.publishDate = publishDate;
+              draft.publishedCopyUrl = publishedCopyUrl;
+              draft.publishedFiles = publishedFiles;
+              draft.updatedAt = new Date().toISOString();
+            }
+          })
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patchResult.undo();
         }
-      })
-    );
-    try {
-      await queryFulfilled;
-    } catch {
-      patchResult.undo();
-    }
-  },
-  transformResponse: (response) => response,
-}),
+      },
+      transformResponse: (response) => response,
+    }),
 
     closeTask: builder.mutation({
       query: ({ id, closureType, closureComments }) => ({

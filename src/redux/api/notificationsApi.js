@@ -1,47 +1,13 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { refreshCsrfToken } from './csrfRefreshHandler';
+import { createApi } from '@reduxjs/toolkit/query/react';
+import { createBaseQuery } from './baseApi';
 
-const baseQuery = fetchBaseQuery({
-  baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/notifications/`,
-  credentials: 'include',
-  prepareHeaders: (headers, { getState }) => {
-    const token = getState().auth?.token;
-    if (token) {
-      headers.set('authorization', `Bearer ${token}`);
-    }
-
-    const csrfToken = getState().csrf?.token;
-    if (csrfToken) {
-      headers.set('X-CSRF-Token', csrfToken);
-    }
-
-    return headers;
-  }
-});
-
-const baseQueryWithReauth = async (args, api, extraOptions) => {
-  let result = await baseQuery(args, api, extraOptions);
-
-  if (result?.error?.status === 401) {
-    api.dispatch({ type: 'auth/logout' });
-  }
-
-  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
-    const success = await refreshCsrfToken(api);
-
-    if (success) {
-      result = await baseQuery(args, api, extraOptions);
-    }
-  }
-
-  return result;
-};
+const baseQueryWithReauth = createBaseQuery(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/notifications/`);
 
 export const notificationsApi = createApi({
   reducerPath: 'notificationsApi',
   baseQuery: baseQueryWithReauth,
   tagTypes: ['Notification', 'NotificationCount'],
-  
+
   keepUnusedDataFor: 10,
   refetchOnMountOrArgChange: true,
   refetchOnReconnect: true,
@@ -54,9 +20,9 @@ export const notificationsApi = createApi({
         if (params.page) searchParams.append('page', params.page);
         if (params.limit) searchParams.append('limit', params.limit);
         if (params.isRead !== undefined) searchParams.append('isRead', params.isRead);
-        
-         searchParams.append('_t', Date.now().toString());
-        
+
+        searchParams.append('_t', Date.now().toString());
+
         return `?${searchParams.toString()}`;
       },
       providesTags: (result) =>
@@ -67,21 +33,21 @@ export const notificationsApi = createApi({
           ]
           : [{ type: 'Notification', id: 'LIST' }],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 10,  
+      keepUnusedDataFor: 10,
     }),
 
     getUnreadCount: builder.query({
-      query: () => `unread-count?_t=${Date.now()}`,  
+      query: () => `unread-count?_t=${Date.now()}`,
       providesTags: ['NotificationCount'],
       transformResponse: (response) => response.unreadCount,
-      keepUnusedDataFor: 10,  
+      keepUnusedDataFor: 10,
     }),
 
     getCounts: builder.query({
-      query: () => `counts?_t=${Date.now()}`,  
+      query: () => `counts?_t=${Date.now()}`,
       providesTags: ['NotificationCount'],
       transformResponse: (response) => response,
-      keepUnusedDataFor: 10,  
+      keepUnusedDataFor: 10,
     }),
 
     markAsRead: builder.mutation({
@@ -91,22 +57,22 @@ export const notificationsApi = createApi({
       }),
       invalidatesTags: (result, error, id) => [
         { type: 'Notification', id },
-        { type: 'Notification', id: 'LIST' },  
+        { type: 'Notification', id: 'LIST' },
         'NotificationCount'
       ],
       async onQueryStarted(id, { dispatch, queryFulfilled, getState }) {
         const state = getState();
-        
+
         const patches = [];
-        
+
         Object.keys(state.notificationsApi?.queries || {}).forEach(queryKey => {
           if (queryKey.startsWith('getNotifications')) {
             const query = state.notificationsApi.queries[queryKey];
             if (query?.data?.notifications) {
               const patchResult = dispatch(
                 notificationsApi.util.updateQueryData(
-                  'getNotifications', 
-                  query.originalArgs, 
+                  'getNotifications',
+                  query.originalArgs,
                   (draft) => {
                     const notification = draft.notifications?.find(n => n.id === id);
                     if (notification) {
@@ -168,8 +134,8 @@ export const notificationsApi = createApi({
             if (query?.data?.notifications) {
               const patchResult = dispatch(
                 notificationsApi.util.updateQueryData(
-                  'getNotifications', 
-                  query.originalArgs, 
+                  'getNotifications',
+                  query.originalArgs,
                   (draft) => {
                     const notification = draft.notifications?.find(n => n.id === id);
                     if (notification) {
@@ -228,8 +194,8 @@ export const notificationsApi = createApi({
             if (query?.data?.notifications) {
               const patchResult = dispatch(
                 notificationsApi.util.updateQueryData(
-                  'getNotifications', 
-                  query.originalArgs, 
+                  'getNotifications',
+                  query.originalArgs,
                   (draft) => {
                     if (draft.notifications) {
                       draft.notifications.forEach(notification => {
@@ -279,7 +245,7 @@ export const notificationsApi = createApi({
       async onQueryStarted(id, { dispatch, queryFulfilled, getState }) {
         const state = getState();
         const patches = [];
-        
+
         let wasUnread = false;
 
         Object.keys(state.notificationsApi?.queries || {}).forEach(queryKey => {
@@ -288,8 +254,8 @@ export const notificationsApi = createApi({
             if (query?.data?.notifications) {
               const patchResult = dispatch(
                 notificationsApi.util.updateQueryData(
-                  'getNotifications', 
-                  query.originalArgs, 
+                  'getNotifications',
+                  query.originalArgs,
                   (draft) => {
                     if (draft.notifications) {
                       const notification = draft.notifications.find(n => n.id === id);

@@ -1,34 +1,20 @@
- 
-export const getCsrfTokenFromCookie = () => {
-  const name = '_csrf=';
-  const decodedCookie = decodeURIComponent(document.cookie);
-  const cookieArray = decodedCookie.split(';');
-  
-  for (let i = 0; i < cookieArray.length; i++) {
-    let cookie = cookieArray[i].trim();
-    if (cookie.indexOf(name) === 0) {
-      return cookie.substring(name.length, cookie.length);
-    }
-  }
-  
-  return null;
-};
+// getCsrfTokenFromCookie removed as it is ineffective for httpOnly cookies.
+export const getCsrfTokenFromCookie = () => null;
 
- 
 export const hasCsrfToken = () => {
-  return getCsrfTokenFromCookie() !== null;
+  return false;
 };
 
- 
+
 export const fetchCsrfToken = async (apiUrl) => {
   try {
     const response = await fetch(`${apiUrl}/api/csrf-token`, {
       method: 'GET',
-      credentials: 'include',  
+      credentials: 'include',
     });
-    
+
     if (response.ok) {
-      const data = await response.json(); 
+      const data = await response.json();
       return {
         success: true,
         token: data.csrfToken,
@@ -48,6 +34,6 @@ export const fetchCsrfToken = async (apiUrl) => {
   }
 };
 
- 
-export const clearCsrfToken = () => { 
+
+export const clearCsrfToken = () => {
 };

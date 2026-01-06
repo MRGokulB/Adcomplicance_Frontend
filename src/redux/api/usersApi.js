@@ -1,50 +1,15 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { refreshCsrfToken } from './csrfRefreshHandler';
+import { createApi } from '@reduxjs/toolkit/query/react';
+import { createBaseQuery } from './baseApi';
 
-const baseQuery = fetchBaseQuery({
-  baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/users/`,
-  credentials: 'include',
-  prepareHeaders: (headers, { getState }) => {
-    const token = getState().auth.token;
-    if (token) {
-      headers.set('authorization', `Bearer ${token}`);
-    }
-
-    const csrfToken = getState().csrf?.token;
-    if (csrfToken) {
-      headers.set('X-CSRF-Token', csrfToken);
-    }
- 
-
-    return headers;
-  }
-});
-
-const baseQueryWithReauth = async (args, api, extraOptions) => {
-  let result = await baseQuery(args, api, extraOptions);
-  
-  if (result?.error?.status === 401) {
-    api.dispatch({ type: 'auth/logout' });
-  }
-  
-  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {    
-    const success = await refreshCsrfToken(api);
-    
-    if (success) {
-      result = await baseQuery(args, api, extraOptions);
-    }
-  }
-  
-  return result;
-};
+const baseQueryWithReauth = createBaseQuery(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/users/`);
 
 export const usersApi = createApi({
   reducerPath: 'usersApi',
   baseQuery: baseQueryWithReauth,
   tagTypes: ['User', 'Absence', 'Profile', 'Promotion'],
 
-  keepUnusedDataFor: 10,   
-  refetchOnMountOrArgChange: true,   
+  keepUnusedDataFor: 10,
+  refetchOnMountOrArgChange: true,
   refetchOnReconnect: true,
   refetchOnFocus: true,
 
@@ -95,7 +60,7 @@ export const usersApi = createApi({
         if (params.role && params.role.trim()) searchParams.append('role', params.role.trim());
         if (params.isActive !== undefined && params.isActive !== '') searchParams.append('isActive', params.isActive);
         if (params.team && params.team.trim()) searchParams.append('team', params.team.trim());
-        
+
         searchParams.append('_t', Date.now().toString());
 
         return `?${searchParams.toString()}`;
@@ -103,19 +68,19 @@ export const usersApi = createApi({
       providesTags: (result) =>
         result?.users
           ? [
-              ...result.users.map(({ id }) => ({ type: 'User', id })),
-              { type: 'User', id: 'LIST' }
-            ]
+            ...result.users.map(({ id }) => ({ type: 'User', id })),
+            { type: 'User', id: 'LIST' }
+          ]
           : [{ type: 'User', id: 'LIST' }],
       transformResponse: (response) => ({
         users: response.users || [],
         pagination: response.pagination || {}
       }),
-      keepUnusedDataFor: 10,   
+      keepUnusedDataFor: 10,
     }),
 
     getUserById: builder.query({
-      query: (id) => `${id}?_t=${Date.now()}`,   
+      query: (id) => `${id}?_t=${Date.now()}`,
       providesTags: (result, error, id) => [{ type: 'User', id }],
       transformResponse: (response) => response,
       keepUnusedDataFor: 30,
@@ -146,7 +111,7 @@ export const usersApi = createApi({
         { type: 'User', id },
         { type: 'User', id: 'LIST' },
         { type: 'Promotion', id: 'ELIGIBLE' },
-        { type: 'Profile', id: 'CURRENT' }   
+        { type: 'Profile', id: 'CURRENT' }
       ],
       transformResponse: (response) => ({
         user: response.user,
@@ -222,7 +187,7 @@ export const usersApi = createApi({
     }),
 
     getPromotionEligibleUsers: builder.query({
-      query: () => `promotion/eligible?_t=${Date.now()}`,   
+      query: () => `promotion/eligible?_t=${Date.now()}`,
       providesTags: [{ type: 'Promotion', id: 'ELIGIBLE' }],
       transformResponse: (response) => ({
         eligibleUsers: response.eligibleUsers || [],
@@ -239,16 +204,16 @@ export const usersApi = createApi({
         if (params.userId) searchParams.append('userId', params.userId);
         if (params.dateFrom) searchParams.append('dateFrom', params.dateFrom);
         if (params.dateTo) searchParams.append('dateTo', params.dateTo);
-        searchParams.append('_t', Date.now().toString());   
+        searchParams.append('_t', Date.now().toString());
 
         return `absences?${searchParams.toString()}`;
       },
       providesTags: (result) =>
         result && Array.isArray(result)
           ? [
-              ...result.map(({ id }) => ({ type: 'Absence', id })),
-              { type: 'Absence', id: 'LIST' }
-            ]
+            ...result.map(({ id }) => ({ type: 'Absence', id })),
+            { type: 'Absence', id: 'LIST' }
+          ]
           : [{ type: 'Absence', id: 'LIST' }],
       transformResponse: (response) => response,
       keepUnusedDataFor: 30,

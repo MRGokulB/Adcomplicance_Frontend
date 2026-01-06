@@ -28,3 +28,44 @@ export const HTTP_STATUS = {
   CONFLICT: 409,
   INTERNAL_ERROR: 500,
 }
+
+import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { refreshCsrfToken } from './csrfRefreshHandler';
+
+export const createBaseQuery = (baseUrl) => {
+  const baseQuery = fetchBaseQuery({
+    baseUrl,
+    credentials: 'include',
+    prepareHeaders: (headers, { getState }) => {
+      const token = getState().auth.token;
+      if (token) {
+        headers.set('authorization', `Bearer ${token}`);
+      }
+
+      const csrfToken = getState().csrf?.token;
+      if (csrfToken) {
+        headers.set('X-CSRF-Token', csrfToken);
+      }
+
+      return headers;
+    },
+  });
+
+  return async (args, api, extraOptions) => {
+    let result = await baseQuery(args, api, extraOptions);
+
+    if (result?.error?.status === 401) {
+      api.dispatch({ type: 'auth/logout' });
+    }
+
+    if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
+      const success = await refreshCsrfToken(api);
+
+      if (success) {
+        result = await baseQuery(args, api, extraOptions);
+      }
+    }
+
+    return result;
+  };
+};

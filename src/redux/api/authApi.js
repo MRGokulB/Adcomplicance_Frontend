@@ -1,46 +1,10 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import { createApi } from '@reduxjs/toolkit/query/react'
 import { logout, setCredentials } from '../slices/authSlice'
-import { getCsrfTokenFromCookie } from '../../utils/csrf'
-import { refreshCsrfToken } from './csrfRefreshHandler'
+import { createBaseQuery } from './baseApi'
 
 const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/`
 
-const baseQuery = fetchBaseQuery({
-  baseUrl: apiUrl,
-  credentials: 'include',  
-  prepareHeaders: (headers, { getState }) => {
-    const token = getState().auth.token;
-    if (token) {
-      headers.set('authorization', `Bearer ${token}`);
-    }
-    
-    const csrfToken = getState().csrf.token || getCsrfTokenFromCookie();
-    if (csrfToken) {
-      headers.set('X-CSRF-Token', csrfToken);
-    }
-    
-    return headers;
-  },
-})
-
-const baseQueryWithReauth = async (args, api, extraOptions) => {
-  let result = await baseQuery(args, api, extraOptions);
-  
-  if (result?.error?.status === 401) {
-    api.dispatch({ type: 'auth/logout' });
-  }
-  
-  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {    
-    
-    const success = await refreshCsrfToken(api);
-    
-    if (success) {
-      result = await baseQuery(args, api, extraOptions);
-    }
-  }
-  
-  return result;
-};
+const baseQueryWithReauth = createBaseQuery(apiUrl);
 
 export const authApi = createApi({
   reducerPath: 'authApi',
@@ -84,8 +48,11 @@ export const authApi = createApi({
           const { data } = await queryFulfilled
           dispatch(setCredentials({ user: data.user }))
         } catch (error) {
-          console.error('Get current user failed:', error)
-          dispatch(logout())
+          // Suppress 401 errors as they are expected when session is invalid/expired
+          if (error?.error?.status !== 401) {
+            console.error('Get current user failed:', error);
+          }
+          dispatch(logout());
         }
       },
       providesTags: ['Auth'],
@@ -114,7 +81,7 @@ export const authApi = createApi({
           dispatch(logout())
         }
       },
-      invalidatesTags: ['Auth'],
+      invalidatesTags: [], // Don't trigger refetch of user details since we are logging out
     }),
   }),
 })

@@ -1,42 +1,7 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { refreshCsrfToken } from './csrfRefreshHandler';
+import { createApi } from '@reduxjs/toolkit/query/react';
+import { createBaseQuery } from './baseApi';
 
-const baseQuery = fetchBaseQuery({
-  baseUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports/`,
-  credentials: 'include',
-  prepareHeaders: (headers, { getState }) => {
-    const token = getState().auth?.token;
-    if (token) {
-      headers.set('authorization', `Bearer ${token}`);
-    }
-
-     const csrfToken = getState().csrf?.token;
-    if (csrfToken) {
-      headers.set('X-CSRF-Token', csrfToken);
-    }
-
-    return headers;
-  }
-});
-
-const baseQueryWithReauth = async (args, api, extraOptions) => {
-  let result = await baseQuery(args, api, extraOptions);
-
-  if (result?.error?.status === 401) {
-    api.dispatch({ type: 'auth/logout' });
-  }
-
-  if (result?.error?.status === 403 && result?.error?.data?.message?.includes('CSRF')) {
-
-    const success = await refreshCsrfToken(api);
-
-    if (success) {
-      result = await baseQuery(args, api, extraOptions);
-    }
-  }
-
-  return result;
-};
+const baseQueryWithReauth = createBaseQuery(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports/`);
 
 export const reportsApi = createApi({
   reducerPath: 'reportsApi',

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { setCsrfToken, clearCsrfToken, setCsrfLoading, setCsrfError } from '../redux/slices/csrfSlice';
-import { fetchCsrfToken, getCsrfTokenFromCookie } from '../utils/csrf';
+import { fetchCsrfToken } from '../utils/csrf';
 
 const CSRFContext = createContext();
 
@@ -18,7 +18,7 @@ export const CSRFProvider = ({ children }) => {
   const csrfToken = useSelector((state) => state.csrf.token);
   const isLoading = useSelector((state) => state.csrf.isLoading);
   const error = useSelector((state) => state.csrf.error);
-  
+
   const isFetchingRef = useRef(false);
   const hasInitializedRef = useRef(false);
 
@@ -29,18 +29,13 @@ export const CSRFProvider = ({ children }) => {
 
     isFetchingRef.current = true;
     dispatch(setCsrfLoading(true));
-    
+
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const result = await fetchCsrfToken(apiUrl);
-      
+
       if (result.success) {
-        const tokenFromCookie = getCsrfTokenFromCookie();
-        if (tokenFromCookie) {
-          dispatch(setCsrfToken(tokenFromCookie));
-        } else {
-          dispatch(setCsrfToken(result.token));
-        }
+        dispatch(setCsrfToken(result.token));
       } else {
         dispatch(setCsrfError(result.error));
         console.error(' Failed to fetch CSRF token:', result.error);
@@ -62,13 +57,7 @@ export const CSRFProvider = ({ children }) => {
     if (isFetchingRef.current) {
       return;
     }
-
-    const tokenFromCookie = getCsrfTokenFromCookie();
-    if (tokenFromCookie) {
-      dispatch(setCsrfToken(tokenFromCookie));
-    } else {
-      await fetchToken();
-    }
+    await fetchToken();
   };
 
   useEffect(() => {
@@ -77,14 +66,8 @@ export const CSRFProvider = ({ children }) => {
     }
 
     hasInitializedRef.current = true;
-
-    const tokenFromCookie = getCsrfTokenFromCookie();
-    if (tokenFromCookie) {
-      dispatch(setCsrfToken(tokenFromCookie));
-    } else {
-      fetchToken();
-    }
-  }, []);  
+    fetchToken();
+  }, []);
 
   const value = {
     csrfToken,
