@@ -19,12 +19,22 @@ import TaskMain from './components/Tasks/TaskMain'
 import UserManagement from './components/Admin/UserManagement/UserManagement'
 import AbsenceTracker from './components/Admin/UserManagement/AbsenceTracker'
 
+import { Toaster } from 'react-hot-toast';
+
 function App() {
   const isAuthenticated = useSelector(selectIsAuthenticated)
   const { csrfToken } = useCSRF();
 
   return (
     <Router>
+      <Toaster position="top-right" toastOptions={{
+        className: 'text-sm font-medium',
+        style: {
+          borderRadius: '8px',
+          background: '#333',
+          color: '#fff',
+        },
+      }} />
       <Routes>
         <Route
           path="/login"

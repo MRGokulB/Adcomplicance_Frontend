@@ -3,9 +3,9 @@ import { useSelector } from 'react-redux';
 import { useNavigate } from "react-router-dom";
 import { selectCurrentUser, selectUserRole } from '../../redux/slices/authSlice';
 import { usePermissions, CanCreateTask, AdminOnly, ManagerAccess, ComplianceAccess } from '../PermissionWrapper';
-import { 
-  useGetDashboardQuery, 
-  useGetQuickStatsQuery, 
+import {
+  useGetDashboardQuery,
+  useGetQuickStatsQuery,
   useGetTaskBucketsQuery,
   useGetWorkloadChartQuery,
   useGetActivityFeedQuery,
@@ -14,12 +14,13 @@ import {
 import CreateNewAdTask from '../Tasks/NewTask';
 import { USER_ROLES } from '../../utils/roles';
 import AdvancedTable from './AdvancedTable';
+import PageHeader from '../common/PageHeader';
 
 const Dashboard = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [lastUserAction, setLastUserAction] = useState(Date.now());
-  
+
   const currentUser = useSelector(selectCurrentUser);
   const userRole = useSelector(selectUserRole);
   const permissions = usePermissions();
@@ -29,34 +30,34 @@ const Dashboard = () => {
     const handleVisibilityChange = () => {
       const visible = document.visibilityState === 'visible';
       setIsVisible(visible);
-      
+
       if (visible) {
         setLastUserAction(Date.now());
       }
     };
-    
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
   const [userActive, setUserActive] = useState(true);
-  
+
   useEffect(() => {
     const resetActivityTimer = () => {
       setLastUserAction(Date.now());
       setUserActive(true);
     };
-    
+
     window.addEventListener('click', resetActivityTimer);
     window.addEventListener('keydown', resetActivityTimer);
-    
+
     const idleCheckInterval = setInterval(() => {
       const timeSinceLastAction = Date.now() - lastUserAction;
-      if (timeSinceLastAction > 120000) {  
+      if (timeSinceLastAction > 120000) {
         setUserActive(false);
       }
-    }, 30000);  
-    
+    }, 30000);
+
     return () => {
       window.removeEventListener('click', resetActivityTimer);
       window.removeEventListener('keydown', resetActivityTimer);
@@ -65,90 +66,80 @@ const Dashboard = () => {
   }, [lastUserAction]);
 
   const getPollingInterval = (baseInterval) => {
-    if (!isVisible) return 0;  
-    if (userActive) return baseInterval;  
-    return baseInterval * 2;  
+    if (!isVisible) return 0;
+    if (userActive) return baseInterval;
+    return baseInterval * 2;
   };
 
   const criticalPolling = getPollingInterval(45000);
-  
+
   const importantPolling = getPollingInterval(60000);
-  
+
   const backgroundPolling = getPollingInterval(120000);
 
-  const { 
-    data: dashboardData, 
-    isLoading: isDashboardLoading, 
+  const {
+    data: dashboardData,
+    isLoading: isDashboardLoading,
     error: dashboardError,
-    refetch: refetchDashboard 
+    refetch: refetchDashboard
   } = useGetDashboardQuery(undefined, {
     pollingInterval: importantPolling,
     skip: !isVisible,
   });
 
-  const { 
-    data: quickStats, 
+  const {
+    data: quickStats,
     isLoading: isStatsLoading,
-    refetch: refetchStats 
+    refetch: refetchStats
   } = useGetQuickStatsQuery(undefined, {
-    pollingInterval: criticalPolling,  
+    pollingInterval: criticalPolling,
     skip: !isVisible,
   });
 
-  const { 
-    data: taskBuckets, 
+  const {
+    data: taskBuckets,
     isLoading: isBucketsLoading,
-    refetch: refetchBuckets 
+    refetch: refetchBuckets
   } = useGetTaskBucketsQuery(undefined, {
-    pollingInterval: 0,  
+    pollingInterval: 0,
   });
 
-  const { 
-    data: workloadChart, 
+  const {
+    data: workloadChart,
     isLoading: isWorkloadLoading,
-    refetch: refetchWorkload 
+    refetch: refetchWorkload
   } = useGetWorkloadChartQuery(undefined, {
-    pollingInterval: backgroundPolling,  
+    pollingInterval: backgroundPolling,
     skip: !isVisible,
   });
 
   const activityParams = React.useMemo(() => {
     const params = { limit: 10 };
-    
+
     if ([USER_ROLES.COMPLIANCE_USER, USER_ROLES.PRODUCT_USER].includes(userRole)) {
-      params.assignedToMe = true;  
+      params.assignedToMe = true;
     }
-    
+
     return params;
   }, [userRole]);
 
-  const { 
-    data: activityFeed, 
+  const {
+    data: activityFeed,
     isLoading: isActivityLoading,
-    refetch: refetchActivity 
+    refetch: refetchActivity
   } = useGetActivityFeedQuery(activityParams, {
-    pollingInterval: criticalPolling,  
+    pollingInterval: criticalPolling,
     skip: !isVisible,
   });
 
-  const { 
-    data: performanceMetrics, 
+  const {
+    data: performanceMetrics,
     isLoading: isMetricsLoading,
-    refetch: refetchMetrics 
-  } = useGetPerformanceMetricsQuery({}, {   
+    refetch: refetchMetrics
+  } = useGetPerformanceMetricsQuery({}, {
     pollingInterval: backgroundPolling,
     skip: !permissions.isAdmin || !isVisible,
   });
-
-  const handleRefreshAll = useCallback(() => {
-    setLastUserAction(Date.now());  
-    refetchDashboard();
-    refetchStats();
-    refetchBuckets();
-    refetchWorkload();
-    refetchActivity();
-    if (permissions.isAdmin) refetchMetrics();
-  }, [refetchDashboard, refetchStats, refetchBuckets, refetchWorkload, refetchActivity, refetchMetrics, permissions.isAdmin]);
 
   const handleTaskCreated = useCallback(() => {
     refetchStats();
@@ -181,7 +172,7 @@ const Dashboard = () => {
           { title: isStatsLoading ? '...' : (stats.activeUsers || '0'), description: 'Users Online', color: 'card-accent-success' },
           { title: isStatsLoading ? '...' : (stats.expiringSoon || '0'), description: 'System Alerts', color: 'card-accent-error' }
         ];
-      
+
       case USER_ROLES.COMPLIANCE_ADMIN:
       case USER_ROLES.COMPLIANCE_USER:
         return [
@@ -190,7 +181,7 @@ const Dashboard = () => {
           { title: isStatsLoading ? '...' : (stats.totalTasks || '0'), description: 'Exchange Approvals', color: 'card-accent-primary' },
           { title: isStatsLoading ? '...' : (stats.expiringSoon || '0'), description: 'Expiring Soon', color: 'card-accent-error' }
         ];
-      
+
       case USER_ROLES.PRODUCT_ADMIN:
       case USER_ROLES.PRODUCT_USER:
         return [
@@ -199,7 +190,7 @@ const Dashboard = () => {
           { title: isBucketsLoading ? '...' : (buckets.completedThisMonth?.length || '0'), description: 'Approved', color: 'card-accent-success' },
           { title: '+', description: 'Create New Task', color: 'card-accent-error', isAction: true }
         ];
-      
+
       default:
         return [
           { title: isBucketsLoading ? '...' : (buckets.myTasks?.length || '0'), description: 'My Tasks', color: 'card-accent-primary' },
@@ -223,7 +214,7 @@ const Dashboard = () => {
     let displayText = '';
     const user = item.user || 'Someone';
     const taskInfo = item.task ? ` "${item.task.title}"` : '';
-    
+
     switch (item.action) {
       case 'TASK_CREATED': displayText = `${user} created a new task${taskInfo}`; break;
       case 'TASK_UPDATED': displayText = `${user} updated task${taskInfo}`; break;
@@ -234,13 +225,13 @@ const Dashboard = () => {
       case 'TASK_PUBLISHED': displayText = `${user} published${taskInfo}`; break;
       default: displayText = item.details || `${user} performed ${item.action}${taskInfo}`;
     }
-    
+
     return { ...item, timeAgo, displayText };
   }, []);
 
   const getActivityType = useCallback((text) => {
     const lowerText = text.toLowerCase();
-    
+
     if (lowerText.includes('uploaded') || lowerText.includes('created')) {
       return {
         bgColor: 'bg-green-50', textColor: 'text-green-600',
@@ -272,33 +263,21 @@ const Dashboard = () => {
 
   return (
     <>
-      <div className='container-lg'>
-        <div className="flex-between items-center mb-6">
-          <div className="flex-start items-center gap-4">
-            <div>
-              <h1 className="text-heading-2">{welcomeMessage()}</h1>
-              <p className="text-caption mt-2">
-                Welcome back, {currentUser?.fullName || 'User'}! 
-                {userRole && (
-                  <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    {userRole.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
-                  </span>
-                )}
-              </p>
-            </div>
-          </div>
-          
-          <button 
-            onClick={handleRefreshAll}
-            className="btn btn-secondary btn-sm"
-            title="Refresh all dashboard data"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Refresh
-          </button>
-        </div>
+      <div className='container-lg section-md'>
+        <PageHeader
+          title={welcomeMessage()}
+          subtitle={
+            <>
+              Welcome back, {currentUser?.fullName || 'User'}!
+              {userRole && (
+                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {userRole.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
+                </span>
+              )}
+            </>
+          }
+        />
+
 
         {dashboardError && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -308,7 +287,7 @@ const Dashboard = () => {
 
         <div className='responsive-grid'>
           {metrics.map((metric, index) => (
-            <div 
+            <div
               key={index}
               className={`card-hover card-actions ${metric.color} ${metric.isAction ? 'cursor-pointer' : ''}`}
               onClick={() => handleMetricClick(metric)}
@@ -325,7 +304,7 @@ const Dashboard = () => {
           <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
           <div className="flex flex-wrap gap-4">
             <CanCreateTask>
-              <button 
+              <button
                 onClick={() => setShowCreateModal(true)}
                 className="btn btn-primary"
               >
@@ -337,7 +316,7 @@ const Dashboard = () => {
             </CanCreateTask>
 
             <ComplianceAccess>
-              <button 
+              <button
                 className="btn btn-secondary"
                 onClick={() => navigate('/tasks?status=COMPLIANCE_REVIEW')}
               >
@@ -349,7 +328,7 @@ const Dashboard = () => {
             </ComplianceAccess>
 
             <ManagerAccess>
-              <button 
+              <button
                 className="btn btn-outline"
                 onClick={() => navigate('/admin/user-management')}
               >
@@ -359,7 +338,7 @@ const Dashboard = () => {
                 Manage Team
               </button>
             </ManagerAccess>
- 
+
           </div>
         </div>
 
@@ -367,10 +346,10 @@ const Dashboard = () => {
           <div className="mt-8">
             <div className="flex-between items-center mb-4">
               <h2 className="text-heading-3">
-                Recent Activity 
+                Recent Activity
               </h2>
             </div>
-            
+
             <div className="card">
               <div className="card-body">
                 {isActivityLoading ? (
@@ -383,21 +362,21 @@ const Dashboard = () => {
                     {activityFeed.slice(0, 5).map((item, index) => {
                       const formattedItem = formatActivityItem(item);
                       const activityType = getActivityType(formattedItem.displayText);
-                      
+
                       return (
-                        <div 
-                          key={index} 
+                        <div
+                          key={index}
                           className="flex items-start gap-3 p-2 rounded-lg shadow-sm hover:bg-gray-50 transition-colors duration-200"
                         >
                           <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex-center ${activityType.bgColor} ${activityType.textColor}`}>
                             {activityType.icon}
                           </div>
-                          
+
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-gray-900">{formattedItem.displayText}</p>
                             <p className="text-xs text-gray-500 mt-1">{formattedItem.timeAgo}</p>
                           </div>
-                          
+
                           {activityType.badge && (
                             <span className={`badge ${activityType.badgeClass}`}>
                               {activityType.badge}
@@ -444,15 +423,15 @@ const Dashboard = () => {
             </div>
           </div>
         )}
-      </div>
 
-      <div className="mt-8">
-        <AdvancedTable/>
-      </div>
+        <div className="mt-8">
+          <AdvancedTable />
+        </div>
+      </div >
 
       {showCreateModal && permissions.canCreateTask && (
-        <CreateNewAdTask 
-          onClose={() => setShowCreateModal(false)} 
+        <CreateNewAdTask
+          onClose={() => setShowCreateModal(false)}
           onSuccess={handleTaskCreated}
         />
       )}

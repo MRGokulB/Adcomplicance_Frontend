@@ -1,11 +1,12 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
+import {
   useGetNotificationsQuery,
   useGetCountsQuery,
   useMarkAsReadMutation,
   useMarkAllAsReadMutation,
 } from '../../redux/api/notificationsApi';
+import PageHeader from '../common/PageHeader';
 
 const Notifications = () => {
   const navigate = useNavigate();
@@ -24,18 +25,18 @@ const Notifications = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
-  
+
   const notificationsParams = useMemo(() => ({
     page,
     limit,
     isRead: filter === 'all' ? undefined : filter === 'read' ? true : false
   }), [page, limit, filter]);
 
-  const { 
-    data: notificationsData, 
-    isLoading, 
+  const {
+    data: notificationsData,
+    isLoading,
     error,
-    refetch 
+    refetch
   } = useGetNotificationsQuery(notificationsParams, {
     pollingInterval: isPageVisible ? 30000 : 0,
     refetchOnMountOrArgChange: 180,
@@ -50,8 +51,8 @@ const Notifications = () => {
   const [markAsRead] = useMarkAsReadMutation();
   const [markAllAsRead] = useMarkAllAsReadMutation();
 
-  const notifications = useMemo(() => 
-    notificationsData?.notifications || [], 
+  const notifications = useMemo(() =>
+    notificationsData?.notifications || [],
     [notificationsData?.notifications]
   );
 
@@ -60,8 +61,8 @@ const Notifications = () => {
     unread: counts?.unread ?? notificationsData?.unreadCount ?? 0,
   }), [counts, notificationsData]);
 
-  const pagination = useMemo(() => 
-    notificationsData?.pagination || {}, 
+  const pagination = useMemo(() =>
+    notificationsData?.pagination || {},
     [notificationsData?.pagination]
   );
 
@@ -154,7 +155,7 @@ const Notifications = () => {
     const now = new Date();
     const notificationTime = new Date(timestamp);
     const diffInMinutes = Math.floor((now - notificationTime) / (1000 * 60));
-    
+
     if (diffInMinutes < 1) return 'Just now';
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
     if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
@@ -195,36 +196,25 @@ const Notifications = () => {
 
   return (
     <div className="container-lg section-md">
-      <div className="flex-between items-center mb-6">
-        <div>
-          <h1 className="text-heading-2">Notifications</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Stay updated with your task activities and system notifications
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {summary.unread > 0 && (
+      <PageHeader
+        title="Notifications"
+        subtitle="Stay updated with your task activities and system notifications"
+        actions={
+          summary.unread > 0 && (
             <button onClick={handleMarkAllAsRead} className="btn btn-primary btn-sm">
               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
               Mark All Read
             </button>
-          )}
-          <button onClick={refetch} className="btn btn-outline btn-sm">
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Refresh
-          </button>
-        </div>
-      </div>
+          )
+        }
+      />
 
       <div className="tabs mb-6">
         <div
-          className={`tab flex items-center gap-2 cursor-pointer ${
-            filter === 'all' ? 'tab-active' : 'tab-inactive'
-          }`}
+          className={`tab flex items-center gap-2 cursor-pointer ${filter === 'all' ? 'tab-active' : 'tab-inactive'
+            }`}
           onClick={() => handleFilterChange('all')}
         >
           <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
@@ -234,9 +224,8 @@ const Notifications = () => {
           )}
         </div>
         <div
-          className={`tab flex items-center gap-2 cursor-pointer ${
-            filter === 'unread' ? 'tab-active' : 'tab-inactive'
-          }`}
+          className={`tab flex items-center gap-2 cursor-pointer ${filter === 'unread' ? 'tab-active' : 'tab-inactive'
+            }`}
           onClick={() => handleFilterChange('unread')}
         >
           <div className="w-2 h-2 bg-red-500 rounded-full"></div>
@@ -246,9 +235,8 @@ const Notifications = () => {
           )}
         </div>
         <div
-          className={`tab flex items-center gap-2 cursor-pointer ${
-            filter === 'read' ? 'tab-active' : 'tab-inactive'
-          }`}
+          className={`tab flex items-center gap-2 cursor-pointer ${filter === 'read' ? 'tab-active' : 'tab-inactive'
+            }`}
           onClick={() => handleFilterChange('read')}
         >
           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -276,8 +264,8 @@ const Notifications = () => {
                   {filter === 'unread' ? "You're all caught up!" : 'No notifications'}
                 </h3>
                 <p className="text-gray-500">
-                  {filter === 'unread' 
-                    ? "All your notifications have been read." 
+                  {filter === 'unread'
+                    ? "All your notifications have been read."
                     : 'No notifications to display at the moment.'
                   }
                 </p>
@@ -287,26 +275,24 @@ const Notifications = () => {
                 {notifications.map(notification => (
                   <div
                     key={notification.id}
-                    className={`p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
-                      !notification.isRead 
-                        ? 'bg-blue-50 border-blue-200 hover:bg-blue-100' 
-                        : 'bg-white border-gray-200 hover:bg-gray-50'
-                    }`}
+                    className={`p-4 border rounded-lg cursor-pointer transition-all duration-200 ${!notification.isRead
+                      ? 'bg-blue-50 border-blue-200 hover:bg-blue-100'
+                      : 'bg-white border-gray-200 hover:bg-gray-50'
+                      }`}
                     onClick={() => handleOpenNotification(notification)}
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex-shrink-0">
                         {getNotificationIcon(notification.type)}
                       </div>
-                      
+
                       <div className="flex-1 min-w-0">
                         <div className="flex-between items-start mb-2">
-                          <h4 className={`text-sm font-semibold ${
-                            !notification.isRead ? 'text-blue-900' : 'text-gray-900'
-                          }`}>
+                          <h4 className={`text-sm font-semibold ${!notification.isRead ? 'text-blue-900' : 'text-gray-900'
+                            }`}>
                             {notification.title}
                           </h4>
-                          
+
                           {!notification.isRead && (
                             <button
                               onClick={(e) => {
@@ -323,22 +309,21 @@ const Notifications = () => {
                             </button>
                           )}
                         </div>
-                        
+
                         <p className="text-xs text-gray-500 mb-2">
                           {getNotificationTypeLabel(notification.type)} • {formatTimeAgo(notification.createdAt)}
                         </p>
-                        
-                        <p className={`text-sm mb-3 ${
-                          !notification.isRead ? 'text-blue-800' : 'text-gray-700'
-                        }`}>
+
+                        <p className={`text-sm mb-3 ${!notification.isRead ? 'text-blue-800' : 'text-gray-700'
+                          }`}>
                           {notification.message}
                         </p>
-                        
+
                         {notification.taskId && (
                           <button
-                            onClick={(e) => { 
-                              e.stopPropagation(); 
-                              handleOpenNotification(notification); 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenNotification(notification);
                             }}
                             className="btn btn-primary btn-sm"
                           >

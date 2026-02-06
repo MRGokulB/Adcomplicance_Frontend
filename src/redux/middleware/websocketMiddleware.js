@@ -1,5 +1,6 @@
 import { io } from 'socket.io-client'
 import { notificationsApi } from '../api/notificationsApi'
+import { notify } from '../../utils/toast'
 
 let socket = null
 let reconnectTimer = null
@@ -21,6 +22,7 @@ const connect = (store) => {
   })
 
   socket.on('connect', () => {
+    console.log('✅ WebSocket connected successfully');
     if (reconnectTimer) {
       clearTimeout(reconnectTimer)
       reconnectTimer = null
@@ -32,6 +34,8 @@ const connect = (store) => {
   }
 
   socket.on('notification:new', (data) => {
+    console.log('🔔 New notification received via WebSocket:', data);
+
     // 1. Optimistically add to 'getNotifications' list
     store.dispatch(
       notificationsApi.util.updateQueryData('getNotifications', { page: 1, limit: 20 }, (draft) => {
@@ -48,7 +52,12 @@ const connect = (store) => {
         draft.total += 1;
       })
     );
-    // 3. Invalidate only if we couldn't optimistic update (fallback)
+
+    // 3. Show Toast!
+    console.log('🍞 Showing toast for:', data.message || 'New Notification');
+    notify.info(data.message || 'New Notification');
+
+    // 4. Invalidate only if we couldn't optimistic update (fallback)
     invalidate();
   })
 

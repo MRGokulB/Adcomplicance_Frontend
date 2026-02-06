@@ -2,17 +2,18 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUserRole, selectIsAuthenticated } from '../../redux/slices/authSlice';
 import { hasPermission, PERMISSIONS } from '../../utils/roles';
-import { 
+import {
   useGetAuditLogsQuery,
   useGetAuditStatsQuery,
   useLazyExportAuditDataQuery,
 } from '../../redux/api/auditApi';
 import { useGetUsersQuery } from '../../redux/api/usersApi';
+import PageHeader from '../common/PageHeader';
 
 const AuditLog = () => {
   const userRole = useSelector(selectUserRole);
   const isAuthenticated = useSelector(selectIsAuthenticated);
-    
+
   const [uiFilters, setUiFilters] = useState({
     page: 1,
     limit: 50,
@@ -53,9 +54,9 @@ const AuditLog = () => {
     );
   }
 
-   const { 
-    data: auditData, 
-    isLoading: isAuditLoading, 
+  const {
+    data: auditData,
+    isLoading: isAuditLoading,
     error: auditError,
     refetch: refetchAudit,
     isFetching
@@ -64,20 +65,20 @@ const AuditLog = () => {
     refetchOnMountOrArgChange: true,
   });
 
-  const { 
-    data: statsData, 
-    isLoading: isStatsLoading 
+  const {
+    data: statsData,
+    isLoading: isStatsLoading
   } = useGetAuditStatsQuery({
     dateFrom: appliedFilters.dateFrom,
     dateTo: appliedFilters.dateTo,
   }, {
-    pollingInterval: 300000,  
+    pollingInterval: 300000,
   });
 
   const { data: usersData } = useGetUsersQuery({ limit: 100 });
   const [exportAuditData] = useLazyExportAuditDataQuery();
 
-   const handleFilterChange = (field, value) => {
+  const handleFilterChange = (field, value) => {
     setUiFilters(prev => ({
       ...prev,
       [field]: value,
@@ -93,14 +94,14 @@ const AuditLog = () => {
   };
 
   const hasActiveFilters = useCallback(() => {
-    return uiFilters.dateFrom || uiFilters.dateTo || uiFilters.action || 
-           uiFilters.performedBy || uiFilters.taskId;
+    return uiFilters.dateFrom || uiFilters.dateTo || uiFilters.action ||
+      uiFilters.performedBy || uiFilters.taskId;
   }, [uiFilters]);
 
   const applyFilters = useCallback(() => {
     setAppliedFilters({
       ...uiFilters,
-      page: 1 
+      page: 1
     });
   }, [uiFilters]);
 
@@ -128,9 +129,9 @@ const AuditLog = () => {
         performedBy: appliedFilters.performedBy,
         action: appliedFilters.action,
       };
-      
+
       const result = await exportAuditData(exportParams).unwrap();
-      
+
       const exportData = result.data || [];
       let fileContent;
       let mimeType;
@@ -139,10 +140,10 @@ const AuditLog = () => {
       if (format === 'csv') {
         if (exportData.length > 0) {
           const headers = Object.keys(exportData[0]).join(',');
-          const rows = exportData.map(row => 
-            Object.values(row).map(value => 
-              typeof value === 'string' && (value.includes(',') || value.includes('"')) 
-                ? `"${value.replace(/"/g, '""')}"` 
+          const rows = exportData.map(row =>
+            Object.values(row).map(value =>
+              typeof value === 'string' && (value.includes(',') || value.includes('"'))
+                ? `"${value.replace(/"/g, '""')}"`
                 : value
             ).join(',')
           );
@@ -157,7 +158,7 @@ const AuditLog = () => {
         mimeType = 'application/json';
         fileExtension = 'json';
       }
-      
+
       const blob = new Blob([fileContent], { type: mimeType });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -237,8 +238,8 @@ const AuditLog = () => {
     })) || [];
 
     const actionTypes = [
-      'TASK_CREATED', 'TASK_UPDATED', 'TASK_APPROVED', 'TASK_REJECTED', 
-      'TASK_PUBLISHED', 'VERSION_UPLOADED', 'COMMENT_ADDED', 
+      'TASK_CREATED', 'TASK_UPDATED', 'TASK_APPROVED', 'TASK_REJECTED',
+      'TASK_PUBLISHED', 'VERSION_UPLOADED', 'COMMENT_ADDED',
       'USER_LOGIN', 'USER_LOGOUT', 'EXCHANGE_APPROVAL_UPDATED'
     ];
 
@@ -255,37 +256,38 @@ const AuditLog = () => {
 
   return (
     <div className="container-lg section-md">
-      <div className="flex-between items-center mb-6">
-        <div>
-          <h1 className="text-heading-1">Audit Log Viewer</h1>
-          <p className="text-body text-gray-600 mt-1">
+      <PageHeader
+        title="Audit Log"
+        subtitle={
+          <>
             Track every meaningful action for compliance, accountability, and traceability
             {isFetching && <span className="ml-2 text-blue-600">• Updating...</span>}
-          </p>
-        </div>
-        
-        {canExportAudit && (
-          <div className="flex gap-2">
-            <button 
-              onClick={() => handleExport('csv')}
-              className="btn btn-outline"
-              disabled={!auditLogs.length}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-              Export CSV
-            </button>
-            <button 
-              onClick={() => handleExport('json')}
-              className="btn btn-secondary"
-              disabled={!auditLogs.length}
-            >
-              Export JSON
-            </button>
-          </div>
-        )}
-      </div>
+          </>
+        }
+        actions={
+          canExportAudit && (
+            <>
+              <button
+                onClick={() => handleExport('csv')}
+                className="btn btn-outline"
+                disabled={!auditLogs.length}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export CSV
+              </button>
+              <button
+                onClick={() => handleExport('json')}
+                className="btn btn-secondary"
+                disabled={!auditLogs.length}
+              >
+                Export JSON
+              </button>
+            </>
+          )
+        }
+      />
 
       {showError && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -298,14 +300,14 @@ const AuditLog = () => {
               <p className="text-sm text-red-700 mt-1">
                 {auditError?.data?.message || 'Failed to fetch audit logs. The Task ID might be invalid or the server is unavailable.'}
               </p>
-              <button 
+              <button
                 onClick={refetchAudit}
                 className="mt-2 text-sm text-red-800 underline hover:no-underline"
               >
                 Try again
               </button>
             </div>
-            <button 
+            <button
               onClick={resetFilters}
               className="ml-4 text-sm text-red-600 hover:text-red-800"
             >
@@ -354,7 +356,7 @@ const AuditLog = () => {
 
       <div className="filter-panel ">
         <div className="card-header">
-          <h3 className="card-title">Filters</h3> 
+          <h3 className="card-title">Filters</h3>
         </div>
         <div className="card-body">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -409,7 +411,7 @@ const AuditLog = () => {
 
             <div>
               <label className="exchange-form-label">
-                Task UIN 
+                Task UIN
               </label>
               <input
                 type="text"
@@ -417,7 +419,7 @@ const AuditLog = () => {
                 placeholder="e.g., AOL-20251009 or full UIN"
                 value={uiFilters.taskId}
                 onChange={(e) => handleFilterChange('taskId', e.target.value)}
-              /> 
+              />
             </div>
           </div>
 
@@ -425,14 +427,14 @@ const AuditLog = () => {
             <div className="text-sm text-gray-600">
               {hasActiveFilters() && (
                 <span>
-                  Active filters: {Object.keys(uiFilters).filter(key => 
+                  Active filters: {Object.keys(uiFilters).filter(key =>
                     key !== 'page' && key !== 'limit' && uiFilters[key]
                   ).map(key => key.replace(/([A-Z])/g, ' $1').trim()).join(', ')}
                 </span>
               )}
             </div>
             <div className="flex gap-3">
-              <button 
+              <button
                 className="btn btn-secondary"
                 onClick={resetFilters}
                 disabled={!hasActiveFilters()}
@@ -442,7 +444,7 @@ const AuditLog = () => {
                 </svg>
                 Reset
               </button>
-              <button 
+              <button
                 className="btn btn-primary"
                 onClick={applyFilters}
                 disabled={!hasUnappliedChanges}
@@ -499,7 +501,7 @@ const AuditLog = () => {
                     <td>
                       <span className="font-medium text-gray-900">
                         {log.performedBy?.name || 'System'}
-                      </span> 
+                      </span>
                     </td>
                     <td>
                       <span className={getRoleBadgeClass(log.performedBy?.role)}>
@@ -539,7 +541,7 @@ const AuditLog = () => {
                 </svg>
                 <h3 className="table-empty-title">No Audit Logs Found</h3>
                 <p className="table-empty-description">
-                  {appliedFilters.taskId 
+                  {appliedFilters.taskId
                     ? `No audit logs found for Task UIN containing "${appliedFilters.taskId}". Try a different search term.`
                     : 'No audit logs match the current filters. Try adjusting your search criteria.'}
                 </p>

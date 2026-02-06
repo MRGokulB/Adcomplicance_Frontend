@@ -12,6 +12,7 @@ import { uploadApi } from './api/uploadApi'
 import { reportsApi } from './api/reportsApi'
 import { auditApi } from './api/auditApi'
 import { websocketMiddleware } from './middleware/websocketMiddleware'
+import { rtkQueryErrorLogger } from './middleware/errorLogger'
 
 const apiReducers = {
   [authApi.reducerPath]: authApi.reducer,
@@ -39,7 +40,7 @@ export const store = configureStore({
     getDefaultMiddleware({
       serializableCheck: {
         ignoredActions: [
-          'persist/PERSIST', 
+          'persist/PERSIST',
           'persist/REHYDRATE',
           'tasksApi/subscriptions/updateSubscriptionOptions',
         ],
@@ -64,7 +65,8 @@ export const store = configureStore({
       .concat(uploadApi.middleware)
       .concat(reportsApi.middleware)
       .concat(auditApi.middleware)
-      .concat(websocketMiddleware),
+      .concat(websocketMiddleware)
+      .concat(rtkQueryErrorLogger),
   devTools: process.env.NODE_ENV !== 'production',
 })
 
