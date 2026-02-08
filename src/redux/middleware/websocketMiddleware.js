@@ -9,7 +9,11 @@ let initialized = false
 const connect = (store) => {
   if (socket) return
 
-  const wsUrl = import.meta.env.VITE_WS_URL || (import.meta.env.VITE_API_URL || 'http://localhost:5000')
+  let wsUrl = (import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL || 'http://localhost:5000').trim();
+
+  if (wsUrl.startsWith('http')) {
+    wsUrl = wsUrl.replace(/^http/, 'ws');
+  }
 
   socket = io(wsUrl, {
     transports: ['websocket', 'polling'],
