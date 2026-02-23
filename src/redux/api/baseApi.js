@@ -63,6 +63,10 @@ export const createBaseQuery = (baseUrl) => {
 
       if (success) {
         result = await baseQuery(args, api, extraOptions);
+
+        if (result?.error?.status === 401) {
+          api.dispatch({ type: 'auth/logout' });
+        }
       }
     }
 
